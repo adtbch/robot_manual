@@ -53,24 +53,31 @@ void serialEmergencyStop() {
 // ============================================================
 
 void serialCommandsTick() {
-    // Process commands from Serial1 (Master)
-    if (Serial1.available()) {
-        char buf1[64];
-        size_t len1 = Serial1.readBytesUntil('\n', buf1, sizeof(buf1) - 1);
-        buf1[len1] = '\0';
+    // Process commands from Serial1 (Master) non-blocking
+    static char buf1[64];
+    static size_t pos = 0;
 
-        // Expected format: vx vy w [durationMs]
-        int vx, vy, w;
-        unsigned long dur = 0;
-        int parsed = sscanf(buf1, "%d %d %d %lu", &vx, &vy, &w, &dur);
+    while (Serial1.available() > 0) {
+        char c = Serial1.read();
 
-        if (parsed >= 3) {
-            // Default durasi panjang jika tidak ditentukan
-            if (parsed == 3) dur = 2000;
+        if (c == '\n' || c == '\r') {
+            if (pos > 0) {
+                buf1[pos] = '\0';
 
-            // Panggil gerakan kinematik field-centric
-            serialContinuousStop();
-            serialTestFieldCentric(vx, vy, w, dur);
+                // Expected format: vx vy w [durationMs]
+                int vx, vy, w;
+                unsigned long dur = 2000; // Default safety timeout
+                int parsed = sscanf(buf1, "%d %d %d %lu", &vx, &vy, &w, &dur);
+
+                if (parsed >= 3) {
+                    // Panggil gerakan kinematik field-centric
+                    serialContinuousStop();
+                    serialTestFieldCentric(vx, vy, w, dur);
+                }
+                pos = 0; // Reset buffer
+            }
+        } else if (pos < sizeof(buf1) - 1) {
+            buf1[pos++] = c;
         }
     }
 
