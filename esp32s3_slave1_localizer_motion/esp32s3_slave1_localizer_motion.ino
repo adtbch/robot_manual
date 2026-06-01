@@ -89,26 +89,25 @@ void loop() {
   // Terima request status dari Master
   if (SerialMaster::isStatusRequested()) {
     Serial.println("[MASTER RX] Status requested");
-    
-    // Kirim status RPM motor
+
     SerialMaster::sendStatusReply(
-      rpmMotorDepanKanan,
-      rpmMotorDepanKiri,
-      rpmMotorBelakangKanan,
-      rpmMotorBelakangKiri,
-      0x00  // Status byte (bisa diisi dengan flag status)
+      (uint16_t)abs(getEncoderVelocityRpm(0)),
+      (uint16_t)abs(getEncoderVelocityRpm(1)),
+      (uint16_t)abs(getEncoderVelocityRpm(2)),
+      (uint16_t)abs(getEncoderVelocityRpm(3)),
+      0x00
     );
   }
   
   // Kirim status RPM secara periodik (setiap 500ms)
   if (now - gLastStatusSendMs >= 500) {
     gLastStatusSendMs = now;
-    
+
     SerialMaster::sendStatusReply(
-      rpmMotorDepanKanan,
-      rpmMotorDepanKiri,
-      rpmMotorBelakangKanan,
-      rpmMotorBelakangKiri,
+      (uint16_t)abs(getEncoderVelocityRpm(0)),
+      (uint16_t)abs(getEncoderVelocityRpm(1)),
+      (uint16_t)abs(getEncoderVelocityRpm(2)),
+      (uint16_t)abs(getEncoderVelocityRpm(3)),
       0x00
     );
   }

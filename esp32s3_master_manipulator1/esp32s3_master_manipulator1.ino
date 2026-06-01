@@ -7,6 +7,8 @@
 // 3. Menerima status dari Slave1 via Serial
 // ============================================================
 
+#include "robot_config.h"
+
 static EspNowControlPacket gLastRxPacket = {};
 static uint32_t gLastSerialSendMs = 0;
 static uint32_t gLastStatusRequestMs = 0;

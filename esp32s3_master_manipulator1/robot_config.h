@@ -108,3 +108,45 @@ inline bool isButtonPressed(uint32_t buttons, uint32_t buttonMask) {
 // if (isButtonPressed(packet.buttons, BTN_CROSS)) {
 //     Serial.println("Button X ditekan!");
 // }
+
+// ============================================================
+// Serial Slave1 Communication Declarations
+// ============================================================
+
+namespace SerialSlave1 {
+  // Struktur data paket (HARUS didefinisikan di header untuk digunakan di main file)
+  typedef struct __attribute__((packed)) {
+    uint8_t header1;
+    uint8_t header2;
+    uint8_t cmdId;
+    uint16_t rpmMotor1;
+    uint16_t rpmMotor2;
+    uint16_t rpmMotor3;
+    uint16_t rpmMotor4;
+    uint8_t status;
+    uint8_t checksum;
+    uint8_t footer;
+  } StatusReplyPacket;
+
+  typedef struct __attribute__((packed)) {
+    uint8_t header1;
+    uint8_t header2;
+    uint8_t cmdId;
+    float posX;
+    float posY;
+    float heading;
+    uint8_t checksum;
+    uint8_t footer;
+  } OdometryDataPacket;
+
+  // Function declarations
+  bool serialSlave1Init();
+  void serialSlave1Tick();
+  bool sendMotorControl(int16_t vx, int16_t vy, int16_t vtheta);
+  bool sendMotorStop();
+  bool sendStatusRequest();
+  bool getStatus(StatusReplyPacket &outStatus);
+  bool getOdometry(OdometryDataPacket &outOdometry);
+  bool isLinkAlive();
+  void printStats();
+}

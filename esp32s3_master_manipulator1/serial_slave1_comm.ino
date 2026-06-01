@@ -62,31 +62,8 @@ typedef struct __attribute__((packed)) {
   uint8_t footer;       // 0xFF
 } MotorStopPacket;
 
-// Paket Slave1 -> Master: Status Reply
-typedef struct __attribute__((packed)) {
-  uint8_t header1;      // 0xAA
-  uint8_t header2;      // 0x55
-  uint8_t cmdId;        // CMD_STATUS_REPLY
-  uint16_t rpmMotor1;   // RPM motor 1
-  uint16_t rpmMotor2;   // RPM motor 2
-  uint16_t rpmMotor3;   // RPM motor 3
-  uint16_t rpmMotor4;   // RPM motor 4
-  uint8_t status;       // Status byte (bit flags)
-  uint8_t checksum;     // XOR checksum
-  uint8_t footer;       // 0xFF
-} StatusReplyPacket;
-
-// Paket Slave1 -> Master: Odometry Data
-typedef struct __attribute__((packed)) {
-  uint8_t header1;      // 0xAA
-  uint8_t header2;      // 0x55
-  uint8_t cmdId;        // CMD_ODOMETRY_DATA
-  float posX;           // Posisi X (meter)
-  float posY;           // Posisi Y (meter)
-  float heading;        // Heading (radian)
-  uint8_t checksum;     // XOR checksum
-  uint8_t footer;       // 0xFF
-} OdometryDataPacket;
+// NOTE: StatusReplyPacket dan OdometryDataPacket sudah didefinisikan di robot_config.h
+// Tidak perlu didefinisikan ulang di sini untuk menghindari duplicate typedef error
 
 // ============================================================
 // VARIABEL GLOBAL
