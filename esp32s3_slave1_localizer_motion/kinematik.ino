@@ -1,13 +1,13 @@
-// Batas performa motor Anda (Sesuaikan nilainya)
-const int kinematicMaxrpm = 150; 
+// Batas performa motor Anda (Bisa dimaksimalkan hingga maxrpm di robot_config)
+const int kinematicMaxrpm = 500;
 
 // 1. ROBOT-CENTRIC (Maju/Geser berdasarkan arah badan robot)
 void driveRobotCentric(int vx, int vy, int vtheta) {
   // Rumus standar kinematik balik Mecanum Wheel
   int rpm1 = vx + vy - vtheta; // Depan Kiri
-  int rpm2 = -vx + vy + vtheta; // Depan Kanan
+  int rpm2 = vx + vy + vtheta; // Depan Kanan
   int rpm3 = vx + vy + vtheta; // Belakang Kiri
-  int rpm4 = -vx + vy - vtheta; // Belakang Kanan
+  int rpm4 = vx + vy - vtheta; // Belakang Kanan
 
   skalaKecepatan(rpm1, rpm2, rpm3, rpm4);
 }
@@ -36,4 +36,8 @@ void skalaKecepatan(int motor1, int motor2, int motor3, int motor4) {
   // Kirim hasil akhir ke fungsi driver motor Anda
   // Pastikan urutan parameter sesuai dengan urutan fisik roda robot Anda
   rpmMotor(motor1, motor2, motor3, motor4); 
+  // pwmMotor(0, motor1); // Motor 1 - Depan Kiri
+  // pwmMotor(1, motor2); // Motor 2 - Depan Kanan
+  // pwmMotor(2, motor3); // Motor 3 - Belakang Kiri
+  // pwmMotor(3, motor4); // Motor 4 - Belakang Kanan
 }

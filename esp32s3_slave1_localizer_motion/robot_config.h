@@ -3,6 +3,8 @@
 #include <vector> // Tambahkan header untuk std::vector
 #include <Preferences.h>
 
+#include "MPU6050_6Axis_MotionApps20.h"
+
 // ============================================================
 // PID & NVS Configuration
 // ============================================================
@@ -78,6 +80,7 @@ typedef struct {
 	double integral;
 	double derivative;
 	double previousError;
+	double previousInput;
 	unsigned long lastTime;
 } PIDData;
 
@@ -157,8 +160,8 @@ const float maxrpm = 500.0f;
 // ============================================================
 // PIN sda/scl untuk I2C (jika diperlukan, misal untuk IMU)
 // ============================================================
-#define sdaPin 13
-#define sclPin  14
+const int sdaPin = 13;
+const int sclPin = 14;
 
 // ============================================================
 // PIN Serial 1 untuk komunikasi dengan ESP32 Master 
@@ -220,3 +223,8 @@ bool espNowControlInit();
 void espNowControlTick();
 bool espNowControlReadPacket(EspNowControlPacket &outPacket);
 bool espNowControlIsLinkAlive();
+
+extern float yawDeg;
+extern float pitchDeg;
+extern float rollDeg;
+#define INTERRUPT_PIN 46

@@ -52,15 +52,35 @@ double computePID(int index, double setpoint, double input, double Kp, double Ki
   }
   pidData[index].lastTime = currentTime;
 
-  // Accumulate integral (discrete sum)
+  // DYNAMIC SETPOINT WEIGHTING (2-DOF PID) - Mencegah lonjakan (Spike) awal
+  // Memberikan bobot Kp yang lebih lembut saat selisih (error) masih besar/jauh dari target.
+  double errorRatio = abs(pidData[index].error) / max(abs(setpoint), 1.0);
+  double dynamicWeight = 0.8; // Default weight untuk jarak jauh (menghaluskan hentakan)
+
+  if (errorRatio < 0.5) {
+    // Transisi membesar kembali ke 1.0 (kekuatan penuh) saat sudah dekat target
+    double transitionRatio = errorRatio / 0.5;
+    dynamicWeight = 1.0 - (0.2 * transitionRatio);
+  }
+
+  // Hitung Term P menggunakan Setpoint Weighting
+  double errorP = (dynamicWeight * setpoint) - input;
+  double pTerm = Kp * errorP;
+
+  // Accumulate integral (discrete sum menggunakan full error)
   pidData[index].integral += pidData[index].error;
   pidData[index].integral = constrain(pidData[index].integral, Minintegral, Maxintegral);
 
   // Calculate derivative (discrete difference)
-  pidData[index].derivative = pidData[index].error - pidData[index].previousError;
+  // Derivative on Measurement (mencegah Derivative Kick saat target berubah mendadak)
+  double dTerm = 0.0;
+  if (pidData[index].previousInput != 0.0) {
+     dTerm = Kd * -(input - pidData[index].previousInput);
+  }
+  pidData[index].previousInput = input;
 
   // Compute final PID output
-  double output = Kp * pidData[index].error + Ki * pidData[index].integral + Kd * pidData[index].derivative;
+  double output = pTerm + (Ki * pidData[index].integral) + dTerm;
 
   // Save current error as previousError for the next computation cycle
   pidData[index].previousError = pidData[index].error;

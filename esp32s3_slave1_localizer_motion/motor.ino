@@ -87,7 +87,7 @@ void rpmMotor(int rpm1, int rpm2, int rpm3, int rpm4) {
             pwmMotorDepanKanan = (int)computePID(0, (double)rpm1, (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
             pwmMotorDepanKanan = constrain(pwmMotorDepanKanan, zeroPwm, maxPwm);
         } else if (rpm1 < 0) {
-            pwmMotorDepanKanan = (int)computePID(0, (double)abs(rpm1), (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
+            pwmMotorDepanKanan = (int)computePID(0, (double)abs(rpm1), (double)abs(currentRpm), kp, ki, kd, minintegral, maxintegral);
             pwmMotorDepanKanan = -pwmMotorDepanKanan;
             pwmMotorDepanKanan = constrain(pwmMotorDepanKanan, minPwm, zeroPwm);
         } else {
@@ -113,7 +113,7 @@ void rpmMotor(int rpm1, int rpm2, int rpm3, int rpm4) {
             pwmMotorDepanKiri = (int)computePID(1, (double)rpm2, (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
             pwmMotorDepanKiri = constrain(pwmMotorDepanKiri, zeroPwm, maxPwm);
         } else if (rpm2 < 0) {
-            pwmMotorDepanKiri = (int)computePID(1, (double)abs(rpm2), (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
+            pwmMotorDepanKiri = (int)computePID(1, (double)abs(rpm2), (double)abs(currentRpm), kp, ki, kd, minintegral, maxintegral);
             pwmMotorDepanKiri = -pwmMotorDepanKiri;
             pwmMotorDepanKiri = constrain(pwmMotorDepanKiri, minPwm, zeroPwm);
         } else {
@@ -139,7 +139,7 @@ void rpmMotor(int rpm1, int rpm2, int rpm3, int rpm4) {
             pwmMotorBelakangKanan = (int)computePID(2, (double)rpm3, (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
             pwmMotorBelakangKanan = constrain(pwmMotorBelakangKanan, zeroPwm, maxPwm);
         } else if (rpm3 < 0) {
-            pwmMotorBelakangKanan = (int)computePID(2, (double)abs(rpm3), (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
+            pwmMotorBelakangKanan = (int)computePID(2, (double)abs(rpm3), (double)abs(currentRpm), kp, ki, kd, minintegral, maxintegral);
             pwmMotorBelakangKanan = -pwmMotorBelakangKanan;
             pwmMotorBelakangKanan = constrain(pwmMotorBelakangKanan, minPwm, zeroPwm);
         } else {
@@ -165,7 +165,7 @@ void rpmMotor(int rpm1, int rpm2, int rpm3, int rpm4) {
             pwmMotorBelakangKiri = (int)computePID(3, (double)rpm4, (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
             pwmMotorBelakangKiri = constrain(pwmMotorBelakangKiri, zeroPwm, maxPwm);
         } else if (rpm4 < 0) {
-            pwmMotorBelakangKiri = (int)computePID(3, (double)abs(rpm4), (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
+            pwmMotorBelakangKiri = (int)computePID(3, (double)abs(rpm4), (double)abs(currentRpm), kp, ki, kd, minintegral, maxintegral);
             pwmMotorBelakangKiri = -pwmMotorBelakangKiri;
             pwmMotorBelakangKiri = constrain(pwmMotorBelakangKiri, minPwm, zeroPwm);
         } else {
