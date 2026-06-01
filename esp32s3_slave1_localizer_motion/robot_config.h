@@ -224,6 +224,23 @@ void espNowControlTick();
 bool espNowControlReadPacket(EspNowControlPacket &outPacket);
 bool espNowControlIsLinkAlive();
 
+// ============================================================
+// Serial Master Communication Declarations
+// ============================================================
+
+namespace SerialMaster {
+  // Function declarations
+  bool serialMasterInit();
+  void serialMasterTick();
+  bool getMotorCommand(int16_t &vx, int16_t &vy, int16_t &vtheta);
+  bool isStopRequested();
+  bool isStatusRequested();
+  bool sendStatusReply(uint16_t rpm1, uint16_t rpm2, uint16_t rpm3, uint16_t rpm4, uint8_t status);
+  bool sendOdometryData(float posX, float posY, float heading);
+  bool isLinkAlive();
+  void printStats();
+}
+
 extern float yawDeg;
 extern float pitchDeg;
 extern float rollDeg;
