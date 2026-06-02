@@ -18,7 +18,7 @@ struct EspNowRxStats {
 };
 
 struct EspNowReceiverState {
-  EspNowControlPacket latestPacket = {};
+  ControlPacket latestPacket = {};
   bool packetAvailable = false;
 
   bool isReady = false;
@@ -66,14 +66,14 @@ bool isNewSequence(uint16_t sequence) {
   return delta > 0 && delta < 32768;
 }
 
-void updatePacketFromIsr(const EspNowControlPacket &packet) {
+void updatePacketFromIsr(const ControlPacket &packet) {
   portENTER_CRITICAL(&espNowPacketMux);
   gEspNow.latestPacket = packet;
   gEspNow.packetAvailable = true;
   portEXIT_CRITICAL(&espNowPacketMux);
 }
 
-bool fetchPacket(EspNowControlPacket &outPacket) {
+bool fetchPacket(ControlPacket &outPacket) {
   bool hasPacket = false;
 
   portENTER_CRITICAL(&espNowPacketMux);
@@ -159,13 +159,13 @@ void onEspNowReceive(const uint8_t *macAddr, const uint8_t *data, int dataLen) {
     return;
   }
 
-  if (dataLen != (int)sizeof(EspNowControlPacket)) {
+  if (dataLen != (int)sizeof(ControlPacket)) {
     gEspNow.stats.rejectedLength++;
     return;
   }
 
-  EspNowControlPacket incoming = {};
-  memcpy(&incoming, data, sizeof(EspNowControlPacket));
+  ControlPacket incoming = {};
+  memcpy(&incoming, data, sizeof(ControlPacket));
 
   if (incoming.magic != ESPNOW_PACKET_MAGIC) {
     gEspNow.stats.rejectedMagic++;
@@ -222,7 +222,7 @@ void espNowControlTick() {
   printStatsIfDue();
 }
 
-bool espNowControlReadPacket(EspNowControlPacket &outPacket) {
+bool espNowControlReadPacket(ControlPacket &outPacket) {
   if (!gEspNow.isReady) {
     return false;
   }
