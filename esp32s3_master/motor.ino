@@ -1,10 +1,12 @@
 #include "robot_config.h"
-extern std::vector<PIDState> pidStates;
+
 // Motor config vector (definition)
 std::vector<MotorConfig> motors = {
     {motorAxisX_A, motorAxisX_B, 0},  
     {motorAxisY_A, motorAxisY_B, 1},   
 };
+
+// Motor state objects (definition)
 
 void SetupMotors() {
     for (size_t i = 0; i < motors.size(); i++) {
@@ -35,3 +37,9 @@ void pwmMotor(int idMotor, int pwmValue) {
         digitalWrite(motors[idMotor].pin_direction, LOW);
     }
 }
+
+void motorStopAll() {
+    for (size_t i = 0; i < motors.size(); i++) {
+        pwmMotor(i, 0);
+    }
+} 

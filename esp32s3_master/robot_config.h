@@ -38,8 +38,17 @@ const unsigned long espNowStatsIntervalMs = 1000;
 typedef struct {
 	uint8_t pin_direction;    // direction pin (OUTPUT, HIGH=maju LOW=mundur)
 	uint8_t pin_pwm;          // speed pin (LEDC PWM)
-	uint8_t ledc_channel;     // LEDC channel
+	uint8_t ledc_channel;     // LEDC channel              // apakah motor sedang dalam proses homing
 } MotorConfig;
+
+struct MotorState {
+	bool homing;
+};
+
+// Deklarasi objek motor state
+extern MotorState motorX;
+extern MotorState motorZ;
+
 
 typedef struct {
 	uint8_t encoderPinA;
@@ -80,8 +89,8 @@ extern std::vector<EncoderConfig> encoders;
 // ============================================================
 
 // Motor Depan (Front)
-#define motorAxisX_A  21
-#define motorAxisX_B  35
+#define motorAxisX_A  35
+#define motorAxisX_B  21
 #define encoderMotorAxisX_A 18
 #define encoderMotorAxisX_B 8
 #define limitSwitchAxisX  3
@@ -111,6 +120,16 @@ const int servoFrequency = 50;
 const int servoResolution = 14;
 
 // ============================================================
+// ARM CENTER POSITION CONFIGURATION (encoder counts)
+// ============================================================
+// Target encoder counts untuk posisi tengah setelah homing
+// Sesuaikan nilai ini dengan range pergerakan fisik arm Anda
+const long CENTER_POSITION_X = 1000;  // Target encoder count untuk axis X di tengah
+const long CENTER_POSITION_Z = 1000;  // Target encoder count untuk axis Z di tengah
+const int CENTER_POSITION_TOLERANCE = 50;  // Toleransi error positioning (counts)
+const int CENTER_MOVE_SPEED = 150;  // Kecepatan PWM untuk move to center
+
+// ============================================================
 // Shared function declarations
 // ============================================================
 void pwmMotor(int idMotor, int pwmValue);
@@ -119,3 +138,16 @@ bool espNowControlInit();
 void espNowControlTick();
 bool espNowControlReadPacket(EspNowControlPacket &outPacket);
 bool espNowControlIsLinkAlive();
+void setServoAngle(int idServo, int angle);
+void SetupMotors();
+void setupServos();
+void setupEncoders();
+void setupLimits();
+
+// Encoder functions
+void resetEncoderCount(uint8_t motorIndex);
+long getEncoderCount(uint8_t motorIndex);
+
+// Arm positioning functions
+bool setHoming();
+bool moveToCenter();

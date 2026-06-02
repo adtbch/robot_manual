@@ -5,9 +5,8 @@
 // ============================================================
 // Encoder config vector (definition)
 std::vector<EncoderConfig> encoders = {
-  {encoderMotorAxisX_A, encoderMotorAxisX_B, 0},  // 0: front_right_wheel
-  {encoderMotorAxisY_A, encoderMotorAxisY_B, 0},   // 1: front_left_wheel (biasanya dibalik)
- // 3: back_left_wheel (biasanya dibalik)
+  {encoderMotorAxisX_A, encoderMotorAxisX_B, 0},  // 0: motor axis X
+  {encoderMotorAxisY_A, encoderMotorAxisY_B, 0}   // 1: motor axis Y
 };
 
 
@@ -39,5 +38,21 @@ void setupEncoders() {
       CHANGE
     );
     }
+}
+
+// Reset encoder count untuk motor tertentu (setelah homing)
+void resetEncoderCount(uint8_t motorIndex) {
+  if (motorIndex >= encoders.size()) {
+    return;
+  }
+  encoders[motorIndex].count = 0;
+}
+
+// Baca posisi encoder motor tertentu
+long getEncoderCount(uint8_t motorIndex) {
+  if (motorIndex >= encoders.size()) {
+    return 0;
+  }
+  return encoders[motorIndex].count;
 }
 

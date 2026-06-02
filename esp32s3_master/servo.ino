@@ -1,15 +1,15 @@
 // KODE KHUSUS ARDUINO CORE ESP32 v2.x.x
 #include "robot_config.h" 
-// Motor config vector (definition)
-std::vector<servoConfig> servos = {
-    {servoRotation, 4}, 
-    {servoGrib, 5},   
-};/
+// Servo config vector (definition)
+std::vector<ServoConfig> servos = {
+    {servoRotation, 2}, 
+    {servoGrib, 3}
+};
 
 void setupServos() {
   for (size_t i = 0; i < servos.size(); i++) {
     ledcSetup(servos[i].ledc_channel, servoFrequency, servoResolution);
-    ledcAttachPin(servos[i].pin, servos[i].ledc_channel);
+    ledcAttachPin(servos[i].servoPin, servos[i].ledc_channel);
   }
 }
 
@@ -24,3 +24,4 @@ void setServoAngle(int idServo, int angle) {
   
   ledcWrite(servos[idServo].ledc_channel, duty);
 }
+
