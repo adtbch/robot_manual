@@ -90,24 +90,24 @@ typedef struct {
 	uint8_t ledc_channel; 
 } ServoConfig;
 
-typedef struct {
-	uint16_t magic;
-	int16_t x;
-	int16_t y;
-	int16_t w;
-	int8_t lx;
-	int8_t ly;
-	int8_t rx;
-	int8_t ry;
-	uint8_t l2Value;
-	uint8_t r2Value;
-	int16_t gyrX;
-	int16_t gyrY;
-	int16_t gyrZ;
-	uint32_t buttons;
-	uint16_t seq;
-	uint8_t connected;
-} EspNowControlPacket;
+struct __attribute__((packed)) ControlPacket {
+	uint16_t magic;      // Harus = ESPNOW_PACKET_MAGIC (0xA5B4)
+	int16_t x;           // Gerakan lateral    (+= kanan, -= kiri)
+	int16_t y;           // Gerakan maju/mundur (+= maju, -= mundur)
+	int16_t w;           // Rotasi             (+= CCW,  -= CW)
+	int8_t lx;           // Analog kiri  X
+	int8_t ly;           // Analog kiri  Y
+	int8_t rx;           // Analog kanan X
+	int8_t ry;           // Analog kanan Y
+	uint8_t l2Value;     // Trigger L2
+	uint8_t r2Value;     // Trigger R2
+	int16_t gyrX;        // Gyro sumbu X
+	int16_t gyrY;        // Gyro sumbu Y
+	int16_t gyrZ;        // Gyro sumbu Z
+	uint32_t buttons;    // Bitmask semua tombol
+	uint16_t seq;        // Nomor urut paket
+	uint8_t  connected;  // 1 = PS4 terhubung, 0 = disconnect
+};
 
 extern std::vector<MotorConfig> motors;
 extern std::vector<EncoderConfig> encoders;
@@ -143,7 +143,7 @@ void pwmMotor(int idMotor, int pwmValue);
 void motorStopAll();
 bool espNowControlInit();
 void espNowControlTick();
-bool espNowControlReadPacket(EspNowControlPacket &outPacket);
+bool espNowControlReadPacket(ControlPacket &outPacket);
 bool espNowControlIsLinkAlive();
 void setServoAngle(int idServo, int angle);
 void SetupMotors();

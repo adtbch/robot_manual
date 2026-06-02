@@ -1,7 +1,7 @@
 #include "robot_config.h"
 
 // Paket terakhir untuk debugging/manual processing.
-static EspNowControlPacket gLastRxPacket = {};
+static ControlPacket gLastRxPacket = {};
 
 void setup() {
   Serial.begin(115200);
@@ -10,7 +10,7 @@ void setup() {
   setupEncoders();
   setupLimits();
   
-  // Step 1: Homing process
+// Step 1: Homing process
   Serial.println("Starting homing...");
   while (!setHoming()) {
     Serial.println("Homing in progress...");
@@ -54,11 +54,21 @@ void loop() {
 
   // 3) Example: consume ESP-NOW packet (optional, for debugging)
   if (espNowControlReadPacket(gLastRxPacket)) {
-    Serial.printf("RX seq=%u x=%d y=%d w=%d connected=%u\n",
-                  gLastRxPacket.seq,
-                  gLastRxPacket.x,
-                  gLastRxPacket.y,
-                  gLastRxPacket.w,
-                  gLastRxPacket.connected);
+    // Throttle: cetak tiap 20 paket (~500ms) agar Serial Monitor tidak spam
+    static uint32_t rxPrintCounter = 0;
+    rxPrintCounter++;
+    if (rxPrintCounter % 20 == 1) {
+      Serial.printf("[ESPNOW-RX] seq=%u x=%d y=%d w=%d lx=%d ly=%d l2=%u r2=%u btn=%lu conn=%d\n",
+                    gLastRxPacket.seq,
+                    gLastRxPacket.x,
+                    gLastRxPacket.y,
+                    gLastRxPacket.w,
+                    gLastRxPacket.lx,
+                    gLastRxPacket.ly,
+                    gLastRxPacket.l2Value,
+                    gLastRxPacket.r2Value,
+                    (unsigned long)gLastRxPacket.buttons,
+                    gLastRxPacket.connected);
+    }
   }
 }
