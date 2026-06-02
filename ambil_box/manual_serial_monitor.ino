@@ -8,7 +8,7 @@
 
 String serialMonInput = "";
 bool serialMonComplete = false;
-int manualDefaultSpeed = 200;
+int manualDefaultSpeed = 450;
 
 enum ManualAction {
   ACTION_NONE,

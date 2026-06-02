@@ -31,7 +31,7 @@ unsigned long lastStatusUpdate = 0;
 const unsigned long STATUS_INTERVAL = 1000; // Update status setiap 1 detik
 
 void setup() {
-  // ====== EMERGENCY SAFETY: Force ALL motor pins to SAFE STATE immediately ======
+  // ====== EMERGENCY SAFETY: Force ALL motor PWM pins LOW immediately ======
   pinMode(MOTOR_PUTAR_RPWM, OUTPUT);
   pinMode(MOTOR_PUTAR_LPWM, OUTPUT);
   pinMode(MOTOR_NAIK_TURUN_RPWM, OUTPUT);
@@ -46,11 +46,41 @@ void setup() {
   digitalWrite(MOTOR_MAJU_MUNDUR_RPWM, LOW);
   digitalWrite(MOTOR_MAJU_MUNDUR_LPWM, LOW);
   
-  delay(500); // Give time for motor driver to stabilize
+  delay(50);
+  
+  digitalWrite(MOTOR_PUTAR_RPWM, LOW);
+  digitalWrite(MOTOR_PUTAR_LPWM, LOW);
+  digitalWrite(MOTOR_NAIK_TURUN_RPWM, LOW);
+  digitalWrite(MOTOR_NAIK_TURUN_LPWM, LOW);
+  digitalWrite(MOTOR_MAJU_MUNDUR_RPWM, LOW);
+  digitalWrite(MOTOR_MAJU_MUNDUR_LPWM, LOW);
   // =============================================================================
   
   // Inisialisasi Serial Monitor
   Serial.begin(115200);
+  delay(200);
+  
+  Serial.println("\n\n========================================");
+  Serial.println("    SISTEM ARM BOX - SAFETY CHECK");
+  Serial.println("========================================");
+  
+#if defined(ESP32)
+  Serial.println("Board: ESP32 DETECTED");
+  Serial.print("PWM Resolution: ");
+  Serial.print(MOTOR_PWM_RESOLUTION);
+  Serial.println(" bit");
+  Serial.print("PWM Frequency: ");
+  Serial.print(MOTOR_PWM_FREQ);
+  Serial.println(" Hz");
+#else
+  Serial.println("WARNING: ESP32 NOT DETECTED!");
+  Serial.println("Upload dengan board ESP32S3 Dev Module");
+#endif
+  
+  Serial.println("SAFETY: All motor PWM pins forced LOW");
+  Serial.println("SAFETY: Motors will NOT move during init");
+  Serial.println("========================================\n");
+  
   delay(100);
   
   Serial.println("========================================");
@@ -172,11 +202,11 @@ void runAutoSequence() {
   
   // 2. Gerak ke posisi ambil
   Serial.println("Step 2: Bergerak ke posisi ambil...");
-  putarKePosisi(500, 200);
+  putarKePosisi(500, PWM_MEDIUM);
   delay(500);
-  majuMundurKePosisi(800, 200);
+  majuMundurKePosisi(800, PWM_MEDIUM);
   delay(500);
-  naikTurunKePosisi(300, 200);
+  naikTurunKePosisi(300, PWM_MEDIUM);
   delay(500);
   
   // 3. Tutup gripper (ambil box)
@@ -186,17 +216,17 @@ void runAutoSequence() {
   
   // 4. Angkat box
   Serial.println("Step 4: Mengangkat box...");
-  naikTurunKePosisi(0, 200);
+  naikTurunKePosisi(0, PWM_MEDIUM);
   delay(500);
   
   // 5. Putar ke posisi drop
   Serial.println("Step 5: Memutar ke posisi drop...");
-  putarKePosisi(1000, 200);
+  putarKePosisi(1000, PWM_MEDIUM);
   delay(500);
   
   // 6. Turunkan box
   Serial.println("Step 6: Menurunkan box...");
-  naikTurunKePosisi(300, 200);
+  naikTurunKePosisi(300, PWM_MEDIUM);
   delay(500);
   
   // 7. Buka gripper (lepas box)
@@ -206,11 +236,11 @@ void runAutoSequence() {
   
   // 8. Kembali ke home
   Serial.println("Step 8: Kembali ke home...");
-  naikTurunKePosisi(0, 200);
+  naikTurunKePosisi(0, PWM_MEDIUM);
   delay(500);
-  majuMundurKePosisi(0, 200);
+  majuMundurKePosisi(0, PWM_MEDIUM);
   delay(500);
-  putarKePosisi(0, 200);
+  putarKePosisi(0, PWM_MEDIUM);
   delay(500);
   servoHome();
   
@@ -243,33 +273,33 @@ void testAllComponents() {
   
   // Test Motor Putar
   Serial.println("\n1. Test Motor Putar:");
-  putarKanan(150);
+  putarKanan(PWM_SLOW);
   delay(2000);
   stopMotorPutar();
   delay(500);
-  putarKiri(150);
+  putarKiri(PWM_SLOW);
   delay(2000);
   stopMotorPutar();
   delay(1000);
   
   // Test Motor Naik Turun
   Serial.println("\n2. Test Motor Naik Turun:");
-  motorNaik(150);
+  motorNaik(PWM_SLOW);
   delay(2000);
   stopMotorNaikTurun();
   delay(500);
-  motorTurun(150);
+  motorTurun(PWM_SLOW);
   delay(2000);
   stopMotorNaikTurun();
   delay(1000);
   
   // Test Motor Maju Mundur
   Serial.println("\n3. Test Motor Maju Mundur:");
-  motorMaju(150);
+  motorMaju(PWM_SLOW);
   delay(2000);
   stopMotorMajuMundur();
   delay(500);
-  motorMundur(150);
+  motorMundur(PWM_SLOW);
   delay(2000);
   stopMotorMajuMundur();
   delay(1000);

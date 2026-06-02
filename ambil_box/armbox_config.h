@@ -7,6 +7,8 @@
 #ifndef ARMBOX_CONFIG_H
 #define ARMBOX_CONFIG_H
 
+#include <Arduino.h>
+
 // ==============================
 // MOTOR PUTAR (Rotasi)
 // ==============================
@@ -15,8 +17,6 @@
 #define MOTOR_PUTAR_ENCODER_A   40
 #define MOTOR_PUTAR_ENCODER_B   39
 #define MOTOR_PUTAR_LIMIT       3
-#define MOTOR_PUTAR_PWM_PIN     MOTOR_PUTAR_RPWM
-#define MOTOR_PUTAR_DIR_PIN     MOTOR_PUTAR_LPWM
 
 // ==============================
 // MOTOR NAIK TURUN (Vertikal)
@@ -26,8 +26,6 @@
 #define MOTOR_NAIK_TURUN_ENCODER_A   41
 #define MOTOR_NAIK_TURUN_ENCODER_B   42
 #define MOTOR_NAIK_TURUN_LIMIT       11
-#define MOTOR_NAIK_TURUN_PWM_PIN     MOTOR_NAIK_TURUN_RPWM
-#define MOTOR_NAIK_TURUN_DIR_PIN     MOTOR_NAIK_TURUN_LPWM
 
 // ==============================
 // MOTOR MAJU MUNDUR (Horizontal)
@@ -37,8 +35,6 @@
 #define MOTOR_MAJU_MUNDUR_ENCODER_A   1
 #define MOTOR_MAJU_MUNDUR_ENCODER_B   2
 #define MOTOR_MAJU_MUNDUR_LIMIT       10
-#define MOTOR_MAJU_MUNDUR_PWM_PIN     MOTOR_MAJU_MUNDUR_RPWM
-#define MOTOR_MAJU_MUNDUR_DIR_PIN     MOTOR_MAJU_MUNDUR_LPWM
 
 // ==============================
 // RELAY
@@ -60,10 +56,14 @@
 // ==============================
 // KONSTANTA MOTOR
 // ==============================
-#define PWM_MAX        255
+#define PWM_MAX        1023
 #define PWM_MIN        0
+#define PWM_MIN_MOVE   150
+#define PWM_SLOW       350
+#define PWM_MEDIUM     450
+#define PWM_FAST       600
 #define MOTOR_PWM_FREQ 20000
-#define MOTOR_PWM_RESOLUTION 8
+#define MOTOR_PWM_RESOLUTION 10
 #define MOTOR_PUTAR_RPWM_CHANNEL 0
 #define MOTOR_PUTAR_LPWM_CHANNEL 1
 #define MOTOR_NAIK_TURUN_RPWM_CHANNEL 2
@@ -96,7 +96,7 @@
 // ==============================
 // KONSTANTA HOMING
 // ==============================
-#define HOMING_SPEED       50      // PWM speed untuk homing (0-255)
+#define HOMING_SPEED       450      // PWM speed untuk homing (0-1023)
 #define HOMING_TIMEOUT     30000    // Timeout homing dalam ms (30 detik)
 
 #endif // ARMBOX_CONFIG_H

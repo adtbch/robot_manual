@@ -7,6 +7,11 @@
 
 #if defined(ESP32)
 static void initMotorMajuMundurPwm() {
+  pinMode(MOTOR_MAJU_MUNDUR_RPWM, OUTPUT);
+  pinMode(MOTOR_MAJU_MUNDUR_LPWM, OUTPUT);
+  digitalWrite(MOTOR_MAJU_MUNDUR_RPWM, LOW);
+  digitalWrite(MOTOR_MAJU_MUNDUR_LPWM, LOW);
+  
   ledcSetup(MOTOR_MAJU_MUNDUR_RPWM_CHANNEL, MOTOR_PWM_FREQ, MOTOR_PWM_RESOLUTION);
   ledcAttachPin(MOTOR_MAJU_MUNDUR_RPWM, MOTOR_MAJU_MUNDUR_RPWM_CHANNEL);
   ledcWrite(MOTOR_MAJU_MUNDUR_RPWM_CHANNEL, 0);
@@ -17,6 +22,12 @@ static void initMotorMajuMundurPwm() {
 }
 
 static void writeMotorMajuMundurPwm(int rpwm, int lpwm) {
+  rpwm = constrain(rpwm, 0, PWM_MAX);
+  lpwm = constrain(lpwm, 0, PWM_MAX);
+  
+  if (rpwm > 0 && rpwm < PWM_MIN_MOVE) rpwm = 0;
+  if (lpwm > 0 && lpwm < PWM_MIN_MOVE) lpwm = 0;
+  
   ledcWrite(MOTOR_MAJU_MUNDUR_RPWM_CHANNEL, rpwm);
   ledcWrite(MOTOR_MAJU_MUNDUR_LPWM_CHANNEL, lpwm);
 }
