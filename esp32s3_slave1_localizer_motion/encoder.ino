@@ -92,12 +92,12 @@ void convertEncoderToRPM() {
 
         int rpm_final = (int)round(rpm_filtered[i]);
 
-        Serial.print("Encoder Motor "); Serial.print(i); Serial.print(": ");
-        Serial.print(current_count); Serial.print(" pulses | RPM: "); Serial.println(rpm_final);
-
-            if (abs(delta) > 0) {
-                Serial.printf("Motor %d - RPM Raw: %.1f | RPM Filtered: %.1f\n", i, rpm_raw, rpm_filtered[i]);
-            }
+        // Debug encoder (matikan sementara untuk fokus debug WSN-31)
+        // Serial.print("Encoder Motor "); Serial.print(i); Serial.print(": ");
+        // Serial.print(current_count); Serial.print(" pulses | RPM: "); Serial.println(rpm_final);
+        // if (abs(delta) > 0) {
+        //     Serial.printf("Motor %d - RPM Raw: %.1f | RPM Filtered: %.1f\n", i, rpm_raw, rpm_filtered[i]);
+        // }
       
       motorVelocityRpm[i] = rpm_filtered[i];
         }

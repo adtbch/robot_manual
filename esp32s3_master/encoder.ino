@@ -40,3 +40,19 @@ void setupEncoders() {
     }
 }
 
+// Reset encoder count untuk motor tertentu (setelah homing)
+void resetEncoderCount(uint8_t motorIndex) {
+  if (motorIndex >= encoders.size()) {
+    return;
+  }
+  encoders[motorIndex].count = 0;
+}
+
+// Baca posisi encoder motor tertentu
+long getEncoderCount(uint8_t motorIndex) {
+  if (motorIndex >= encoders.size()) {
+    return 0;
+  }
+  return encoders[motorIndex].count;
+}
+
