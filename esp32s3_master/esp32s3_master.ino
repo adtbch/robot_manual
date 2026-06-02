@@ -29,8 +29,7 @@ void setup() {
     long posX = getEncoderCount(0);
     long posZ = getEncoderCount(1);
     Serial.printf("Moving... X: %ld/%ld, Z: %ld/%ld\n", 
-                  posX, CENTER_POSITION_X, posZ, CENTER_POSITION_Z);
-    delay(100);
+                  posX, CENTER_POSITION_X, posZ, CENTER_POSITION_Z);  
   }
   Serial.println("Arm at center position!");
   
@@ -39,17 +38,21 @@ void setup() {
   // Step 4: Initialize ESP-NOW
   bool espNowReady = espNowControlInit();
   Serial.printf("ESP-NOW control: %s\n", espNowReady ? "READY" : "ERROR");
+  
+  // Step 5: Initialize Serial Command Handler
+  setupSerialCommand();
+  
   Serial.println("Robot ready!");
 }
 
 void loop() {
-  // setServoAngle(1, 90); // Contoh: set servo 1 ke posisi 90 derajat
+  // 1) Serial command handler (motor & servo control via USB)
+  serialCommandTick();
 
-   // 4) Mode normal: jalankan service receiver ESP-NOW.
+  // 2) ESP-NOW control receiver service
   espNowControlTick();
 
-  // 5) Contoh konsumsi paket mentah ESP-NOW.
-  //    Bagian ini aman untuk diganti dengan logika aplikasi kamu nanti.
+  // 3) Example: consume ESP-NOW packet (optional, for debugging)
   if (espNowControlReadPacket(gLastRxPacket)) {
     Serial.printf("RX seq=%u x=%d y=%d w=%d connected=%u\n",
                   gLastRxPacket.seq,
