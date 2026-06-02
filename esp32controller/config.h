@@ -59,7 +59,7 @@ constexpr uint32_t kBlinkIntervalMs = 250;
 // =====================================================================
 
 // WSN-31 UART
-constexpr long kWsnBaudrate = 115200;
+constexpr long kWsnBaudrate = 9600;
 
 // ESP-NOW WiFi channel (harus sama dengan ESP32-S3 penerima)
 constexpr uint8_t kEspNowChannel = 1;
