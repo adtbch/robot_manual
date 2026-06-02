@@ -22,17 +22,6 @@ const float kdMax = 10.0f;
 #define BOOT_BUTTON_PIN  0  // ESP32 default BOOT pin
 
 // ============================================================
-// ESP-NOW Manual Control Configuration
-// ============================================================
-#define ESPNOW_PACKET_MAGIC  0xA5B4
-const bool espNowEnableMacWhitelist = true;
-const uint8_t espNowAllowedTransmitterStaMac[6] = {0x58, 0xBF, 0x25, 0x8B, 0xDB, 0x18};
-const uint8_t espNowAllowedTransmitterApMac[6] = {0x58, 0xBF, 0x25, 0x8B, 0xDB, 0x19};
-const uint8_t espNowChannel = 1;
-const unsigned long espNowLinkAliveMs = 180;
-const unsigned long espNowStatsIntervalMs = 1000;
-
-// ============================================================
 // Unit conversion helpers (rad/s ↔ RPM)
 // ============================================================
 constexpr float kRadPerSecToRpm = 9.54929659f;  // 30 / π

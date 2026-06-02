@@ -1,0 +1,43 @@
+#include "robot_config.h"
+
+// ============================================================
+// Per-motor velocity storage (updated in convertEncoderToRPM)
+// ============================================================
+// Encoder config vector (definition)
+std::vector<EncoderConfig> encoders = {
+  {encoderMotorAxisX_A, encoderMotorAxisX_B, 0},  // 0: front_right_wheel
+  {encoderMotorAxisY_A, encoderMotorAxisY_B, 0},   // 1: front_left_wheel (biasanya dibalik)
+ // 3: back_left_wheel (biasanya dibalik)
+};
+
+
+void IRAM_ATTR Encoder(void *arg) {
+  size_t idx = (size_t)(uintptr_t)arg;
+  if (idx >= encoders.size()) {
+    return;
+  }
+
+  int encA = digitalRead(encoders[idx].encoderPinA);
+  int encB = digitalRead(encoders[idx].encoderPinB);
+
+  if (encA == encB) {
+    encoders[idx].count--;
+  } else {
+    encoders[idx].count++;
+  }
+}
+
+void setupEncoders() {
+  for (size_t i = 0; i < encoders.size(); i++) {
+        pinMode(encoders[i].encoderPinA, INPUT_PULLUP);
+        pinMode(encoders[i].encoderPinB, INPUT_PULLUP);
+
+    attachInterruptArg(
+      digitalPinToInterrupt(encoders[i].encoderPinA),
+      Encoder,
+      (void *)(uintptr_t)i,
+      CHANGE
+    );
+    }
+}
+

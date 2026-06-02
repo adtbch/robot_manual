@@ -15,7 +15,7 @@ void setup() {
 
   // Inisialisasi Serial1 untuk komunikasi dengan Master
   // Parameter: baud rate, protocol, RX pin, TX pin
-  Serial1.begin(115200, SERIAL_8N1, serial_1_rxPin, serial_1_txPin);
+  Serial1.begin(921600, SERIAL_8N1, serial_1_rxPin, serial_1_txPin);
 
   Wire.begin(sdaPin,sclPin);
   Wire.setClock(400000);
