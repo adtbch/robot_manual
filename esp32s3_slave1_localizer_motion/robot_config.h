@@ -161,8 +161,8 @@ const int sclPin = 14;
 // ============================================================
 // PIN Serial 2 untuk komunikasi dengan Modul Radio
 // ============================================================
-#define serial_2_rxPin 11
-#define serial_2_txPin 12
+#define serial_2_rxPin 12
+#define serial_2_txPin 11
 #define setRadionPin 19
 
 #define AUTOTUNE_TARGET_RPM   100.0f // target velocity saat tuning dalam RPM — edit sesuai kebutuhan
