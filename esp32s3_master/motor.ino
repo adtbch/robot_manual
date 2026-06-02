@@ -6,6 +6,8 @@ std::vector<MotorConfig> motors = {
     {motorAxisY_A, motorAxisY_B, 1},   
 };
 
+// Motor state objects (definition)
+
 void SetupMotors() {
     for (size_t i = 0; i < motors.size(); i++) {
         pinMode(motors[i].pin_direction, OUTPUT);
@@ -35,3 +37,9 @@ void pwmMotor(int idMotor, int pwmValue) {
         digitalWrite(motors[idMotor].pin_direction, LOW);
     }
 }
+
+void motorStopAll() {
+    for (size_t i = 0; i < motors.size(); i++) {
+        pwmMotor(i, 0);
+    }
+} 
