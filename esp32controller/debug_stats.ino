@@ -16,6 +16,7 @@
  */
 
 #include "config.h"
+#include <WiFi.h>
 
 // =====================================================================
 //  VARIABEL LOKAL
@@ -50,6 +51,9 @@ void debug_cetak_info_boot(bool espnow_ok) {
     Serial.println("=========================================");
     Serial.println("     ESP32 CONTROLLER — DUAL CHANNEL     ");
     Serial.println("=========================================");
+    // Cetak MAC address board ini
+    Serial.printf("Board WiFi STA MAC     : %s\n", WiFi.macAddress().c_str());
+    Serial.printf("Board Bluetooth MAC    : ");  // ESP32 BT MAC = WiFi MAC (sama)
     Serial.printf("PS4 Bluetooth MAC target : %s\n", kPs4BluetoothMac);
     Serial.printf("ESP-NOW target MAC       : %02X:%02X:%02X:%02X:%02X:%02X\n",
         kEspNowTargetMac[0], kEspNowTargetMac[1], kEspNowTargetMac[2],

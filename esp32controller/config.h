@@ -30,7 +30,7 @@ static const char kPs4BluetoothMac[] = "00:00:00:00:00:00"; // <-- GANTI
 // MAC WiFi STA ESP32-S3 penerima (target ESP-NOW).
 // Cara cari: lihat Serial Monitor ESP32-S3 saat boot, baris "MAC STA".
 // Format: { 0xXX, 0xXX, 0xXX, 0xXX, 0xXX, 0xXX }
-constexpr uint8_t kEspNowTargetMac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // <-- GANTI
+constexpr uint8_t kEspNowTargetMac[6] = {0xA4, 0xCB, 0x8F, 0xD9, 0x2B, 0xA0}; // ESP32-S3 Master
 
 // =====================================================================
 //  KONFIGURASI PIN
