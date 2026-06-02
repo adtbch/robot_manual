@@ -34,8 +34,8 @@ bool homingMotorPutar() {
       return false;
     }
     
-    // Gerak ke arah limit switch
-    setMotorPutarRaw(-HOMING_SPEED);
+    // Gerak ke arah limit switch (ke KIRI)
+    setMotorPutarRaw(HOMING_SPEED);
     delay(10);
   }
   
@@ -45,23 +45,23 @@ bool homingMotorPutar() {
   
   Serial.println("Limit switch terdeteksi");
   
-  // Fase 2: Mundur sedikit dari limit switch
+  // Fase 2: Mundur sedikit dari limit switch (ke KANAN)
   Serial.println("Mundur dari limit switch...");
   unsigned long backoffTime = millis() + 500; // Mundur 500ms
   
   while (millis() < backoffTime) {
-    setMotorPutarRaw(HOMING_SPEED / 2);
+    setMotorPutarRaw(-HOMING_SPEED / 2);
     delay(10);
   }
   
   stopMotorPutar();
   delay(200);
 
-  // Fase 3: Approach pelan ke limit switch
+  // Fase 3: Approach pelan ke limit switch (ke KIRI)
   Serial.println("Approach pelan...");
   
   while (digitalRead(MOTOR_PUTAR_LIMIT) == HIGH) {
-    setMotorPutarRaw(-HOMING_SPEED / 3);
+    setMotorPutarRaw(HOMING_SPEED / 3);
     delay(10);
   }
   

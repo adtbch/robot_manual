@@ -7,6 +7,11 @@
 
 #if defined(ESP32)
 static void initMotorPutarPwm() {
+  pinMode(MOTOR_PUTAR_RPWM, OUTPUT);
+  pinMode(MOTOR_PUTAR_LPWM, OUTPUT);
+  digitalWrite(MOTOR_PUTAR_RPWM, LOW);
+  digitalWrite(MOTOR_PUTAR_LPWM, LOW);
+  
   ledcSetup(MOTOR_PUTAR_RPWM_CHANNEL, MOTOR_PWM_FREQ, MOTOR_PWM_RESOLUTION);
   ledcAttachPin(MOTOR_PUTAR_RPWM, MOTOR_PUTAR_RPWM_CHANNEL);
   ledcWrite(MOTOR_PUTAR_RPWM_CHANNEL, 0);
@@ -17,6 +22,12 @@ static void initMotorPutarPwm() {
 }
 
 static void writeMotorPutarPwm(int rpwm, int lpwm) {
+  rpwm = constrain(rpwm, 0, PWM_MAX);
+  lpwm = constrain(lpwm, 0, PWM_MAX);
+  
+  if (rpwm > 0 && rpwm < PWM_MIN_MOVE) rpwm = 0;
+  if (lpwm > 0 && lpwm < PWM_MIN_MOVE) lpwm = 0;
+  
   ledcWrite(MOTOR_PUTAR_RPWM_CHANNEL, rpwm);
   ledcWrite(MOTOR_PUTAR_LPWM_CHANNEL, lpwm);
 }

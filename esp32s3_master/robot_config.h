@@ -4,6 +4,34 @@
 #include <Preferences.h>
 
 // ============================================================
+// PIN MOTOR - 2 pin per motor (H-bridge IN1/IN2, misal L298N)
+// ============================================================
+
+// Motor Depan (Front)
+#define motorAxisX_A  35
+#define motorAxisX_B  21
+#define encoderMotorAxisX_A 8
+#define encoderMotorAxisX_B 18
+#define limitSwitchAxisX  3
+
+#define motorAxisY_A   37
+#define motorAxisY_B   36
+#define encoderMotorAxisY_A   11
+#define encoderMotorAxisY_B   10
+#define limitSwitchAxisY   9
+
+// Servo 
+#define servoRotation  2
+#define servoGrib  42
+
+#define baudrate 921600
+#define serial_1_rxPin 7
+#define serial_1_txPin 6
+
+#define serial_2_rxPin 4
+#define serial_2_txPin 5
+
+// ============================================================
 // PID & NVS Configuration
 // ============================================================
 #define PID_NVS_NAMESPACE  "pid_tuning"
@@ -42,13 +70,14 @@ typedef struct {
 } MotorConfig;
 
 struct MotorState {
-	bool homing;
+	bool xhoming;
+	bool zhoming;
+	bool xAtCenter;
+	bool zAtCenter;
 };
 
 // Deklarasi objek motor state
-extern MotorState motorX;
-extern MotorState motorZ;
-
+extern MotorState motorArm;
 
 typedef struct {
 	uint8_t encoderPinA;
@@ -80,37 +109,9 @@ struct __attribute__((packed)) ControlPacket {
 	uint8_t  connected;  // 1 = PS4 terhubung, 0 = disconnect
 };
 
-// Forward declarations for globals (defined in motor.ino / encoder.ino)
 extern std::vector<MotorConfig> motors;
 extern std::vector<EncoderConfig> encoders;
-
-// ============================================================
-// PIN MOTOR - 2 pin per motor (H-bridge IN1/IN2, misal L298N)
-// ============================================================
-
-// Motor Depan (Front)
-#define motorAxisX_A  35
-#define motorAxisX_B  21
-#define encoderMotorAxisX_A 18
-#define encoderMotorAxisX_B 8
-#define limitSwitchAxisX  3
-
-#define motorAxisY_A   37
-#define motorAxisY_B   36
-#define encoderMotorAxisY_A   10
-#define encoderMotorAxisY_B   11
-#define limitSwitchAxisY   9
-
-// Servo 
-#define servoRotation  2
-#define servoGrib  42
-
-#define baudrate 921600
-#define serial_1_rxPin 7
-#define serial_1_txPin 6
-
-#define serial_2_rxPin 4
-#define serial_2_txPin 5
+// Forward declarations for globals (defined in motor.ino / encoder.ino)
 
 const int maxPwm = 1023;
 const int minPwm = -1023;
@@ -124,10 +125,16 @@ const int servoResolution = 14;
 // ============================================================
 // Target encoder counts untuk posisi tengah setelah homing
 // Sesuaikan nilai ini dengan range pergerakan fisik arm Anda
-const long CENTER_POSITION_X = 1000;  // Target encoder count untuk axis X di tengah
-const long CENTER_POSITION_Z = 1000;  // Target encoder count untuk axis Z di tengah
-const int CENTER_POSITION_TOLERANCE = 50;  // Toleransi error positioning (counts)
-const int CENTER_MOVE_SPEED = 150;  // Kecepatan PWM untuk move to center
+const long CENTER_POSITION_X = 2500;  // Target encoder count untuk axis X di tengah
+const long CENTER_POSITION_Z = 500;  // Target encoder count untuk axis Z di tengah  // Toleransi error positioning (counts)
+const int MOVE_SPEED = 300;  // Kecepatan PWM untuk move to center
+
+// ============================================================
+// ARM HOMING & POSITIONING LIMITS
+// ============================================================
+const int HOMING_SPEED = 500;  // Kecepatan PWM untuk homing ke limit switch
+const long MAX_ENCODER_POSITION_X = 2000;  // Batas maksimum encoder X
+const long MAX_ENCODER_POSITION_Z = 2000;  // Batas maksimum encoder Z
 
 // ============================================================
 // Shared function declarations
@@ -151,3 +158,11 @@ long getEncoderCount(uint8_t motorIndex);
 // Arm positioning functions
 bool setHoming();
 bool moveToCenter();
+bool moveTargetPosition(uint8_t motorIndex, long targetPosition);
+void setMotorTarget(uint8_t motorIndex, long targetPosition);
+void stopMotorTarget(uint8_t motorIndex);
+void stopAllMotorTargets();
+void updateMotorPositioning();
+// Serial command functions
+void setupSerialCommand();
+void serialCommandTick();

@@ -1,13 +1,14 @@
 #include "robot_config.h"
 
-// ============================================================
-// Per-motor velocity storage (updated in convertEncoderToRPM)
-// ============================================================
 // Encoder config vector (definition)
 std::vector<EncoderConfig> encoders = {
   {encoderMotorAxisX_A, encoderMotorAxisX_B, 0},  // 0: motor axis X
   {encoderMotorAxisY_A, encoderMotorAxisY_B, 0}   // 1: motor axis Y
 };
+
+// ============================================================
+// Per-motor velocity storage (updated in convertEncoderToRPM)
+// ============================================================
 
 
 void IRAM_ATTR Encoder(void *arg) {

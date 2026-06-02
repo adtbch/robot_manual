@@ -7,6 +7,11 @@
 
 #if defined(ESP32)
 static void initMotorNaikTurunPwm() {
+  pinMode(MOTOR_NAIK_TURUN_RPWM, OUTPUT);
+  pinMode(MOTOR_NAIK_TURUN_LPWM, OUTPUT);
+  digitalWrite(MOTOR_NAIK_TURUN_RPWM, LOW);
+  digitalWrite(MOTOR_NAIK_TURUN_LPWM, LOW);
+  
   ledcSetup(MOTOR_NAIK_TURUN_RPWM_CHANNEL, MOTOR_PWM_FREQ, MOTOR_PWM_RESOLUTION);
   ledcAttachPin(MOTOR_NAIK_TURUN_RPWM, MOTOR_NAIK_TURUN_RPWM_CHANNEL);
   ledcWrite(MOTOR_NAIK_TURUN_RPWM_CHANNEL, 0);
@@ -17,6 +22,12 @@ static void initMotorNaikTurunPwm() {
 }
 
 static void writeMotorNaikTurunPwm(int rpwm, int lpwm) {
+  rpwm = constrain(rpwm, 0, PWM_MAX);
+  lpwm = constrain(lpwm, 0, PWM_MAX);
+  
+  if (rpwm > 0 && rpwm < PWM_MIN_MOVE) rpwm = 0;
+  if (lpwm > 0 && lpwm < PWM_MIN_MOVE) lpwm = 0;
+  
   ledcWrite(MOTOR_NAIK_TURUN_RPWM_CHANNEL, rpwm);
   ledcWrite(MOTOR_NAIK_TURUN_LPWM_CHANNEL, lpwm);
 }
