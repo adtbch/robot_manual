@@ -38,8 +38,17 @@ const unsigned long espNowStatsIntervalMs = 1000;
 typedef struct {
 	uint8_t pin_direction;    // direction pin (OUTPUT, HIGH=maju LOW=mundur)
 	uint8_t pin_pwm;          // speed pin (LEDC PWM)
-	uint8_t ledc_channel;     // LEDC channel
+	uint8_t ledc_channel;     // LEDC channel              // apakah motor sedang dalam proses homing
 } MotorConfig;
+
+struct MotorX{
+	bool homing;
+};
+
+struct MotorZ{
+	bool homing;
+};
+
 
 typedef struct {
 	uint8_t encoderPinA;
@@ -119,3 +128,7 @@ bool espNowControlInit();
 void espNowControlTick();
 bool espNowControlReadPacket(EspNowControlPacket &outPacket);
 bool espNowControlIsLinkAlive();
+  void setServoAngle(int idServo, int angle);
+  void SetupMotors();
+  void setupServos();
+  void setupEncoders();

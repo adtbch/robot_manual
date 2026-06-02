@@ -1,5 +1,5 @@
 #include "robot_config.h"
-extern std::vector<PIDState> pidStates;
+
 // Motor config vector (definition)
 std::vector<MotorConfig> motors = {
     {motorAxisX_A, motorAxisX_B, 0},  

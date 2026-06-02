@@ -5,9 +5,8 @@
 // ============================================================
 // Encoder config vector (definition)
 std::vector<EncoderConfig> encoders = {
-  {encoderMotorAxisX_A, encoderMotorAxisX_B, 0},  // 0: front_right_wheel
-  {encoderMotorAxisY_A, encoderMotorAxisY_B, 0},   // 1: front_left_wheel (biasanya dibalik)
- // 3: back_left_wheel (biasanya dibalik)
+  {encoderMotorAxisX_A, encoderMotorAxisX_B, 0},  // 0: motor axis X
+  {encoderMotorAxisY_A, encoderMotorAxisY_B, 0}   // 1: motor axis Y
 };
 
 
