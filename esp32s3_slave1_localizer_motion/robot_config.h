@@ -81,24 +81,27 @@ typedef struct {
 	float prev_error;
 } PID;
 
-typedef struct {
-	uint16_t magic;
-	int16_t x;
-	int16_t y;
-	int16_t w;
-	int8_t lx;
-	int8_t ly;
-	int8_t rx;
-	int8_t ry;
-	uint8_t l2Value;
-	uint8_t r2Value;
-	int16_t gyrX;
-	int16_t gyrY;
-	int16_t gyrZ;
-	uint32_t buttons;
-	uint16_t seq;
-	uint8_t connected;
-} EspNowControlPacket;
+// Magic number validasi paket (harus sama dengan esp32controller)
+constexpr uint16_t kPacketMagic = 0xA5B4;
+
+struct __attribute__((packed)) ControlPacket {
+	uint16_t magic;      // Harus = kPacketMagic (0xA5B4)
+	int16_t x;           // Gerakan lateral    (+= kanan, -= kiri)
+	int16_t y;           // Gerakan maju/mundur (+= maju, -= mundur)
+	int16_t w;           // Rotasi             (+= CCW,  -= CW)
+	int8_t lx;           // Analog kiri  X
+	int8_t ly;           // Analog kiri  Y
+	int8_t rx;           // Analog kanan X
+	int8_t ry;           // Analog kanan Y
+	uint8_t l2Value;     // Trigger L2
+	uint8_t r2Value;     // Trigger R2
+	int16_t gyrX;        // Gyro sumbu X
+	int16_t gyrY;        // Gyro sumbu Y
+	int16_t gyrZ;        // Gyro sumbu Z
+	uint32_t buttons;    // Bitmask semua tombol
+	uint16_t seq;        // Nomor urut paket
+	uint8_t  connected;  // 1 = PS4 terhubung, 0 = disconnect
+};
 
 // Forward declarations for globals (defined in motor.ino / encoder.ino)
 extern std::vector<MotorConfig> motors;
@@ -159,11 +162,11 @@ const int sclPin = 14;
 #define serial_1_txPin 10
 
 // ============================================================
-// PIN Serial 2 untuk komunikasi dengan Modul Radio
+// PIN WSN-31 untuk komunikasi dengan Modul Radio
 // ============================================================
-#define serial_2_rxPin 12
-#define serial_2_txPin 11
-#define setRadionPin 19
+#define wsn_serial_rxPin 12
+#define wsn_serial_txPin 11
+#define kWsnSetPin 19
 
 #define AUTOTUNE_TARGET_RPM   100.0f // target velocity saat tuning dalam RPM — edit sesuai kebutuhan
 #define AUTOTUNE_RUN_MS       10000  // durasi test per siklus (ms)
@@ -210,7 +213,7 @@ void skalaKecepatan(int motor1, int motor2, int motor3, int motor4);
 
 bool espNowControlInit();
 void espNowControlTick();
-bool espNowControlReadPacket(EspNowControlPacket &outPacket);
+bool espNowControlReadPacket(ControlPacket &outPacket);
 bool espNowControlIsLinkAlive();
 
 // ============================================================
