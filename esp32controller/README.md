@@ -317,3 +317,5 @@ command for upload
 ```
 arduino-cli upload -p COM14 --fqbn "esp32:esp32:esp32:PartitionScheme=huge_app" "C:\Users\NITRO 5\Documents\GitHub\robot_manual\esp32controller"
 ```
+
+MAC STICK = B8:1E:A4:97:26:D8
