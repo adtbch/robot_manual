@@ -108,33 +108,7 @@ void loop() {
         if (ps4_aktif) {
             ps4_baca_paket(paket);
         } else {
-            // === MODE DUMMY DATA (untuk testing tanpa PS4) ===
-            // Kirim data dummy agar ESP32-S3 bisa verifikasi koneksi WSN-31
-            static uint32_t counter = 0;
-            counter++;
-            paket.magic     = kPacketMagic;
-            paket.x         = (counter / 50) % 200 - 100;   // naik-turun -100..99
-            paket.y         = 100;                           // maju terus
-            paket.w         = 0;                             // tidak rotasi
-            paket.lx        = 0;
-            paket.ly        = 127;                           // stick kiri full atas
-            paket.rx        = 0;
-            paket.ry        = 0;
-            paket.l2Value   = 0;
-            paket.r2Value   = 0;
-            paket.gyrX      = 0;
-            paket.gyrY      = 0;
-            paket.gyrZ      = 0;
-            paket.buttons   = 0;
-            paket.seq       = counter;
-            paket.connected = 0;  // 0 = ini data dummy, bukan PS4 asli
-            // === END MODE DUMMY DATA ===
-
-            // Cetak data dummy ke Serial Monitor (throttle: tiap 20 paket / ~500ms)
-            if (counter % 20 == 1) {
-                Serial.printf("[DUMMY] seq=%lu x=%d y=%d w=%d ly=%d\n",
-                    (unsigned long)counter, paket.x, paket.y, paket.w, paket.ly);
-            }
+            buat_paket_stop(paket);
         }
 
         // Kirim ke jalur yang sedang aktif
