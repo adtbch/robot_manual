@@ -40,9 +40,12 @@ static uint32_t waktu_led_terakhir    = 0;     // untuk timing kedip LED
  * Dipanggil SEBELUM inisialisasi WiFi/ESP-NOW di setup().
  */
 void ps4_init() {
+    // PS4.begin() membutuhkan MAC address ESP32 SENDIRI sebagai host,
+    // bukan MAC PS4 controller. Pakai MAC dari config.h.
     PS4.begin(kPs4BluetoothMac);
-    Serial.printf("[PS4] Bluetooth init — target MAC: %s\n", kPs4BluetoothMac);
+    Serial.printf("[PS4] Bluetooth init — host MAC: %s\n", kPs4BluetoothMac);
     Serial.println("[PS4] Menunggu koneksi DualShock 4...");
+    Serial.println("[PS4] Pair: tahan tombol Share + PS bersamaan");
 }
 
 // =====================================================================

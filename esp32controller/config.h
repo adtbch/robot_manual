@@ -21,11 +21,10 @@
 //  MAC ADDRESS — WAJIB DIISI SEBELUM UPLOAD
 // =====================================================================
 
-// MAC Bluetooth PS4 DualShock 4.
-// Cara cari: flash sketch GetBDAddress (dari contoh library PS4Controller),
-// lalu baca output Serial Monitor.
-// Format: "xx:xx:xx:xx:xx:xx" (huruf kecil, dipisah titik dua)
-static const char kPs4BluetoothMac[] = "b8:1e:a4:97:26:d8"; // PS4 DualShock 4
+// MAC Bluetooth ESP32 ini sendiri (host address untuk PS4.begin).
+// PS4.begin() membutuhkan MAC ESP32, bukan MAC PS4 controller.
+// Pakai "00:00:00:00:00:00" untuk auto-detect BT MAC default ESP32.
+static const char kPs4BluetoothMac[] = "00:00:00:00:00:00";
 
 // MAC WiFi STA ESP32-S3 penerima (target ESP-NOW).
 // Cara cari: lihat Serial Monitor ESP32-S3 saat boot, baris "MAC STA".
