@@ -17,7 +17,7 @@ static float gyroZFiltered = 0.0f;
 
 // Tuning: smaller alpha = smoother but more lag
 static constexpr float GYRO_LPF_ALPHA = 0.18f;
-static constexpr float GYRO_DEADZONE = 0.008f;
+static constexpr float GYRO_DEADZONE = 0.02f;
 
 // Yaw angle in degrees
 static float yaw = 0.0f;
