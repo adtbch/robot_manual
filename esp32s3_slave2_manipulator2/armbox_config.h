@@ -1,0 +1,187 @@
+#pragma once
+
+#include <vector>
+
+// ============================================================
+// PIN MOTOR - 2 pin per motor (H-bridge RPWM/LPWM)
+// ============================================================
+
+// Sumbu W (Motor Putar / Rotasi)
+#define motorAxisW_A        16
+#define motorAxisW_B        15
+#define encoderMotorAxisW_A   40
+#define encoderMotorAxisW_B   39
+#define limitSwitchAxisW       10
+
+// Sumbu Z (Motor Naik Turun / Vertikal)
+#define motorAxisZ_A        7
+#define motorAxisZ_B        6
+#define encoderMotorAxisZ_A   41
+#define encoderMotorAxisZ_B   42
+#define limitSwitchAxisZ       11
+
+// Sumbu Y (Motor Maju Mundur / Horizontal)
+#define motorAxisY_A        5
+#define motorAxisY_B        4
+#define encoderMotorAxisY_A   1
+#define encoderMotorAxisY_B   2
+#define limitSwitchAxisY       3
+
+// Motor Indices
+#define MOTOR_W       0
+#define MOTOR_Z       1
+#define MOTOR_Y       2
+#define MOTOR_COUNT   3
+
+// ============================================================
+// PIN SERVO
+// ============================================================
+#define SERVO_PIN      38
+#define SERVO_CHANNEL  6
+
+// ============================================================
+// PIN RELAY
+// ============================================================
+#define RELAY_1_PIN    12
+#define RELAY_2_PIN    13
+
+// ============================================================
+// PIN UART
+// ============================================================
+#define UART_RX_PIN    38
+#define UART_TX_PIN    21
+
+// ============================================================
+// PWM CONSTANTS
+// ============================================================
+const int maxPwm = 1023;
+const int minPwm = -1023;
+const int pwmFrequency = 20000;
+const int pwmResolution = 10;
+
+// ============================================================
+// SERVO CONSTANTS
+// ============================================================
+const int servoFrequency = 50;
+const int servoResolution = 16;
+const int servoMinPulseUs = 500;
+const int servoMaxPulseUs = 2500;
+const int servoMinAngle = 0;
+const int servoMaxAngle = 180;
+const int servoHomeAngle = 90;
+
+// ============================================================
+// ENCODER CONSTANTS
+// ============================================================
+const int ENCODER_PPR = 360;
+const float LEAD_SCREW_PITCH = 8.0;
+
+// ============================================================
+// MOTOR LIMITS
+// ============================================================
+const int PWM_MIN_MOVE = 150;
+const int PWM_SLOW = 350;
+const int PWM_MEDIUM = 450;
+const int PWM_FAST = 600;
+
+// ============================================================
+// HOMING CONSTANTS
+// ============================================================
+const int HOMING_SPEED = 200;
+const unsigned long HOMING_TIMEOUT = 30000;
+
+// ============================================================
+// POSITIONING CONSTANTS
+// ============================================================
+const int MOTOR_POSITION_TOLERANCE = 10;
+const long MAX_ENCODER_POSITION = 2000;
+const int MOVE_SPEED = 300;
+
+// ============================================================
+// Shared types
+// ============================================================
+
+typedef struct {
+    uint8_t pwmPin;
+    uint8_t pinDirection;
+    uint8_t ledc_channel;
+    uint8_t encA;
+    uint8_t encB;
+    uint8_t limitPin;
+    int8_t limitDir;  // +1=check on positive, -1=on negative
+} MotorConfig;
+
+typedef struct {
+    uint8_t servoPin;
+    uint8_t ledc_channel;
+} ServoConfig;
+
+typedef struct {
+    uint8_t pin;
+    bool state;
+} RelayConfig;
+
+typedef struct {
+    uint8_t encoderPinA;
+    uint8_t encoderPinB;
+    volatile long count;
+} EncoderConfig;
+
+struct MotorState {
+    bool homed[MOTOR_COUNT];
+};
+
+extern MotorState motorArm;
+
+// ============================================================
+// Shared function declarations
+// ============================================================
+
+// Vector externs
+extern std::vector<MotorConfig> motors;
+extern std::vector<ServoConfig> servos;
+extern std::vector<EncoderConfig> encoders;
+extern std::vector<RelayConfig> relays;
+
+// Motor
+void SetupMotors();
+void pwmMotor(int idMotor, int pwmValue);
+void motorStopAll();
+
+// Servo
+void setupServos();
+void setServoAngle(int idServo, int angle);
+
+// Encoder
+void setupEncoders();
+void resetEncoderCount(uint8_t motorIndex);
+long getEncoderCount(uint8_t motorIndex);
+
+// Relay
+void setupRelays();
+void setRelay(int idRelay, bool state);
+
+// Limit Switch
+void setupLimits();
+
+// Arm positioning
+void setMotorTarget(uint8_t motorIndex, long targetPosition);
+void stopMotorTarget(uint8_t motorIndex);
+void stopAllMotorTargets();
+void updateMotorPositioning();
+
+// Homing
+bool setHoming();
+bool homingMotor(uint8_t id);
+bool homingAllMotors();
+bool isAllMotorHomed();
+void printHomingStatus();
+
+// Serial
+void setupSerialCommand();
+void serialCommandTick();
+
+// UART
+void initUART();
+void readUART();
+void processUARTCommand();
