@@ -9,8 +9,8 @@ Dokumen ini menjelaskan protokol komunikasi data antar mikrokontroler dari **ESP
 Komunikasi berjalan menggunakan jalur **Serial1** (UART1) dengan pengaturan non-blocking.
 * **Baud Rate:** `921600 bps`
 * **Format Data:** `8 Data bits, No Parity, 1 Stop bit (SERIAL_8N1)`
-* **Pin RX Slave (Serial 1):** `GPIO 9` (Terhubung ke TX Master)
-* **Pin TX Slave (Serial 1):** `GPIO 10` (Terhubung ke RX Master)
+* **Pin RX Slave (Serial 1):** `GPIO 21` (Terhubung ke TX Master)
+* **Pin TX Slave (Serial 1):** `GPIO 20` (Terhubung ke RX Master)
 
 ---
 
