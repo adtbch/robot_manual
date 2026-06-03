@@ -32,6 +32,11 @@ static int g_cmdPwm = 0;
 static int g_cmdVx = 0, g_cmdVy = 0, g_cmdVtheta = 0;
 static int g_seqMaxIdx = 0;
 
+// --- Realtime joystick from Master (tanpa durasi) ---
+static bool g_joystickActive = false;
+static unsigned long g_lastJoystickMs = 0;
+static const unsigned long JOYSTICK_TIMEOUT_MS = 2000;
+
 // ============================================================
 // Helper Functions
 // ============================================================
@@ -66,13 +71,21 @@ void serialCommandsTick() {
 
                 // Expected format: vx vy w [durationMs]
                 int vx, vy, w;
-                unsigned long dur = 2000; // Default safety timeout
+                unsigned long dur = 0;
                 int parsed = sscanf(buf1, "%d %d %d %lu", &vx, &vy, &w, &dur);
 
                 if (parsed >= 3) {
-                    // Panggil gerakan kinematik field-centric
-                    serialContinuousStop();
-                    serialTestFieldCentric(vx, vy, w, dur);
+                    if (parsed >= 4 && dur > 0) {
+                        // Perintah dengan durasi (dari Serial USB / manual)
+                        serialContinuousStop();
+                        serialTestFieldCentric(vx, vy, w, dur);
+                    } else {
+                        // Realtime joystick dari Master (tanpa durasi)
+                        // Langsung drive, bypass state machine
+                        g_joystickActive = true;
+                        g_lastJoystickMs = millis();
+                        driveFieldCentric(vx, vy, w);
+                    }
                 }
                 pos = 0; // Reset buffer
             }
@@ -84,8 +97,16 @@ void serialCommandsTick() {
     if (stopRequested) {
         stopRequested = false;
         g_cmdState = CmdState::CMD_IDLE;
+        g_joystickActive = false;
         motorStopAll();
         return;
+    }
+
+    // Safety: stop jika joystick timeout (koneksi terputus)
+    if (g_joystickActive && (millis() - g_lastJoystickMs >= JOYSTICK_TIMEOUT_MS)) {
+        g_joystickActive = false;
+        motorStopAll();
+        Serial.println("[JOYSTICK] Timeout — motor stopped");
     }
 
     switch (g_cmdState) {
@@ -358,6 +379,7 @@ void processSerialCommands() {
         motorStopAll();
         g_cmdState = CmdState::CMD_IDLE;
     }
+    g_joystickActive = false;
 
     // ==================== AUTOTUNE ====================
     if (strncmp(cmd, "AUTOTUNE", 8) == 0) {
