@@ -29,8 +29,8 @@ static const char kPs4BluetoothMac[] = "58:bf:25:8b:db:1a"; // PS4 DualShock 4
 
 // MAC WiFi STA ESP32-S3 penerima (target ESP-NOW).
 // Cara cari: lihat Serial Monitor ESP32-S3 saat boot, baris "MAC STA".
-// Format: { 0xXX, 0xXX, 0xXX, 0xXX, 0xXX, 0xXX }
-constexpr uint8_t kEspNowTargetMac[6] = {0xA4, 0xCB, 0x8F, 0xD9, 0x2B, 0xA0}; // ESP32-S3 Master
+// Format: { 0xXX, 0xXX, 0xXX, 0xXX, 0xXX, 0xXX }44:1B:F6:82:D6:C8
+constexpr uint8_t kEspNowTargetMac[6] = {0x44, 0x1B, 0xF6, 0x82, 0xD6, 0xC8}; // ESP32-S3 Master
 
 // =====================================================================
 //  KONFIGURASI PIN
