@@ -1,3 +1,4 @@
+#include <WiFi.h>
 #include "robot_config.h"
 
 // Paket terakhir untuk debugging/manual processing.
@@ -23,7 +24,7 @@ void setup() {
   Serial.begin(115200);
   Serial.print("ESP32 MAC Address for ESP-NOW: ");
   Serial.println(WiFi.macAddress());
-  
+
   SetupMotors();
   setupServos();
   setupEncoders();

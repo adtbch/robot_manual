@@ -52,8 +52,8 @@ const float kdMax = 10.0f;
 // ============================================================
 #define ESPNOW_PACKET_MAGIC  0xA5B4
 const bool espNowEnableMacWhitelist = true;
-const uint8_t espNowAllowedTransmitterStaMac[6] = {0x58, 0xBF, 0x25, 0x8B, 0xDB, 0x18};
-const uint8_t espNowAllowedTransmitterApMac[6] = {0x58, 0xBF, 0x25, 0x8B, 0xDB, 0x19};
+const uint8_t espNowAllowedTransmitterStaMac[6] = {0xD4, 0xE9, 0xF4, 0x8D, 0xAE, 0xB4};
+const uint8_t espNowAllowedTransmitterApMac[6] = {0xD4, 0xE9, 0xF4, 0x8D, 0xAE, 0xB4};
 const uint8_t espNowChannel = 1;
 const unsigned long espNowLinkAliveMs = 180;
 const unsigned long espNowStatsIntervalMs = 1000;
