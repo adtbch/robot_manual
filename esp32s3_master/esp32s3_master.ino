@@ -3,6 +3,22 @@
 // Paket terakhir untuk debugging/manual processing.
 static ControlPacket gLastRxPacket = {};
 
+// =====================================================================
+//  SHARED: consume packet + print throttled (tiap 20 paket)
+// =====================================================================
+
+static void consumePacket(const char *source, ControlPacket &pkt) {
+  static uint32_t rxPrintCounter = 0;
+  rxPrintCounter++;
+  if (rxPrintCounter % 20 == 1) {
+    Serial.printf("[%s] seq=%u x=%d y=%d w=%d lx=%d ly=%d l2=%u r2=%u btn=%lu conn=%d\n",
+                  source,
+                  pkt.seq, pkt.x, pkt.y, pkt.w,
+                  pkt.lx, pkt.ly, pkt.l2Value, pkt.r2Value,
+                  (unsigned long)pkt.buttons, pkt.connected);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   SetupMotors();
@@ -10,7 +26,6 @@ void setup() {
   setupEncoders();
   setupLimits();
   
-// Step 1: Homing process
   Serial.println("Starting homing...");
   while (!setHoming()) {
     Serial.println("Homing in progress...");
@@ -18,12 +33,10 @@ void setup() {
   }
   Serial.println("Homing complete!");
   
-  // Step 2: Reset encoder counts setelah homing
-  resetEncoderCount(0);  // Reset encoder motor X
-  resetEncoderCount(1);  // Reset encoder motor Z
+  resetEncoderCount(0);
+  resetEncoderCount(1);
   Serial.println("Encoder counts reset to 0");
   
-  // Step 3: Move to center position
   Serial.println("Moving to center position...");
   while (!moveToCenter()) {
     long posX = getEncoderCount(0);
@@ -33,42 +46,29 @@ void setup() {
   }
   Serial.println("Arm at center position!");
   
-  motorStopAll(); // Pastikan motor berhenti
+  motorStopAll();
   
-  // Step 4: Initialize ESP-NOW
   bool espNowReady = espNowControlInit();
   Serial.printf("ESP-NOW control: %s\n", espNowReady ? "READY" : "ERROR");
   
-  // Step 5: Initialize Serial Command Handler
+  motion_serial_init();
   setupSerialCommand();
   
   Serial.println("Robot ready!");
 }
 
 void loop() {
-  // 1) Serial command handler (motor & servo control via USB)
   serialCommandTick();
-
-  // 2) ESP-NOW control receiver service
   espNowControlTick();
+  motion_serial_tick();
 
-  // 3) Example: consume ESP-NOW packet (optional, for debugging)
   if (espNowControlReadPacket(gLastRxPacket)) {
-    // Throttle: cetak tiap 20 paket (~500ms) agar Serial Monitor tidak spam
-    static uint32_t rxPrintCounter = 0;
-    rxPrintCounter++;
-    if (rxPrintCounter % 20 == 1) {
-      Serial.printf("[ESPNOW-RX] seq=%u x=%d y=%d w=%d lx=%d ly=%d l2=%u r2=%u btn=%lu conn=%d\n",
-                    gLastRxPacket.seq,
-                    gLastRxPacket.x,
-                    gLastRxPacket.y,
-                    gLastRxPacket.w,
-                    gLastRxPacket.lx,
-                    gLastRxPacket.ly,
-                    gLastRxPacket.l2Value,
-                    gLastRxPacket.r2Value,
-                    (unsigned long)gLastRxPacket.buttons,
-                    gLastRxPacket.connected);
-    }
+    consumePacket("ESPNOW-RX", gLastRxPacket);
   }
+
+  if (motion_serialReadPacket(gLastRxPacket)) {
+    consumePacket("MOTION-RX", gLastRxPacket);
+  }
+
+  motion_serialPrintStats();
 }

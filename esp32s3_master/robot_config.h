@@ -25,8 +25,8 @@
 #define servoGrib  42
 
 #define baudrate 921600
-#define serial_1_rxPin 7
-#define serial_1_txPin 6
+#define motion_serial_rxPin 7
+#define motion_serial_txPin 6
 
 #define serial_2_rxPin 4
 #define serial_2_txPin 5
@@ -145,6 +145,10 @@ bool espNowControlInit();
 void espNowControlTick();
 bool espNowControlReadPacket(ControlPacket &outPacket);
 bool espNowControlIsLinkAlive();
+void motion_serial_init();
+void motion_serial_tick();
+bool motion_serialReadPacket(ControlPacket &outPacket);
+void motion_serialPrintStats();
 void setServoAngle(int idServo, int angle);
 void SetupMotors();
 void setupServos();
