@@ -158,8 +158,8 @@ const int sclPin = 14;
 // ============================================================
 // PIN Serial 1 untuk komunikasi dengan ESP32 Master 
 // ============================================================
-#define serial_1_rxPin 9
-#define serial_1_txPin 10
+#define master_serial_rxPin 21
+#define master_serial_txPin 20
 
 // ============================================================
 // PIN WSN-31 untuk komunikasi dengan Modul Radio
