@@ -21,6 +21,9 @@ static void consumePacket(const char *source, ControlPacket &pkt) {
 
 void setup() {
   Serial.begin(115200);
+  Serial.print("ESP32 MAC Address for ESP-NOW: ");
+  Serial.println(WiFi.macAddress());
+  
   SetupMotors();
   setupServos();
   setupEncoders();
@@ -64,10 +67,12 @@ void loop() {
 
   if (espNowControlReadPacket(gLastRxPacket)) {
     consumePacket("ESPNOW-RX", gLastRxPacket);
+    mecanum_control_tick(gLastRxPacket);
   }
 
   if (motion_serialReadPacket(gLastRxPacket)) {
     consumePacket("MOTION-RX", gLastRxPacket);
+    mecanum_control_tick(gLastRxPacket);
   }
 
   motion_serialPrintStats();

@@ -149,6 +149,7 @@ void motion_serial_init();
 void motion_serial_tick();
 bool motion_serialReadPacket(ControlPacket &outPacket);
 void motion_serialPrintStats();
+void mecanum_control_tick(const ControlPacket &pkt);
 void setServoAngle(int idServo, int angle);
 void SetupMotors();
 void setupServos();
