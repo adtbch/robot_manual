@@ -112,14 +112,6 @@ void pidResetOne(int motorIdx) {
         return;
     }
     pidStates[motorIdx].reset();
-
-    // Reset our dynamic vector-based pidData as well!
-    if ((size_t)motorIdx < pidData.size()) {
-        pidData[motorIdx].integral = 0.0;
-        pidData[motorIdx].previousError = 0.0;
-        pidData[motorIdx].error = 0.0;
-        pidData[motorIdx].lastTime = 0;
-    }
 }
 
 void pidReloadFromNVS() {
@@ -136,5 +128,86 @@ void pidReloadFromNVS() {
 void motorStopAll() {
     for (size_t i = 0; i < motors.size(); i++) {
         pwmMotor(i, 0);
+    }
+}
+
+// ============================================================
+// pidCompute — satu-satunya PID compute function
+// Dipakai oleh autoTuner DAN rpmMotor (unifikasi)
+// Anti-windup proporsional terhadap Ki, bukan hardcoded
+// ============================================================
+
+int pidCompute(int motorIdx, float targetRPM, float dt) {
+    if (motorIdx < 0 || (size_t)motorIdx >= pidStates.size()) {
+        return 0;
+    }
+
+    PIDState &pid = pidStates[motorIdx];
+
+    // DETEKSI PERUBAHAN TARGET BESAR: reset integral jika target berubah > 20%
+    // Ini mencegah "overshoot" saat tiba-tiba turun dari 100 RPM ke 30 RPM
+    if (pid.lastTargetRPM != 0.0f && fabs(targetRPM - pid.lastTargetRPM) > fabs(pid.lastTargetRPM) * 0.20f) {
+        pid.integral = 0.0f;  // Reset integral agar tidak ada windup dari target lama
+    }
+    pid.lastTargetRPM = targetRPM;
+
+    float currentRPM = getEncoderVelocityRpm(motorIdx);
+    float error = targetRPM - currentRPM;
+
+    // Proportional
+    float pOut = pid.kp * error;
+
+    // Integral dengan anti-windup proporsional Ki
+    float integralLimit = (pid.ki > 0.0001f) ? (float)maxPwm / pid.ki : 2000.0f;
+    pid.integral += error * dt;
+    pid.integral = constrain(pid.integral, -integralLimit, integralLimit);
+    float iOut = pid.ki * pid.integral;
+
+    // Derivative on MEASUREMENT (bukan error) → mencegah derivative kick
+    float dOut = 0.0f;
+    if (dt > 0.0f && pid.lastTime > 0.0f) {
+        // Negative derivative karena jika currentRPM naik, kita kurangi output
+        dOut = -pid.kd * (currentRPM - pid.lastError) / dt;
+    }
+
+    float output = pOut + iOut + dOut;
+    int pwmOutput = (int)constrain(output, (float)minPwm, (float)maxPwm);
+
+    // Simpan currentRPM sebagai "lastError" untuk derivative next cycle
+    pid.lastError = currentRPM;
+    pid.lastTime  = millis();
+
+    return pwmOutput;
+}
+
+// ============================================================
+// rpmMotorControl — kontrol 4 motor sekaligus via pidCompute
+// ============================================================
+
+void rpmMotorControl(int targetRPM0, int targetRPM1, int targetRPM2, int targetRPM3) {
+    static uint32_t lastTickMs = 0;
+    uint32_t nowMs = millis();
+    float dt = (lastTickMs > 0) ? (nowMs - lastTickMs) / 1000.0f : 0.04f;
+    lastTickMs = nowMs;
+    dt = constrain(dt, 0.01f, 0.1f);
+
+    int targets[4] = {targetRPM0, targetRPM1, targetRPM2, targetRPM3};
+    for (size_t i = 0; i < motors.size() && i < 4; i++) {
+        int pwmOut = pidCompute((int)i, (float)targets[i], dt);
+        pwmMotor((int)i, pwmOut);
+    }
+}
+
+void rpmMotorControlTargets(const std::vector<float> &targetRpm) {
+    static uint32_t lastTickMs = 0;
+    uint32_t nowMs = millis();
+    float dt = (lastTickMs > 0) ? (nowMs - lastTickMs) / 1000.0f : 0.04f;
+    lastTickMs = nowMs;
+    dt = constrain(dt, 0.01f, 0.1f);
+
+    for (size_t i = 0; i < motors.size(); i++) {
+        float target = (i < targetRpm.size()) ? targetRpm[i] : 0.0f;
+        int pwmOut = pidCompute((int)i, target, dt);
+        pwmMotor((int)i, pwmOut);
     }
 }

@@ -5,16 +5,27 @@ const int kinematicMaxrpm = 500;
 void driveRobotCentric(int vx, int vy, int vtheta) {
   // Rumus standar kinematik balik Mecanum Wheel
   int rpm1 = vx + vy - vtheta; // Depan Kiri
-  int rpm2 = vx + vy + vtheta; // Depan Kanan
-  int rpm3 = vx + vy + vtheta; // Belakang Kiri
-  int rpm4 = vx + vy - vtheta; // Belakang Kanan
+  int rpm2 = vx - vy + vtheta; // Depan Kanan
+  int rpm3 = vx - vy - vtheta; // Belakang Kiri
+  int rpm4 = vx + vy + vtheta; // Belakang Kanan
 
   skalaKecepatan(rpm1, rpm2, rpm3, rpm4);
 }
 
 // 2. FIELD-CENTRIC (Maju/Geser berdasarkan arah lapangan, menggunakan data YAW)
 void driveFieldCentric(int vx, int vy, int vtheta) {
-  driveRobotCentric(vx, vy, vtheta);
+  // Rotasi vx/vy dari field frame ke robot frame berdasarkan yaw
+  // vx_r =  vx_f * cos(yaw) + vy_f * sin(yaw)
+  // vy_r = -vx_f * sin(yaw) + vy_f * cos(yaw)
+  float yawRad = getYaw() * (PI / 180.0f);
+  float c = cosf(yawRad);
+  float s = sinf(yawRad);
+
+  int vxRot = roundf(vx * c + vy * s);
+  int vyRot = roundf(-vx * s + vy * c);
+
+  // vtheta (rotasi) tetap robot-relative (standard field-centric convention)
+  driveRobotCentric(vxRot, vyRot, vtheta);
 }
 
 // 3. FUNGSI SCALING (Memastikan rasio kecepatan tetap sama jika melebihi maxrpm)

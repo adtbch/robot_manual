@@ -47,14 +47,15 @@ double computePID(int index, double setpoint, double input, double Kp, double Ki
   if (pidData[index].lastTime > 0) {
     dt = (currentTime - pidData[index].lastTime) / 1000.0;
   }
+  // Clamp dt: jika lastTime == 0 (baru reset) atau dt tidak wajar, pakai 40ms default
   if (pidData[index].lastTime == 0 || dt <= 0.0 || dt > 1.0) {
-    dt = 0.1; // Default to 100ms on first run or invalid dt
+    dt = 0.04; // 40ms — sesuai kPidTickMs autoTuner
   }
   pidData[index].lastTime = currentTime;
 
   // DYNAMIC SETPOINT WEIGHTING (2-DOF PID) - Mencegah lonjakan (Spike) awal
   // Memberikan bobot Kp yang lebih lembut saat selisih (error) masih besar/jauh dari target.
-  double errorRatio = abs(pidData[index].error) / max(abs(setpoint), 1.0);
+  double errorRatio = fabs(pidData[index].error) / fmax(fabs(setpoint), 1.0);
   double dynamicWeight = 0.8; // Default weight untuk jarak jauh (menghaluskan hentakan)
 
   if (errorRatio < 0.5) {
@@ -67,15 +68,19 @@ double computePID(int index, double setpoint, double input, double Kp, double Ki
   double errorP = (dynamicWeight * setpoint) - input;
   double pTerm = Kp * errorP;
 
-  // Accumulate integral (discrete sum menggunakan full error)
-  pidData[index].integral += pidData[index].error;
+  // Accumulate integral — WAJIB dikali dt agar konsisten terhadap tick rate
+  // Tanpa dt, integral tumbuh proporsional jumlah tick, bukan waktu → perilaku berbeda saat rate berubah
+  pidData[index].integral += pidData[index].error * dt;
   pidData[index].integral = constrain(pidData[index].integral, Minintegral, Maxintegral);
 
-  // Calculate derivative (discrete difference)
-  // Derivative on Measurement (mencegah Derivative Kick saat target berubah mendadak)
+  // Calculate derivative (discrete difference) — Derivative on Measurement
+  // (mencegah Derivative Kick saat target berubah mendadak)
+  // FIX: guard pakai flag firstRun, bukan cek != 0.0
+  // Cek != 0.0 akan skip derivative saat motor benar-benar diam (input = 0 RPM)
   double dTerm = 0.0;
-  if (pidData[index].previousInput != 0.0) {
-     dTerm = Kd * -(input - pidData[index].previousInput);
+  if (pidData[index].lastTime > 0 && pidData[index].previousInput != -99999.0) {
+    // Dibagi dt agar magnitude derivative tidak tergantung tick rate
+    dTerm = Kd * -(input - pidData[index].previousInput) / dt;
   }
   pidData[index].previousInput = input;
 

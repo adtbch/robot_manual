@@ -94,8 +94,13 @@ const unsigned long HOMING_TIMEOUT = 30000;
 // POSITIONING CONSTANTS
 // ============================================================
 const int MOTOR_POSITION_TOLERANCE = 10;
-const long MAX_ENCODER_POSITION = 2000;
+const long MAX_ENCODER_POSITION = 2000; // fallback, dipakai per-axis di bawah
 const int MOVE_SPEED = 300;
+
+// Safety limits per-axis (max encoder count, hardware limit)
+const long MAX_POS_W =  500;  // Sumbu W (Rotasi) — range terbatas
+const long MAX_POS_Y = 2900;  // Sumbu Y (Maju Mundur)
+const long MAX_POS_Z = 4580;  // Sumbu Z (Naik Turun) — travel terpanjang
 
 // ============================================================
 // Shared types
@@ -169,6 +174,9 @@ void setMotorTarget(uint8_t motorIndex, long targetPosition);
 void stopMotorTarget(uint8_t motorIndex);
 void stopAllMotorTargets();
 void updateMotorPositioning();
+bool isPositionSafe(uint8_t motorIndex, long pos);
+void moveToPosition(long posW, long posZ, long posY);
+bool moveTargetPosition(uint8_t motorIndex, long targetPosition);
 
 // Homing
 bool setHoming();

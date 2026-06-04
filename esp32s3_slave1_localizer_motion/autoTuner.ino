@@ -24,8 +24,8 @@ namespace AutoTunerNS {
     constexpr float kSteadyStateMinSamples = 10.0f;
 
     // Metrics thresholds (dalam RPM)
-    constexpr float HIGH_OVERSHOOT_PCT = 15.0f;
-    constexpr float MEDIUM_OVERSHOOT_PCT = 8.0f;
+    constexpr float HIGH_OVERSHOOT_PCT = 10.0f;
+    constexpr float MEDIUM_OVERSHOOT_PCT = 5.0f;
     constexpr float LOW_OVERSHOOT_PCT = 3.0f;
     constexpr uint32_t SLOW_RISE_MS = 3000UL;
     constexpr uint32_t MEDIUM_RISE_MS = 1500UL;
@@ -35,18 +35,18 @@ namespace AutoTunerNS {
     constexpr float GOOD_SCORE = 35.0f;
 
     // Scoring weights
-    constexpr float W_ERROR = 12.0f;
-    constexpr float W_OVERSHOOT = 3.0f;
-    constexpr float W_RISE_TIME = 0.003f;
+    constexpr float W_ERROR = 10.0f;
+    constexpr float W_OVERSHOOT = 5.0f;
+    constexpr float W_RISE_TIME = 0.05f;
     constexpr float W_STABILITY = 5.0f;
     constexpr float W_BURST = 0.6f;
 
     // Precision stages adjustment
-    constexpr float KP_COARSE = 5.0f, KP_FINE = 1.5f, KP_ULTRA = 0.5f;
-    constexpr float KI_COARSE = 2.0f, KI_FINE = 0.6f, KI_ULTRA = 0.2f;
+    constexpr float KP_COARSE = 5.0f, KP_FINE = 1.0f, KP_ULTRA = 0.3f;
+    constexpr float KI_COARSE = 1.2f, KI_FINE = 0.8f, KI_ULTRA = 0.4f;
     constexpr float KD_COARSE = 0.10f, KD_FINE = 0.04f, KD_ULTRA = 0.01f;
-    constexpr int STAGE_COARSE_CYCLES = 5;
-    constexpr int STAGE_FINE_CYCLES = 4;
+    constexpr int STAGE_COARSE_CYCLES = 6;
+    constexpr int STAGE_FINE_CYCLES = 5;
     constexpr int STAGNATION_LIMIT = 3;
 }
 
@@ -138,6 +138,7 @@ static bool gScreenDrawn = false;
 static float gCurrentKp, gCurrentKi, gCurrentKd;
 static float gBestKp, gBestKi, gBestKd;
 static float gBestScore;
+static float gCurrentScore;  // Score siklus terakhir — dipakai adjust() untuk mode konservatif
 static CycleMetrics gMetrics;
 
 static Precision gPrecision = Precision::COARSE;
@@ -169,6 +170,11 @@ static void precisionInit() {
 }
 
 static void precisionAdvance() {
+    // Kembalikan parameter aktif ke parameter terbaik sebelum masuk ke stage yang lebih teliti
+    gCurrentKp = gBestKp;
+    gCurrentKi = gBestKi;
+    gCurrentKd = gBestKd;
+
     if (gPrecision == Precision::COARSE) {
         gPrecision = Precision::FINE;
         gKpStep = AutoTunerNS::KP_FINE;
@@ -187,6 +193,13 @@ static void precisionAdvance() {
 static bool precisionShouldAdvance() {
     gStageCount++;
     if (gPrecision == Precision::ULTRA_FINE) return false;
+    
+    // Jika score sudah bagus (< 20), segera naik ke stage berikutnya untuk refinement halus
+    if (gCurrentScore < AutoTunerNS::EXCELLENT_SCORE) {
+        Serial.println("AutoTuner: Excellent score achieved. Advancing stage for fine refinement.");
+        return true;
+    }
+    
     if (gPrecision == Precision::COARSE && (gStageCount >= AutoTunerNS::STAGE_COARSE_CYCLES || gNoImprove >= AutoTunerNS::STAGNATION_LIMIT)) return true;
     if (gPrecision == Precision::FINE && (gStageCount >= AutoTunerNS::STAGE_FINE_CYCLES || gNoImprove >= AutoTunerNS::STAGNATION_LIMIT)) return true;
     return false;
@@ -264,24 +277,38 @@ static void adjustCoarse() {
     float err = gMetrics.avg_err();
     uint32_t rt = gMetrics.rise_time_ms;
 
+    // CONSERVATIVE MODE: jika score sudah bagus, perkecil step size agar tidak overshoot
+    float stepScale = 1.0f;
+    if (gCurrentScore < AutoTunerNS::EXCELLENT_SCORE) {
+        stepScale = 0.2f;
+    } else if (gCurrentScore < AutoTunerNS::GOOD_SCORE) {
+        stepScale = 0.5f;
+    }
+
     if (over > AutoTunerNS::HIGH_OVERSHOOT_PCT) {
-        gCurrentKp *= 0.75f;
-        gCurrentKd *= 1.50f;
+        gCurrentKp *= (1.0f - 0.25f * stepScale);
+        gCurrentKd *= (1.0f + 0.50f * stepScale);
     } else if (rt > AutoTunerNS::SLOW_RISE_MS) {
-        gCurrentKp *= 1.40f;
-        gCurrentKi *= 1.20f;
+        gCurrentKp *= (1.0f + 0.40f * stepScale);
+        gCurrentKi *= (1.0f + 0.20f * stepScale);
     } else if (err > 5.0f) {
-        gCurrentKi *= 1.50f;
+        gCurrentKi *= (1.0f + 0.50f * stepScale);
     } else if (over > AutoTunerNS::MEDIUM_OVERSHOOT_PCT && rt < AutoTunerNS::MEDIUM_RISE_MS) {
-        gCurrentKd *= 1.30f;
-        gCurrentKp *= 0.95f;
+        gCurrentKd *= (1.0f + 0.30f * stepScale);
+        gCurrentKp *= (1.0f - 0.05f * stepScale);
     } else if (gMetrics.burst_detected) {
-        gCurrentKp *= 0.70f;
-        gCurrentKd *= 1.80f;
-        gCurrentKi *= 0.80f;
+        gCurrentKp *= (1.0f - 0.30f * stepScale);
+        gCurrentKd *= (1.0f + 0.80f * stepScale);
+        gCurrentKi *= (1.0f - 0.20f * stepScale);
     } else {
-        if (gNoImprove == 0) gCurrentKp += gKpStep * 1.2f;
-        else gCurrentKi += gKiStep;
+        // Tidak ada masalah signifikan — jangan naikkan Kp/Ki agresif
+        if (gNoImprove == 0) {
+            // Cycle pertama bagus tanpa improvement → coba Ki sedikit
+            gCurrentKi += gKiStep * 0.5f * stepScale;
+        } else {
+            // Sudah beberapa cycle stagnan → hapus Ki sedikit
+            gCurrentKi *= (1.0f - 0.10f * stepScale);
+        }
     }
 }
 
@@ -290,17 +317,25 @@ static void adjustFine() {
     float err = gMetrics.avg_err();
     uint32_t rt = gMetrics.rise_time_ms;
 
+    // CONSERVATIVE MODE: jika score sudah bagus, perkecil step size agar tidak overshoot
+    float stepScale = 1.0f;
+    if (gCurrentScore < AutoTunerNS::EXCELLENT_SCORE) {
+        stepScale = 0.2f;
+    } else if (gCurrentScore < AutoTunerNS::GOOD_SCORE) {
+        stepScale = 0.5f;
+    }
+
     if (over > AutoTunerNS::MEDIUM_OVERSHOOT_PCT) {
-        gCurrentKp -= gKpStep;
-        gCurrentKd += gKdStep * 1.5f;
+        gCurrentKp -= gKpStep * stepScale;
+        gCurrentKd += gKdStep * 1.5f * stepScale;
     } else if (over < AutoTunerNS::LOW_OVERSHOOT_PCT && err < 3.0f && rt < AutoTunerNS::MEDIUM_RISE_MS) {
-        gCurrentKi += gKiStep * 0.8f;
+        gCurrentKi += gKiStep * 0.8f * stepScale;
     } else if (err > 3.0f) {
-        gCurrentKi += gKiStep * 1.2f;
+        gCurrentKi += gKiStep * 1.2f * stepScale;
     } else if (rt > AutoTunerNS::MEDIUM_RISE_MS) {
-        gCurrentKp += gKpStep * 0.8f;
+        gCurrentKp += gKpStep * 0.8f * stepScale;
     } else {
-        gCurrentKd += gKdStep * 0.5f;
+        gCurrentKd += gKdStep * 0.5f * stepScale;
     }
 }
 
@@ -309,17 +344,26 @@ static void adjustUltraFine() {
     float err = gMetrics.avg_err();
     uint32_t rt = gMetrics.rise_time_ms;
 
+    // CONSERVATIVE MODE: jika score sudah bagus, perkecil step size agar tidak overshoot
+    float stepScale = 1.0f;
+    if (gCurrentScore < AutoTunerNS::EXCELLENT_SCORE) {
+        stepScale = 0.2f;
+    } else if (gCurrentScore < AutoTunerNS::GOOD_SCORE) {
+        stepScale = 0.5f;
+    }
+
     if (over > 5.0f) {
-        gCurrentKp -= gKpStep * 0.6f;
+        gCurrentKp -= gKpStep * 0.6f * stepScale;
     } else if (err > 2.0f) {
-        gCurrentKi += gKiStep * 0.8f;
+        gCurrentKi += gKiStep * 0.8f * stepScale;
     } else if (rt > AutoTunerNS::MEDIUM_RISE_MS + 500) {
-        gCurrentKp += gKpStep * 0.5f;
+        gCurrentKp += gKpStep * 0.5f * stepScale;
     } else {
+        // Dithering lebih halus — tidak osilasi agresif
         switch (gCycleCount % 3) {
-            case 0: gCurrentKp += gKpStep * 0.3f; break;
-            case 1: gCurrentKp -= gKpStep * 0.3f; break;
-            case 2: gCurrentKi += gKiStep * 0.4f; break;
+            case 0: gCurrentKp += gKpStep * 0.15f * stepScale; break;
+            case 1: gCurrentKp -= gKpStep * 0.15f * stepScale; break;
+            case 2: gCurrentKi += gKiStep * 0.2f * stepScale; break;
         }
     }
 }
@@ -424,8 +468,28 @@ bool autoTunerIsActive() {
 void autoTunerTick(bool bootPressed) {
     switch (gAtState) {
 
-    case ATState::AT_IDLE:
+    case ATState::AT_IDLE: {
+        static uint32_t bootPressStartMs = 0;
+        if (bootPressed) {
+            if (bootPressStartMs == 0) {
+                bootPressStartMs = millis();  // Catat waktu awal tekan
+                Serial.println("[BOOT] Button pressed, counting...");
+            }
+            // Tahan 3 detik → start, tapi SEBELUM start tunggu tombol dilepas dulu
+            if (millis() - bootPressStartMs >= 3000) {
+                bootPressStartMs = 0;
+                Serial.println("[BOOT] 3s reached — release button to start auto-tune");
+                gAtState = ATState::AT_WAIT_RELEASE;  // tunggu release
+            }
+        } else {
+            // Boot released sebelum 3 detik → reset timer
+            if (bootPressStartMs != 0) {
+                Serial.println("[BOOT] Released before 3s — cancelled");
+            }
+            bootPressStartMs = 0;
+        }
         break;
+    }
 
     case ATState::AT_WAIT_RELEASE:
         if (!bootPressed) {
@@ -475,8 +539,7 @@ void autoTunerTick(bool bootPressed) {
         bool isFirstTime = (fabsf(gCurrentKp - 0.1f) < 0.0001f);
 
         if (isFirstTime && !gUseCustomInitGains) {
-            float target_vel_rads = AUTOTUNE_TARGET_RPM * kRpmToRadPerSec;
-            float kpMin = AutoTunerNS::kMinKpForMotionFraction * maxPwm / target_vel_rads;
+            float kpMin = AutoTunerNS::kMinKpForMotionFraction * maxPwm / AUTOTUNE_TARGET_RPM;
             gCurrentKp = kpMin;
             gCurrentKi = 0.5f;
             gCurrentKd = 0.0f;
@@ -512,7 +575,6 @@ void autoTunerTick(bool bootPressed) {
         pidSetGains(gMotorIdx, gCurrentKp, gCurrentKi, gCurrentKd);
         pidResetOne(gMotorIdx);
         gMetrics.reset();
-        pidResetOne(gMotorIdx);
         gStartMs = millis();
         gLastPidTickMs = millis();
         gAtState = ATState::AT_CYCLE_RUN;
@@ -535,15 +597,15 @@ void autoTunerTick(bool bootPressed) {
 
             float velRpm = getEncoderVelocityRpm(gMotorIdx);
 
-            // Anti-windup startup
-            if (elapsed < AutoTunerNS::kBootPressResetMs && fabsf(velRpm) < AutoTunerNS::kTargetRpm * AutoTunerNS::kMinActiveTargetFraction) {
-                pidResetOne(gMotorIdx);
-            }
+            // Anti-windup startup — DISABLED: reset berulang ini cegah integral build-up
+            // Dengan target change detection di pidCompute, ini tidak diperlukan lagi
+            // if (elapsed < AutoTunerNS::kBootPressResetMs && fabsf(velRpm) < AutoTunerNS::kTargetRpm * AutoTunerNS::kMinActiveTargetFraction) {
+            //     pidResetOne(gMotorIdx);
+            // }
 
-            // Run PID controller
-            double minIntegral = (gCurrentKi > 0.0001f) ? -1023.0 / gCurrentKi : -2000.0;
-            double maxIntegral = (gCurrentKi > 0.0001f) ? 1023.0 / gCurrentKi : 2000.0;
-            int pwm = (int)computePID(gMotorIdx, AutoTunerNS::kTargetRpm, velRpm, gCurrentKp, gCurrentKi, gCurrentKd, minIntegral, maxIntegral);
+            // Run PID controller — pakai pidCompute() yang SAMA dengan runtime rpmMotor
+            // Ini memastikan gains yang dituning = gains yang dipakai saat joystick
+            int pwm = pidCompute(gMotorIdx, AutoTunerNS::kTargetRpm, AutoTunerNS::kPidTickMs / 1000.0f);
             pwmMotor(gMotorIdx, pwm);
 
             // Collect metrics
@@ -582,6 +644,7 @@ void autoTunerTick(bool bootPressed) {
 
         if (elapsed >= AUTOTUNE_RUN_MS) {
             motorStopAll();
+            pidResetOne(gMotorIdx);  // Reset PID state agar cycle baru mulai bersih
             gAtState = ATState::AT_CYCLE_FINISH;
         }
         break;
@@ -589,6 +652,7 @@ void autoTunerTick(bool bootPressed) {
 
     case ATState::AT_CYCLE_FINISH: {
         float score = calculateScore();
+        gCurrentScore = score;
 
         if (score < gBestScore) {
             gBestScore = score;
@@ -598,6 +662,13 @@ void autoTunerTick(bool bootPressed) {
             gNoImprove = 0;
         } else {
             gNoImprove++;
+            // Rollback ke parameter terbaik jika hasil memburuk,
+            // agar adjustment berikutnya dimulai dari baseline yang aman/bagus
+            gCurrentKp = gBestKp;
+            gCurrentKi = gBestKi;
+            gCurrentKd = gBestKd;
+            Serial.printf("AutoTuner: Score worsened (%.1f vs best %.1f). Rolling back to Kp=%.2f Ki=%.2f Kd=%.4f\n",
+                          score, gBestScore, gBestKp, gBestKi, gBestKd);
         }
 
         adjustParameters();
