@@ -11,9 +11,9 @@
  *
  * BITMASK REFERENSI:
  *   L1=bit4, R1=bit5, L2=bit6, R2=bit7
- *   Triangle=bit3, Circle=bit1, Cross=bit0, Square=bit2
- *   Up=bit12, Down=bit14, Left=bit15, Right=bit13
- *   Share=bit8, Options=bit9, PS=bit10, Touchpad=bit13
+ *   Triangle=bit2, Circle=bit1, Cross=bit0, Square=bit3
+ *   Up=bit10, Down=bit11, Left=bit12, Right=bit13
+ *   Share=bit8, Options=bit9, PS=bit16, Touchpad=bit17
  * =====================================================================
  */
 
@@ -36,11 +36,11 @@
 #define BTN_TRIANGLE (1u << 3)
 
 // ============================================================
-// DPAD
+// DPAD — sesuai mapping di esp32controller/ps4_bluetooth.ino
 // ============================================================
-#define BTN_UP       (1u << 12)
-#define BTN_DOWN     (1u << 14)
-#define BTN_LEFT     (1u << 15)
+#define BTN_UP       (1u << 10)
+#define BTN_DOWN     (1u << 11)
+#define BTN_LEFT     (1u << 12)
 #define BTN_RIGHT    (1u << 13)
 
 // ============================================================

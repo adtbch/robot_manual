@@ -11,12 +11,9 @@ static ControlPacket gLastRxPacket = {};
 static void consumePacket(const char *source, ControlPacket &pkt) {
   static uint32_t rxPrintCounter = 0;
   rxPrintCounter++;
-  if (rxPrintCounter % 20 == 1) {
-    Serial.printf("[%s] seq=%u x=%d y=%d w=%d lx=%d ly=%d l2=%u r2=%u btn=%lu conn=%d\n",
-                  source,
-                  pkt.seq, pkt.x, pkt.y, pkt.w,
-                  pkt.lx, pkt.ly, pkt.l2Value, pkt.r2Value,
-                  (unsigned long)pkt.buttons, pkt.connected);
+  if (rxPrintCounter % 50 == 1) {
+    Serial.printf("[%s] seq=%u btn=0x%08lX conn=%d\n",
+                  source, pkt.seq, (unsigned long)pkt.buttons, pkt.connected);
   }
 }
 
@@ -69,11 +66,21 @@ void loop() {
   if (espNowControlReadPacket(gLastRxPacket)) {
     consumePacket("ESPNOW-RX", gLastRxPacket);
     mecanum_control_tick(gLastRxPacket);
+    gripper_tick(gLastRxPacket);
+    gripper_motor_tick(gLastRxPacket);
   }
 
   if (motion_serialReadPacket(gLastRxPacket)) {
     consumePacket("MOTION-RX", gLastRxPacket);
     mecanum_control_tick(gLastRxPacket);
+    gripper_tick(gLastRxPacket);
+    gripper_motor_tick(gLastRxPacket);
+  }
+
+  if (digitalRead(limitSwitchAxisX) == LOW){
+        resetEncoderCount(0); // Reset encoder X saat mulai gerak horizontal
+  } else if (digitalRead(limitSwitchAxisY) == LOW){
+        resetEncoderCount(1); // Reset encoder Z saat mulai gerak vertikal
   }
 
   motion_serialPrintStats();
