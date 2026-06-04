@@ -40,142 +40,81 @@ void pwmMotor(int idMotor, int pwmValue) {
 }
 
 // ============================================================
-// RPM Motor Control for 4 Wheels using the new computePID (vector-based)
+// RPM Motor Control for 4 Wheels
+// Compatible interface: tetap rpmMotor(rpm1, rpm2, rpm3, rpm4)
+// Internal target ramp + PID reset policy untuk perpindahan target ekstrem
 // ============================================================
 
+static int rampedPidPwm(int motorIdx, int requestedRpm, float dt) {
+    static float activeTarget[4] = {0, 0, 0, 0};
+    static int lastRequested[4] = {0, 0, 0, 0};
+
+    if (motorIdx < 0 || motorIdx >= 4) return 0;
+
+    // Target 0 = stop bersih, buang semua history PID motor itu
+    if (requestedRpm == 0) {
+        activeTarget[motorIdx] = 0.0f;
+        lastRequested[motorIdx] = 0;
+        pidResetOne(motorIdx);
+        return 0;
+    }
+
+    const int prevReq = lastRequested[motorIdx];
+    const bool signChanged = (prevReq != 0) && ((prevReq > 0) != (requestedRpm > 0));
+
+    // Ganti arah = mulai kontrol dari state bersih (reset PID & target mulai dari 0)
+    if (signChanged) {
+        pidResetOne(motorIdx);
+        activeTarget[motorIdx] = 0.0f;
+    }
+    lastRequested[motorIdx] = requestedRpm;
+
+    // RAMP — percentage of delta (50% per tick)
+    // Dekat target  → langkah kecil  (smooth finish)
+    // Jauh target   → langkah besar  (fast catch-up)
+    // Self-regulating, tidak perlu tuning ramp rate manual
+    float delta = (float)requestedRpm - activeTarget[motorIdx];
+    if (fabsf(delta) < 2.0f) {
+        // Sudah cukup dekat (< 2 RPM) → set langsung
+        activeTarget[motorIdx] = (float)requestedRpm;
+    } else {
+        // Bergerak 50% dari sisa jarak tiap tick
+        float step = fabsf(delta) * 0.5f;
+        step = fmaxf(step, 1.0f);           // minimal 1 RPM agar tidak stagnasi
+        step = fminf(step, fabsf(delta));  // jangan overshoot
+        activeTarget[motorIdx] += (delta > 0.0f) ? step : -step;
+    }
+
+    return pidCompute(motorIdx, activeTarget[motorIdx], dt);
+}
+
 void rpmMotor(int rpm1, int rpm2, int rpm3, int rpm4) {
-    // Guard 40ms: computePID hanya dijalankan 40Hz agar integral konsisten
-    // dari mana pun fungsi ini dipanggil (auto-tuner, serial, atau loop utama).
-    static unsigned long lastRpmTick = 0;
-    if (millis() - lastRpmTick < 40) return;
-    lastRpmTick = millis();
+    // Guard 40ms: pidCompute hanya dijalankan 40Hz agar integral konsisten
+    // UNIFIKASI: gunakan satu timer untuk guard DAN dt computation
+    static uint32_t lastTickMs = 0;
+    uint32_t nowMs = millis();
+    
+    // Guard: skip jika belum 40ms
+    if (lastTickMs > 0 && (nowMs - lastTickMs) < 40) return;
+    
+    // Compute dt (konsisten dengan guard 40ms)
+    float dt = (lastTickMs > 0) ? (nowMs - lastTickMs) / 1000.0f : 0.04f;
+    lastTickMs = nowMs;
+    dt = constrain(dt, 0.01f, 0.1f);
 
-    // Gunakan konstanta dari robot_config.h
-    const float minrpm_local = -500.0f;
-    const float maxrpm_local = 500.0f;
+    // Constrain input RPMs
+    rpm1 = constrain(rpm1, (int)minrpm, (int)maxrpm);
+    rpm2 = constrain(rpm2, (int)minrpm, (int)maxrpm);
+    rpm3 = constrain(rpm3, (int)minrpm, (int)maxrpm);
+    rpm4 = constrain(rpm4, (int)minrpm, (int)maxrpm);
 
-    // Constrain input RPMs to valid ranges
-    rpm1 = constrain(rpm1, (int)minrpm_local, (int)maxrpm_local);
-    rpm2 = constrain(rpm2, (int)minrpm_local, (int)maxrpm_local);
-    rpm3 = constrain(rpm3, (int)minrpm_local, (int)maxrpm_local);
-    rpm4 = constrain(rpm4, (int)minrpm_local, (int)maxrpm_local);
+    // PID pakai target yang sudah diramp internal; caller tetap kirim target RPM langsung
+    int pwmMotorDepanKanan    = rampedPidPwm(0, rpm1, dt);
+    int pwmMotorDepanKiri     = rampedPidPwm(1, rpm2, dt);
+    int pwmMotorBelakangKanan = rampedPidPwm(2, rpm3, dt);
+    int pwmMotorBelakangKiri  = rampedPidPwm(3, rpm4, dt);
 
-    // Initializing PWM variables
-    int pwmMotorDepanKanan = 0;
-    int pwmMotorDepanKiri = 0;
-    int pwmMotorBelakangKanan = 0;
-    int pwmMotorBelakangKiri = 0;
-
-    // Make sure pidData is initialized to prevent bounds issues
-    if (pidData.size() < 4) {
-        pidData.resize(4);
-    }
-
-    // ==========================================
-    // MOTOR 1 (Indeks 0) - Front Right
-    // ==========================================
-    if (pidStates.size() > 0) {
-        double kp = pidStates[0].kp;
-        double ki = pidStates[0].ki;
-        double kd = pidStates[0].kd;
-        double minintegral = (ki > 0.0001) ? -1023.0 / ki : -2000.0;
-        double maxintegral = (ki > 0.0001) ? 1023.0 / ki : 2000.0;
-
-        float currentRpm = getEncoderVelocityRpm(0);
-
-        if (rpm1 > 0) {
-            pwmMotorDepanKanan = (int)computePID(0, (double)rpm1, (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
-            pwmMotorDepanKanan = constrain(pwmMotorDepanKanan, zeroPwm, maxPwm);
-        } else if (rpm1 < 0) {
-            pwmMotorDepanKanan = (int)computePID(0, (double)abs(rpm1), (double)abs(currentRpm), kp, ki, kd, minintegral, maxintegral);
-            pwmMotorDepanKanan = -pwmMotorDepanKanan;
-            pwmMotorDepanKanan = constrain(pwmMotorDepanKanan, minPwm, zeroPwm);
-        } else {
-            pwmMotorDepanKanan = 0;
-            pidData[0].error = 0.0;
-            pidData[0].integral = 0.0;
-        }
-    }
-
-    // ==========================================
-    // MOTOR 2 (Indeks 1) - Front Left
-    // ==========================================
-    if (pidStates.size() > 1) {
-        double kp = pidStates[1].kp;
-        double ki = pidStates[1].ki;
-        double kd = pidStates[1].kd;
-        double minintegral = (ki > 0.0001) ? -1023.0 / ki : -2000.0;
-        double maxintegral = (ki > 0.0001) ? 1023.0 / ki : 2000.0;
-
-        float currentRpm = getEncoderVelocityRpm(1);
-
-        if (rpm2 > 0) {
-            pwmMotorDepanKiri = (int)computePID(1, (double)rpm2, (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
-            pwmMotorDepanKiri = constrain(pwmMotorDepanKiri, zeroPwm, maxPwm);
-        } else if (rpm2 < 0) {
-            pwmMotorDepanKiri = (int)computePID(1, (double)abs(rpm2), (double)abs(currentRpm), kp, ki, kd, minintegral, maxintegral);
-            pwmMotorDepanKiri = -pwmMotorDepanKiri;
-            pwmMotorDepanKiri = constrain(pwmMotorDepanKiri, minPwm, zeroPwm);
-        } else {
-            pwmMotorDepanKiri = 0;
-            pidData[1].error = 0.0;
-            pidData[1].integral = 0.0;
-        }
-    }
-
-    // ==========================================
-    // MOTOR 3 (Indeks 2) - Back Right
-    // ==========================================
-    if (pidStates.size() > 2) {
-        double kp = pidStates[2].kp;
-        double ki = pidStates[2].ki;
-        double kd = pidStates[2].kd;
-        double minintegral = (ki > 0.0001) ? -1023.0 / ki : -2000.0;
-        double maxintegral = (ki > 0.0001) ? 1023.0 / ki : 2000.0;
-
-        float currentRpm = getEncoderVelocityRpm(2);
-
-        if (rpm3 > 0) {
-            pwmMotorBelakangKanan = (int)computePID(2, (double)rpm3, (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
-            pwmMotorBelakangKanan = constrain(pwmMotorBelakangKanan, zeroPwm, maxPwm);
-        } else if (rpm3 < 0) {
-            pwmMotorBelakangKanan = (int)computePID(2, (double)abs(rpm3), (double)abs(currentRpm), kp, ki, kd, minintegral, maxintegral);
-            pwmMotorBelakangKanan = -pwmMotorBelakangKanan;
-            pwmMotorBelakangKanan = constrain(pwmMotorBelakangKanan, minPwm, zeroPwm);
-        } else {
-            pwmMotorBelakangKanan = 0;
-            pidData[2].error = 0.0;
-            pidData[2].integral = 0.0;
-        }
-    }
-
-    // ==========================================
-    // MOTOR 4 (Indeks 3) - Back Left
-    // ==========================================
-    if (pidStates.size() > 3) {
-        double kp = pidStates[3].kp;
-        double ki = pidStates[3].ki;
-        double kd = pidStates[3].kd;
-        double minintegral = (ki > 0.0001) ? -1023.0 / ki : -2000.0;
-        double maxintegral = (ki > 0.0001) ? 1023.0 / ki : 2000.0;
-
-        float currentRpm = getEncoderVelocityRpm(3);
-
-        if (rpm4 > 0) {
-            pwmMotorBelakangKiri = (int)computePID(3, (double)rpm4, (double)currentRpm, kp, ki, kd, minintegral, maxintegral);
-            pwmMotorBelakangKiri = constrain(pwmMotorBelakangKiri, zeroPwm, maxPwm);
-        } else if (rpm4 < 0) {
-            pwmMotorBelakangKiri = (int)computePID(3, (double)abs(rpm4), (double)abs(currentRpm), kp, ki, kd, minintegral, maxintegral);
-            pwmMotorBelakangKiri = -pwmMotorBelakangKiri;
-            pwmMotorBelakangKiri = constrain(pwmMotorBelakangKiri, minPwm, zeroPwm);
-        } else {
-            pwmMotorBelakangKiri = 0;
-            pidData[3].error = 0.0;
-            pidData[3].integral = 0.0;
-        }
-    }
-
-    // Apply the computed PWM values to each motor physically
+    // Apply PWM
     pwmMotor(0, pwmMotorDepanKanan);
     pwmMotor(1, pwmMotorDepanKiri);
     pwmMotor(2, pwmMotorBelakangKanan);

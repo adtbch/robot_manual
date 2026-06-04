@@ -1,5 +1,7 @@
 #include "armbox_config.h"
 
+extern bool encoderMonitor;
+
 // ============================================================
 // Serial Command Handler (USB Serial + UART)
 // ============================================================
@@ -26,6 +28,7 @@ void setupSerialCommand() {
   Serial.println("  homing        - Start homing all motors");
   Serial.println("  status        - Show motor positions");
   Serial.println("  encoders      - Show encoder counts");
+  Serial.println("  monitor       - Toggle continuous encoder print (every 500ms)");
   Serial.println("  stop          - Stop all motors");
   Serial.println();
 }
@@ -114,6 +117,12 @@ void parseAndExecuteCommand(char* cmd) {
   // ENCODERS
   else if (strcmp(token, "encoders") == 0) {
     printAllEncoders();
+  }
+
+  // ENCODER MONITOR (continuous periodic)
+  else if (strcmp(token, "monitor") == 0) {
+    encoderMonitor = !encoderMonitor;
+    Serial.printf("Encoder continuous monitor: %s\n", encoderMonitor ? "ON (every 500ms)" : "OFF");
   }
 
   // STOP

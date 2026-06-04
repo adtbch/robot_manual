@@ -81,10 +81,12 @@ void serialCommandsTick() {
                         serialTestFieldCentric(vx, vy, w, dur);
                     } else {
                         // Realtime joystick dari Master (tanpa durasi)
-                        // Langsung drive, bypass state machine
+                        // Simpan target — dieksekusi di serialCommandsTick() dengan interval 40ms
                         g_joystickActive = true;
                         g_lastJoystickMs = millis();
-                        driveFieldCentric(vx, vy, w);
+                        g_cmdVx = vx;
+                        g_cmdVy = vy;
+                        g_cmdVtheta = w;
                     }
                 }
                 pos = 0; // Reset buffer
@@ -107,6 +109,15 @@ void serialCommandsTick() {
         g_joystickActive = false;
         motorStopAll();
         Serial.println("[JOYSTICK] Timeout — motor stopped");
+        return;
+    }
+
+    // Joystick realtime: drive dengan interval 40ms (sama dengan autoTuner tick)
+    // Ini memastikan PID dipanggil pada frekuensi yang sama saat runtime dan autoTuning
+    static uint32_t lastJoyDriveMs = 0;
+    if (g_joystickActive && (millis() - lastJoyDriveMs >= 40)) {
+        lastJoyDriveMs = millis();
+        driveFieldCentric(g_cmdVx, g_cmdVy, g_cmdVtheta);
     }
 
     switch (g_cmdState) {
@@ -334,6 +345,10 @@ void printSerialUsage() {
     Serial.println("\nKINEMATIK:");
     Serial.println("  ROBOT <vx> <vy> <w> <ms>                   - robot-centric movement");
     Serial.println("  FIELD <vx> <vy> <w> <ms>                   - field-centric movement");
+    Serial.println("\nMPU/GYRO:");
+    Serial.println("  CALIB_GYRO                                 - recalibrate gyro bias (auto-save to NVS)");
+    Serial.println("  RESET_GYRO                                 - clear saved gyro bias, force recalib on next boot");
+    Serial.println("  YAW                                        - print current yaw angle");
     Serial.println("\nOTHER:");
     Serial.println("  STOP                                       - emergency stop");
     Serial.println("  HELP                                       - show this help");
@@ -528,6 +543,39 @@ void processSerialCommands() {
 
         serialContinuousStop();
         serialTestFieldCentric(atoi(svx), atoi(svy), atoi(sw), (unsigned long)dur);
+        return;
+    }
+
+    // ==================== RESET_PID (Clear NVS PID data) ====================
+    if (strncmp(cmd, "RESET_PID", 9) == 0) {
+        Preferences prefs;
+        prefs.begin(PID_NVS_NAMESPACE, false);
+        prefs.clear();
+        prefs.end();
+        Serial.println("PID NVS data cleared. Reloading defaults...");
+        pidControllerInit();  // Reload default values
+        Serial.println("PID reset complete. Run AUTOTUNE to retune.");
+        return;
+    }
+
+    // ==================== CALIB_GYRO (Recalibrate gyro bias) ====================
+    if (strncmp(cmd, "CALIB_GYRO", 10) == 0) {
+        serialEmergencyStop();
+        delay(100);
+        calibrateGyroHot(); // auto-save ke NVS
+        return;
+    }
+
+    // ==================== RESET_GYRO (Clear saved gyro bias) ====================
+    if (strncmp(cmd, "RESET_GYRO", 10) == 0) {
+        gyroBiasClearNVS();
+        Serial.println("Gyro NVS cleared. Recalibrate on next boot or send CALIB_GYRO now.");
+        return;
+    }
+
+    // ==================== YAW (Print current yaw) ====================
+    if (strncmp(cmd, "YAW", 3) == 0) {
+        Serial.printf("Yaw: %.2f deg\n", getYaw());
         return;
     }
 

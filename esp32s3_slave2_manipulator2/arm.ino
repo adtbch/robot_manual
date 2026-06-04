@@ -15,13 +15,34 @@ static MotorTarget motorTargets[MOTOR_COUNT] = {
   {0, false}
 };
 
+// Helper: dapatkan safety limit per-axis
+static long getAxisMaxPos(uint8_t motorIndex) {
+  switch (motorIndex) {
+    case MOTOR_W: return MAX_POS_W;
+    case MOTOR_Y: return MAX_POS_Y;
+    case MOTOR_Z: return MAX_POS_Z;
+    default:      return MAX_ENCODER_POSITION;
+  }
+}
+
+// Safety check: apakah posisi dalam batas aman per-axis?
+bool isPositionSafe(uint8_t motorIndex, long pos) {
+  long maxPos = getAxisMaxPos(motorIndex);
+  return (pos >= 0 && pos <= maxPos);
+}
+
 void setMotorTarget(uint8_t motorIndex, long targetPosition) {
   if (motorIndex >= motors.size()) return;
 
-  targetPosition = constrain(targetPosition, 0, MAX_ENCODER_POSITION);
+  // Safety: constrain per-axis limit
+  long maxPos = getAxisMaxPos(motorIndex);
+  targetPosition = constrain(targetPosition, 0, maxPos);
 
   motorTargets[motorIndex].targetPosition = targetPosition;
   motorTargets[motorIndex].active = true;
+
+  char axis = (motorIndex == MOTOR_W) ? 'W' : ((motorIndex == MOTOR_Z) ? 'Z' : 'Y');
+  Serial.printf("Motor %c target: %ld (safe limit: %ld)\n", axis, targetPosition, maxPos);
 }
 
 void stopMotorTarget(uint8_t motorIndex) {
@@ -85,7 +106,7 @@ bool setHoming() {
   }
 
   if (!motorArm.homed[2]) {
-    pwmMotor(2, -HOMING_SPEED);
+    pwmMotor(2, -HOMING_SPEED * 2.5);
   }
 
   // Return true hanya jika semua motor sudah selesai homing
@@ -152,4 +173,23 @@ void printHomingStatus() {
     char axis = (i == MOTOR_W) ? 'W' : ((i == MOTOR_Z) ? 'Z' : 'Y');
     Serial.printf("  Motor %c: %s\n", axis, motorArm.homed[i] ? "HOMED" : "NOT HOMED");
   }
+}
+
+// ============================================================
+// Multi-axis movement (non-blocking)
+// ============================================================
+
+// Set target 3 sumbu sekaligus dengan safety per-axis
+void moveToPosition(long posW, long posZ, long posY) {
+  setMotorTarget(MOTOR_W, posW);
+  setMotorTarget(MOTOR_Z, posZ);
+  setMotorTarget(MOTOR_Y, posY);
+  Serial.printf("moveToPosition: W=%ld Z=%ld Y=%ld\n", posW, posZ, posY);
+}
+
+// Singleton helper: move satu sumbu, return false jika masih bergerak
+bool moveTargetPosition(uint8_t motorIndex, long targetPosition) {
+  setMotorTarget(motorIndex, targetPosition);
+  updateMotorPositioning();
+  return !motorTargets[motorIndex].active;
 }

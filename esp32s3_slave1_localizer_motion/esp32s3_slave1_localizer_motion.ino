@@ -31,7 +31,13 @@ void loop() {
   // Relay: teruskan semua byte dari WSN-31 ke Master (tanpa parsing)
   wsn_serial_tick();
 
-  convertEncoderToRPM();
+  // convertEncoderToRPM dengan interval 40ms — konsisten dengan autoTuner tick
+  static uint32_t lastEncoderMs = 0;
+  if (millis() - lastEncoderMs >= 40) {
+    lastEncoderMs = millis();
+    convertEncoderToRPM();
+  }
+
   updateYaw();
   autoTunerTick(digitalRead(BOOT_BUTTON_PIN) == LOW);
 

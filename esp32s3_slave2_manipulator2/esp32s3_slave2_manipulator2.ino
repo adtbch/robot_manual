@@ -47,6 +47,9 @@ void setup() {
   Serial.println("========================================\n");
 }
 
+// Flag untuk continuous encoder monitor (toggle via serial: monitor)
+bool encoderMonitor = false;
+
 void loop() {
   // 1) Serial command handler (USB Serial)
   serialCommandTick();
@@ -54,4 +57,11 @@ void loop() {
   // 2) UART command handler (from master ESP32)
   readUART();
   processUARTCommand();
+
+  // 3) Continuous encoder monitor (periodik 500ms)
+  static uint32_t lastEncPrint = 0;
+  if (encoderMonitor && millis() - lastEncPrint >= 500) {
+    lastEncPrint = millis();
+    printAllEncoders();
+  }
 }

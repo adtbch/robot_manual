@@ -53,11 +53,13 @@ typedef struct {
 	float integral;
 	float lastError;
 	float lastTime;
+	float lastTargetRPM;  // Track previous target untuk deteksi perubahan
 
 	void reset() {
 		integral = 0.0f;
 		lastError = 0.0f;
 		lastTime = 0.0f;
+		lastTargetRPM = 0.0f;
 	}
 } PIDState;
 
