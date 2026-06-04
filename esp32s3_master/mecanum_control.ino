@@ -5,20 +5,20 @@
  *           perintah mecanum kinematik, kirim ke Slave via motion_serial.
  *
  * MAPPING:
- *   Left stick Y  (ly) → Vx  (maju/mundur)
- *   Left stick X  (lx) → Vy  (geser kiri/kanan)
- *   Right stick X (rx) → W   (rotasi)
+ *   pkt.x  → Vy  (geser kiri/kanan lateral)   sudah -1023..1023
+ *   pkt.y  → Vx  (maju/mundur)                sudah -1023..1023, Y diinvert di controller
+ *   pkt.w  → W   (rotasi / sudut putar)       sudah -1023..1023
  *
- * SPEED MODE:
- *   Default        → 100
- *   R1 hold (tahan) → 300 (cepat)
- *   L1 hold (tahan) → 50  (lambat)
+ * SPEED MODE (via tombol):
+ *   Default        → skala penuh dari controller
+ *   R1 hold (tahan) → cepat (tidak scale ulang — sudah dari controller)
+ *   L1 hold (tahan) → lambat (50% dari nilai pkt)
  *
  * PROTOKOL KE SLAVE:
  *   "Vx Vy W\n"    (tanpa durasi — slave auto-stop 2 detik)
  *
  * SAFETY:
- *   - Deadzone: analog |val| < 15 dianggap 0
+ *   - Deadzone kecil 20 (dari -1023..1023) untuk noise tengah stik
  *   - Update minimal tiap 100ms agar slave tidak timeout (2 detik)
  * =====================================================================
  */
@@ -27,9 +27,8 @@
 
 #define SLAVE_SERIAL Serial1
 
-static const int8_t  DEADZONE      = 15;
-static const int16_t ANALOG_MAX    = 127;
-static const unsigned long SEND_INTERVAL_MS = 100;
+static const int16_t DEADZONE_RAW    = 10;   // deadzone untuk raw int8_t -128..127
+static const unsigned long SEND_INTERVAL_MS = 50;
 
 // =====================================================================
 //  STATE
@@ -44,8 +43,8 @@ static unsigned long gLastSendMs = 0;
 //  HELPER
 // =====================================================================
 
-static int8_t applyDeadzone(int8_t val) {
-    if (abs(val) < DEADZONE) return 0;
+static int8_t applyDeadzoneRaw(int8_t val) {
+    if (abs(val) < DEADZONE_RAW) return 0;
     return val;
 }
 
@@ -56,9 +55,8 @@ static int16_t getSpeedMode(uint32_t buttons) {
 }
 
 static int16_t scaleSpeed(int8_t val, int16_t maxSpeed) {
-    return map(val, -ANALOG_MAX, ANALOG_MAX, -maxSpeed, maxSpeed);
+    return map((int16_t)val, -128, 127, -maxSpeed, maxSpeed);
 }
-
 // =====================================================================
 //  KIRIM PERINTAH KE SLAVE
 // =====================================================================
@@ -82,17 +80,18 @@ void mecanum_control_tick(const ControlPacket &pkt) {
         }
         return;
     }
-
+    
     int16_t maxSpeed = getSpeedMode(pkt.buttons);
+    
+    // Ambil dari pkt.lx/ly/rx (raw int8_t -128..127 dari controller), olah di sini
+    int8_t rawVx = applyDeadzoneRaw(pkt.ly);    // maju/mundur (ly: push maju = negatif)
+    int8_t rawVy = applyDeadzoneRaw(pkt.lx);    // geser kiri/kanan
+    int8_t rawW  = applyDeadzoneRaw(pkt.rx);    // rotasi
 
-    int8_t lx = applyDeadzone(pkt.lx);
-    int8_t ly = applyDeadzone(pkt.ly);
-    int8_t rx = applyDeadzone(pkt.rx);
-
-    int16_t vx = scaleSpeed(-ly, maxSpeed);
-    int16_t vy = scaleSpeed(lx, maxSpeed);
-    int16_t w  = scaleSpeed(rx, maxSpeed);
-
+    int16_t vx = scaleSpeed(-rawVx, maxSpeed);  // invert Y: push maju → vx positif
+    int16_t vy = scaleSpeed(rawVy,  maxSpeed);
+    int16_t w  = scaleSpeed(rawW,   maxSpeed);
+    
     bool changed = (vx != gLastVx || vy != gLastVy || w != gLastW);
     unsigned long nowMs = millis();
 

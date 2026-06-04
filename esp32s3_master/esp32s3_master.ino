@@ -65,7 +65,6 @@ void loop() {
   serialCommandTick();
   espNowControlTick();
   motion_serial_tick();
-
   if (espNowControlReadPacket(gLastRxPacket)) {
     consumePacket("ESPNOW-RX", gLastRxPacket);
     mecanum_control_tick(gLastRxPacket);

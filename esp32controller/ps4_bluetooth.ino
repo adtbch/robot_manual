@@ -143,17 +143,11 @@ bool ps4_is_aktif(uint32_t sekarang) {
 void ps4_baca_paket(ControlPacket &paket) {
     paket.magic = kPacketMagic;
 
-    // --- Analog stik mentah (-128..127) ---
+    // --- Analog stik mentah (-128..127) — int8_t, jangan discale ---
     paket.lx = PS4.LStickX();
     paket.ly = PS4.LStickY();
     paket.rx = PS4.RStickX();
     paket.ry = PS4.RStickY();
-
-    // --- Perintah gerak (dikali 8 → range ~-1016..1016) ---
-    // Y dibalik: pada PS4, dorong maju = nilai negatif LStickY
-    paket.x = static_cast<int16_t>(PS4.LStickX()) * 8;
-    paket.y = static_cast<int16_t>(-PS4.LStickY()) * 8;
-    paket.w = static_cast<int16_t>(PS4.RStickX()) * 8;
 
     // --- Trigger analog (0..255) ---
     paket.l2Value = PS4.L2Value();
