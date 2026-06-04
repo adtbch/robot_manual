@@ -4,6 +4,9 @@
 // Paket terakhir untuk debugging/manual processing.
 static ControlPacket gLastRxPacket = {};
 
+// Edge detection untuk tombol Options (mode toggle)
+static bool optionsPrev = false;
+
 // =====================================================================
 //  SHARED: consume packet + print throttled (tiap 20 paket)
 // =====================================================================
@@ -15,6 +18,13 @@ static void consumePacket(const char *source, ControlPacket &pkt) {
     Serial.printf("[%s] seq=%u btn=0x%08lX conn=%d\n",
                   source, pkt.seq, (unsigned long)pkt.buttons, pkt.connected);
   }
+
+  // Deteksi edge tombol Options → toggle mode
+  bool optionsNow = (pkt.buttons & BTN_OPTIONS) != 0;
+  if (optionsNow && !optionsPrev) {
+    mode_toggle();
+  }
+  optionsPrev = optionsNow;
 }
 
 void setup() {
@@ -54,6 +64,7 @@ void setup() {
   
   motion_serial_init();
   setupSerialCommand();
+  mode_init();
   
   Serial.println("Robot ready!");
 }
