@@ -31,6 +31,17 @@ static bool     ps4_status_sebelumnya = false; // untuk deteksi perubahan koneks
 static bool     led_state             = false; // status LED saat ini (ON/OFF)
 static uint32_t waktu_led_terakhir    = 0;     // untuk timing kedip LED
 
+// --- State untuk toggle warna LED PS4 via Options ---
+static bool     options_prev          = false; // edge detection: state sebelumnya
+static uint8_t  led_color_index       = 0;     // indeks warna aktif
+
+// Palet warna untuk LED PS4 (R, G, B) — kontras tinggi
+static const uint8_t led_palet[][3] = {
+    {0,   0,   255},  // 0: Biru
+    {255, 0,   0  },  // 1: Merah
+};
+static const uint8_t kLedPaletCount = sizeof(led_palet) / sizeof(led_palet[0]);
+
 // =====================================================================
 //  FUNGSI: INISIALISASI BLUETOOTH PS4
 // =====================================================================
@@ -110,6 +121,13 @@ bool ps4_is_aktif(uint32_t sekarang) {
         if (!ps4_status_sebelumnya) {
             ps4_status_sebelumnya = true;
             Serial.println("[PS4] Terhubung!");
+            // Set LED ke warna terakhir saat pertama kali connect
+            uint8_t r = led_palet[led_color_index][0];
+            uint8_t g = led_palet[led_color_index][1];
+            uint8_t b = led_palet[led_color_index][2];
+            PS4.setLed(r, g, b);
+            PS4.sendToController();
+            Serial.printf("[PS4] LED diset ke R=%u G=%u B=%u\n", r, g, b);
         }
         return true;
     }
@@ -179,6 +197,20 @@ void ps4_baca_paket(ControlPacket &paket) {
     if (PS4.PSButton()) btn |= (1u << 16);
     if (PS4.Touchpad()) btn |= (1u << 17);
     paket.buttons = btn;
+
+    // --- Deteksi edge tombol Options → ganti warna LED PS4 ---
+    bool options_sekarang = PS4.Options();
+    if (options_sekarang && !options_prev) {
+        // Rising edge: baru saja ditekan
+        led_color_index = (led_color_index + 1) % kLedPaletCount;
+        uint8_t r = led_palet[led_color_index][0];
+        uint8_t g = led_palet[led_color_index][1];
+        uint8_t b = led_palet[led_color_index][2];
+        PS4.setLed(r, g, b);
+        PS4.sendToController();
+        Serial.printf("[PS4] Options ditekan → LED: R=%u G=%u B=%u\n", r, g, b);
+    }
+    options_prev = options_sekarang;
 
     // --- Metadata ---
     nomor_urut_paket++;

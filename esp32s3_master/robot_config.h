@@ -58,6 +58,29 @@ const uint8_t espNowChannel = 1;
 const unsigned long espNowLinkAliveMs = 180;
 const unsigned long espNowStatsIntervalMs = 1000;
 
+// ============================================================
+// PS4 BUTTON BITMASK — harus sama dengan esp32controller
+// ============================================================
+#define BTN_L1       (1u << 4)
+#define BTN_R1       (1u << 5)
+#define BTN_L2       (1u << 6)
+#define BTN_R2       (1u << 7)
+#define BTN_CROSS    (1u << 0)
+#define BTN_CIRCLE   (1u << 1)
+#define BTN_SQUARE   (1u << 3)
+#define BTN_TRIANGLE (1u << 2)
+#define BTN_UP       (1u << 10)
+#define BTN_DOWN     (1u << 11)
+#define BTN_LEFT     (1u << 12)
+#define BTN_RIGHT    (1u << 13)
+#define BTN_SHARE    (1u << 14)
+#define BTN_OPTIONS  (1u << 15)
+#define BTN_PS       (1u << 16)
+#define BTN_TOUCHPAD (1u << 17)
+
+#define SPEED_MODE_FAST    300
+#define SPEED_MODE_DEFAULT 100
+#define SPEED_MODE_SLOW    50
 
 // ============================================================
 // Shared types and extern globals
@@ -137,6 +160,15 @@ const long MAX_ENCODER_POSITION_X = 2000;  // Batas maksimum encoder X
 const long MAX_ENCODER_POSITION_Z = 2000;  // Batas maksimum encoder Z
 
 // ============================================================
+// MODE SYSTEM — toggle via tombol Options, disimpan di NVS
+// ============================================================
+enum RobotMode : uint8_t {
+    MODE_GRIPPING = 0,  // Mode gripper aktif
+    MODE_ARM_BOX  = 1,  // Mode arm box
+};
+extern RobotMode currentMode;
+
+// ============================================================
 // Shared function declarations
 // ============================================================
 void pwmMotor(int idMotor, int pwmValue);
@@ -150,6 +182,9 @@ void motion_serial_tick();
 bool motion_serialReadPacket(ControlPacket &outPacket);
 void motion_serialPrintStats();
 void mecanum_control_tick(const ControlPacket &pkt);
+void gripper_init();
+void gripper_tick(const ControlPacket &pkt);
+void gripper_motor_tick(const ControlPacket &pkt);
 void setServoAngle(int idServo, int angle);
 void SetupMotors();
 void setupServos();
@@ -171,3 +206,8 @@ void updateMotorPositioning();
 // Serial command functions
 void setupSerialCommand();
 void serialCommandTick();
+
+// Mode control functions
+void mode_init();
+void mode_toggle();
+const char* mode_name();
