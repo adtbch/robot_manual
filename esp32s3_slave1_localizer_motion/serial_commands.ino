@@ -346,8 +346,8 @@ void printSerialUsage() {
     Serial.println("  ROBOT <vx> <vy> <w> <ms>                   - robot-centric movement");
     Serial.println("  FIELD <vx> <vy> <w> <ms>                   - field-centric movement");
     Serial.println("\nMPU/GYRO:");
-    Serial.println("  CALIB_GYRO                                 - recalibrate gyro bias (auto-save to NVS)");
-    Serial.println("  RESET_GYRO                                 - clear saved gyro bias, force recalib on next boot");
+    Serial.println("  CALIB_GYRO                                 - recalibrate accel+gyro+mag (auto-save to NVS)");
+    Serial.println("  RESET_GYRO                                 - clear saved calibration, force recalib on next boot");
     Serial.println("  YAW                                        - print current yaw angle");
     Serial.println("\nOTHER:");
     Serial.println("  STOP                                       - emergency stop");
@@ -566,10 +566,10 @@ void processSerialCommands() {
         return;
     }
 
-    // ==================== RESET_GYRO (Clear saved gyro bias) ====================
+    // ==================== RESET_GYRO (Clear saved calibration) ====================
     if (strncmp(cmd, "RESET_GYRO", 10) == 0) {
-        gyroBiasClearNVS();
-        Serial.println("Gyro NVS cleared. Recalibrate on next boot or send CALIB_GYRO now.");
+        calibClearNVS();
+        Serial.println("Calibration NVS cleared. Recalibrate on next boot or send CALIB_GYRO now.");
         return;
     }
 

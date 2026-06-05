@@ -16,6 +16,7 @@ void setup() {
   Wire.begin(sdaPin,sclPin);
   Wire.setClock(400000);
   pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP);
+  setupOLED();
   SetupMotors();
   pidControllerInit();
   setupEncoders();
@@ -23,7 +24,7 @@ void setup() {
   if (!setupMPU()) {
     Serial.println("MPU: not ready, yaw will stay 0");
   }
-  setupOLED();
+  // Reinit I2C bus — MPU9250 library may leave bus in bad state
   Serial.println("=== Robot Slave — WSN-31 Relay ===");
 }
 
@@ -46,7 +47,11 @@ void loop() {
   serialCommandsTick();
   serialContinuousTick();
 
-  // Update OLED display setiap 200ms
-  const char* status = autoTunerIsActive() ? "AUTOTUNE" : "READY";
-  displayYaw(getYaw(), status);
+  // Update OLED — rate limit 200ms supaya tidak starve I2C bus MPU9250
+  static uint32_t lastOledMs = 0;
+  if (millis() - lastOledMs >= 200) {
+    lastOledMs = millis();
+    const char* status = autoTunerIsActive() ? "AUTOTUNE" : "READY";
+    displayYaw(getYaw(), status);
+  }
 }

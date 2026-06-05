@@ -3,7 +3,7 @@
 #include <vector> // Tambahkan header untuk std::vector
 #include <Preferences.h>
 
-#include "MPU6050_6Axis_MotionApps20.h"
+#include "MPU9250.h"
 
 // ============================================================
 // PID & NVS Configuration
@@ -235,7 +235,4 @@ namespace SerialMaster {
   void printStats();
 }
 
-extern float yawDeg;
-extern float pitchDeg;
-extern float rollDeg;
 #define INTERRUPT_PIN 46
