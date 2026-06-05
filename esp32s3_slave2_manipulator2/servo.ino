@@ -18,15 +18,15 @@ void setupServos() {
 }
 
 void setServoAngle(int idServo, int angle) {
-  if (idServo < 0 || (size_t)idServo >= servos.size()) return;
-
-  angle = constrain(angle, servoMinAngle, servoMaxAngle);
-
-  long pulseWidth = map(angle, servoMinAngle, servoMaxAngle, servoMinPulseUs, servoMaxPulseUs);
-  long duty = (pulseWidth * ((1 << servoResolution) - 1)) / 20000;
-
+  // 1. Ubah sudut (0-180) menjadi lebar pulsa waktu (500us sampai 2400us)
+  // Rentang standar servo: 500us (0 derajat) hingga 2400us (180 derajat)
+  long pulseWidth = map(angle, 0, 180, 500, 2400);
+  
+  // 2. Petakan lebar pulsa ke nilai Duty Cycle resolusi 14-bit (0 hingga 16383)
+  // Rumus: (pulseWidth / 20000us) * 16383
+  long duty = (pulseWidth * 16383) / 20000;
+  
   ledcWrite(servos[idServo].ledc_channel, duty);
-  currentServoAngle = angle;
 }
 
 int getCurrentServoAngle() {

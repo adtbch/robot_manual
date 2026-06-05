@@ -26,11 +26,11 @@ void setup() {
   setupLimits();
   initUART();
   setupSerialCommand();
+  initPidW();
 
   // Step 2: Homing process
   Serial.println("\nStarting homing...");
   while (!setHoming()) {
-    setServoAngle(0, servoHomeAngle);
     Serial.println("Homing in progress...");
   }
   Serial.println("Homing complete!");
@@ -42,6 +42,7 @@ void setup() {
   Serial.println("Encoder counts reset to 0");
 
   motorStopAll();
+  setMotorTarget(MOTOR_W, 0); // Mulai aktif menahan posisi home (0) untuk Motor W
   Serial.println("\n========================================");
   Serial.println("Robot ready!");
   Serial.println("========================================\n");
@@ -51,14 +52,20 @@ void setup() {
 bool encoderMonitor = false;
 
 void loop() {
+  checkLimitSwitches();  // Reset encoder jika limit switch aktif
+  updateEncoderCounts(); // Pastikan kita selalu punya nilai encoder terbaru (volatile)
+  
   // 1) Serial command handler (USB Serial)
   serialCommandTick();
-
+  
   // 2) UART command handler (from master ESP32)
   readUART();
   processUARTCommand();
 
-  // 3) Continuous encoder monitor (periodik 500ms)
+  // 3) Motor positioning update (tiap loop)
+  updateMotorPositioning();
+
+  // 4) Continuous encoder monitor (periodik 500ms)
   static uint32_t lastEncPrint = 0;
   if (encoderMonitor && millis() - lastEncPrint >= 500) {
     lastEncPrint = millis();

@@ -90,10 +90,12 @@ Baudrate Serial: **`115200`**. Setiap command diakhiri dengan newline (`\n` atau
 
 ### 4. Perintah Relay
 
-- `relay0 <0/1>` - Mengatur Relay 1 (`0` = OFF, `1` = ON)
-- `relay1 <0/1>` - Mengatur Relay 2 (`0` = OFF, `1` = ON)
-- `relay0_on` / `relay0_off` - Nyalakan / Matikan Relay 1
-- `relay1_on` / `relay1_off` - Nyalakan / Matikan Relay 2
+- `relay0 <0/1>` - Atur Relay 1 (`0` = ON (nyala), `1` = OFF (mati))
+- `relay1 <0/1>` - Atur Relay 2 (`0` = ON (nyala), `1` = OFF (mati))
+- `relay0_on` / `relay0_off` - Nyalakan / Matikan Relay 1 (via preset)
+- `relay1_on` / `relay1_off` - Nyalakan / Matikan Relay 2 (via preset)
+
+> **Catatan:** Nilai `0` = ON (nyala), `1` = OFF (mati). Ini kebalikan dari konvensi biner biasa — dirancang agar pemanggilan fungsi `relay(id, 0)` langsung menyalakan relay tanpa perlu mengingat `true/false`.
 
 ### 5. Perintah Sistem Utama
 

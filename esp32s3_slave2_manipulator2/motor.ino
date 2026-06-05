@@ -13,6 +13,9 @@ std::vector<MotorConfig> motors = {
 
 MotorState motorArm = {false, false, false};
 
+// Track last PWM value per motor (untuk limit switch check)
+static int lastPwmValue[MOTOR_COUNT] = {0, 0, 0};
+
 void SetupMotors() {
   for (size_t i = 0; i < motors.size(); i++) {
     pinMode(motors[i].pinDirection, OUTPUT);
@@ -29,7 +32,16 @@ void SetupMotors() {
 void pwmMotor(int idMotor, int pwmValue) {
   if (idMotor < 0 || (size_t)idMotor >= motors.size()) return;
 
+  // Safety: block PWM jika limit switch aktif (LOW) dan PWM minus
+  if (digitalRead(motors[idMotor].limitPin) == LOW && pwmValue < 0) {
+    ledcWrite(motors[idMotor].ledc_channel, 0);
+    digitalWrite(motors[idMotor].pinDirection, LOW);
+    lastPwmValue[idMotor] = 0;
+    return;
+  }
+
   pwmValue = constrain(pwmValue, minPwm, maxPwm);
+  lastPwmValue[idMotor] = pwmValue;
 
   if (pwmValue > 0) {
     ledcWrite(motors[idMotor].ledc_channel, pwmValue);
@@ -47,4 +59,9 @@ void motorStopAll() {
   for (size_t i = 0; i < motors.size(); i++) {
     pwmMotor(i, 0);
   }
+}
+
+int getLastPwmValue(uint8_t motorIndex) {
+  if (motorIndex >= MOTOR_COUNT) return 0;
+  return lastPwmValue[motorIndex];
 }

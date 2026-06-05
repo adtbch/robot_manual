@@ -41,12 +41,14 @@ void resetEncoderCount(uint8_t motorIndex) {
   encoders[motorIndex].count = 0;
 }
 
-long getEncoderCount(uint8_t motorIndex) {
-  if (motorIndex >= encoders.size()) return 0;
-  return encoders[motorIndex].count;
+void updateEncoderCounts() {
+  // Baca dari volatile ISR count → global vars
+  encoderMotorW = encoders[0].count;
+  encoderMotorZ = encoders[1].count;
+  encoderMotorY = encoders[2].count;
 }
 
 void printAllEncoders() {
   Serial.printf("Encoders: W=%ld | Z=%ld | Y=%ld\n",
-                encoders[0].count, encoders[1].count, encoders[2].count);
+                encoderMotorW, encoderMotorZ, encoderMotorY);
 }

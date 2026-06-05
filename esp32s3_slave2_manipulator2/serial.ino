@@ -23,11 +23,13 @@ void setupSerialCommand() {
   Serial.println("  motorZ <pos>  - Move Motor Z (Naik Turun) to position");
   Serial.println("  motorY <pos>  - Move Motor Y (Maju Mundur) to position");
   Serial.println("  servo0 <angle> - Set servo angle (0-180)");
-  Serial.println("  relay0 <0/1>  - Set relay 1 on/off");
-  Serial.println("  relay1 <0/1>  - Set relay 2 on/off");
+  Serial.println("  relay0 <0/1>  - Set relay 1 (0=ON, 1=OFF)");
+  Serial.println("  relay1 <0/1>  - Set relay 2 (0=ON, 1=OFF)");
   Serial.println("  homing        - Start homing all motors");
   Serial.println("  status        - Show motor positions");
   Serial.println("  encoders      - Show encoder counts");
+  Serial.println("  setpid <p> <i> <d> - Set & Save PID constants for Motor W");
+  Serial.println("  showpid       - Print current PID constants");
   Serial.println("  monitor       - Toggle continuous encoder print (every 500ms)");
   Serial.println("  stop          - Stop all motors");
   Serial.println();
@@ -88,11 +90,10 @@ void parseAndExecuteCommand(char* cmd) {
     uint8_t relayId = token[5] - '0';
     char* valueStr = strtok(NULL, " ");
     if (valueStr != NULL) {
-      bool state = atoi(valueStr);
-      setRelay(relayId, state);
-      Serial.printf("Relay %d set to: %s\n", relayId, state ? "ON" : "OFF");
+      int val = atoi(valueStr); // 0=ON, 1=OFF
+      relay(relayId, val);
     } else {
-      Serial.println("Error: relay requires 0/1 value");
+      Serial.println("Error: relay requires 0/1 value (0=ON, 1=OFF)");
     }
   }
 
@@ -104,10 +105,9 @@ void parseAndExecuteCommand(char* cmd) {
 
   // STATUS
   else if (strcmp(token, "status") == 0) {
-    for (size_t i = 0; i < motors.size(); i++) {
-      char axis = (i == MOTOR_W) ? 'W' : ((i == MOTOR_Z) ? 'Z' : 'Y');
-      Serial.printf("Motor %ld (Sumbu %c): pos=%ld\n", i, axis, getEncoderCount(i));
-    }
+    Serial.printf("Motor W: pos=%ld\n", encoderMotorW);
+    Serial.printf("Motor Z: pos=%ld\n", encoderMotorZ);
+    Serial.printf("Motor Y: pos=%ld\n", encoderMotorY);
     Serial.printf("Servo: %d degrees\n", getCurrentServoAngle());
     for (size_t i = 0; i < relays.size(); i++) {
       Serial.printf("Relay %ld: %s\n", i, relays[i].state ? "ON" : "OFF");
@@ -117,6 +117,24 @@ void parseAndExecuteCommand(char* cmd) {
   // ENCODERS
   else if (strcmp(token, "encoders") == 0) {
     printAllEncoders();
+  }
+
+  // PID COMMANDS
+  else if (strcmp(token, "setpid") == 0) {
+    char* pStr = strtok(NULL, " ");
+    char* iStr = strtok(NULL, " ");
+    char* dStr = strtok(NULL, " ");
+    if (pStr != NULL && iStr != NULL && dStr != NULL) {
+      float kp = atof(pStr);
+      float ki = atof(iStr);
+      float kd = atof(dStr);
+      setPidW(kp, ki, kd);
+    } else {
+      Serial.println("Usage: setpid <p> <i> <d> (e.g. setpid 2.5 0.05 0.1)");
+    }
+  }
+  else if (strcmp(token, "showpid") == 0) {
+    showPidW();
   }
 
   // ENCODER MONITOR (continuous periodic)
@@ -159,10 +177,10 @@ void parseAndExecuteCommand(char* cmd) {
   else if (strcmp(token, "home") == 0) { setServoAngle(0, servoHomeAngle); Serial.println("Servo home"); }
 
   // RELAY TOGGLE
-  else if (strcmp(token, "relay0_on") == 0) { setRelay(0, true); Serial.println("Relay 1 ON"); }
-  else if (strcmp(token, "relay0_off") == 0) { setRelay(0, false); Serial.println("Relay 1 OFF"); }
-  else if (strcmp(token, "relay1_on") == 0) { setRelay(1, true); Serial.println("Relay 2 ON"); }
-  else if (strcmp(token, "relay1_off") == 0) { setRelay(1, false); Serial.println("Relay 2 OFF"); }
+  else if (strcmp(token, "relay0_on") == 0) { relay(0, 0); }
+  else if (strcmp(token, "relay0_off") == 0) { relay(0, 1); }
+  else if (strcmp(token, "relay1_on") == 0) { relay(1, 0); }
+  else if (strcmp(token, "relay1_off") == 0) { relay(1, 1); }
 
   else {
     Serial.printf("Unknown command: %s\n", token);
@@ -188,8 +206,6 @@ void serialCommandTick() {
       bufferIndex = 0;
     }
   }
-
-  updateMotorPositioning();
 }
 
 // ============================================================

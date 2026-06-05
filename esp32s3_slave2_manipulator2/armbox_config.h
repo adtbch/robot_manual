@@ -9,8 +9,8 @@
 // Sumbu W (Motor Putar / Rotasi)
 #define motorAxisW_A        16
 #define motorAxisW_B        15
-#define encoderMotorAxisW_A   40
-#define encoderMotorAxisW_B   39
+#define encoderMotorAxisW_A   39
+#define encoderMotorAxisW_B   40
 #define limitSwitchAxisW       10
 
 // Sumbu Z (Motor Naik Turun / Vertikal)
@@ -36,7 +36,7 @@
 // ============================================================
 // PIN SERVO
 // ============================================================
-#define SERVO_PIN      38
+#define SERVO_PIN      14
 #define SERVO_CHANNEL  6
 
 // ============================================================
@@ -48,8 +48,8 @@
 // ============================================================
 // PIN UART
 // ============================================================
-#define UART_RX_PIN    38
-#define UART_TX_PIN    21
+#define UART_RX_PIN    21
+#define UART_TX_PIN    38
 
 // ============================================================
 // PWM CONSTANTS
@@ -63,7 +63,7 @@ const int pwmResolution = 10;
 // SERVO CONSTANTS
 // ============================================================
 const int servoFrequency = 50;
-const int servoResolution = 16;
+const int servoResolution = 14;
 const int servoMinPulseUs = 500;
 const int servoMaxPulseUs = 2500;
 const int servoMinAngle = 0;
@@ -93,14 +93,16 @@ const unsigned long HOMING_TIMEOUT = 30000;
 // ============================================================
 // POSITIONING CONSTANTS
 // ============================================================
-const int MOTOR_POSITION_TOLERANCE = 10;
+const int MOTOR_POSITION_TOLERANCE = 2;
 const long MAX_ENCODER_POSITION = 2000; // fallback, dipakai per-axis di bawah
-const int MOVE_SPEED = 300;
+const int MOVE_SPEED = 400;
 
 // Safety limits per-axis (max encoder count, hardware limit)
 const long MAX_POS_W =  500;  // Sumbu W (Rotasi) — range terbatas
 const long MAX_POS_Y = 2900;  // Sumbu Y (Maju Mundur)
-const long MAX_POS_Z = 4580;  // Sumbu Z (Naik Turun) — travel terpanjang
+const long MAX_POS_Z = 4000; 
+
+long encoderMotorW, encoderMotorZ, encoderMotorY; // Sumbu Z (Naik Turun) — travel terpanjang
 
 // ============================================================
 // Shared types
@@ -152,6 +154,7 @@ extern std::vector<RelayConfig> relays;
 void SetupMotors();
 void pwmMotor(int idMotor, int pwmValue);
 void motorStopAll();
+int getLastPwmValue(uint8_t motorIndex);
 
 // Servo
 void setupServos();
@@ -160,11 +163,13 @@ void setServoAngle(int idServo, int angle);
 // Encoder
 void setupEncoders();
 void resetEncoderCount(uint8_t motorIndex);
-long getEncoderCount(uint8_t motorIndex);
+void updateEncoderCounts();
+void checkLimitSwitches();
+void printAllEncoders();
 
 // Relay
 void setupRelays();
-void setRelay(int idRelay, bool state);
+void relay(int idRelay, int value); // value: 0=ON, 1=OFF
 
 // Limit Switch
 void setupLimits();
@@ -177,6 +182,23 @@ void updateMotorPositioning();
 bool isPositionSafe(uint8_t motorIndex, long pos);
 void moveToPosition(long posW, long posZ, long posY);
 bool moveTargetPosition(uint8_t motorIndex, long targetPosition);
+
+// PID NVS
+typedef struct {
+    float kp;
+    float ki;
+    float kd;
+    float integral;
+    float lastError;
+    float lastTarget;
+} PIDState;
+
+extern PIDState pidW;
+
+void initPidW();
+void setPidW(float p, float i, float d);
+void showPidW();
+int pidCompute(PIDState &pid, float target, float current, float dt);
 
 // Homing
 bool setHoming();
