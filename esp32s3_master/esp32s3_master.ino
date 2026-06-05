@@ -73,6 +73,7 @@ void loop() {
   serialCommandTick();
   espNowControlTick();
   motion_serial_tick();
+  motion_serial_checkLinkTimeout();
 
   if (espNowControlReadPacket(gLastRxPacket)) {
     consumePacket("ESPNOW-RX", gLastRxPacket);

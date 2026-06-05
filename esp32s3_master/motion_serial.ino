@@ -173,3 +173,27 @@ void motion_serialPrintStats() {
                 (unsigned long)gMS.rejectedOverflow,
                 linkAlive ? "OK" : "TIMEOUT");
 }
+
+// =====================================================================
+//  LINK TIMEOUT — kirim stop ke Slave jika link mati
+// =====================================================================
+
+/**
+ * Cek apakah link ke Slave sudah timeout (tidak ada paket selama X ms).
+ * Jika timeout, kirim "0 0 0\n" ke Slave agar motor berhenti.
+ * Dipanggil setiap loop().
+ */
+void motion_serial_checkLinkTimeout() {
+  const uint32_t nowMs = millis();
+  static bool wasAlive = true;
+
+  bool alive = (nowMs - gMS.lastPacketRxMs) <= espNowLinkAliveMs;
+
+  if (!alive && wasAlive) {
+    // Link baru saja mati — kirim stop ke Slave
+    motion_serial.print("0 0 0\n");
+    Serial.println("[MOTION-SERIAL] Link TIMEOUT — kirim STOP ke Slave");
+  }
+
+  wasAlive = alive;
+}
