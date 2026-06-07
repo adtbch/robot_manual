@@ -7,9 +7,59 @@
 // PID state per motor (dinamis sesuai jumlah motor)
 std::vector<PIDState> pidStates;
 
+// PID State untuk koreksi Yaw pada Field-Centric
+PIDState pidKinematicYaw;
+
+// NVS namespace untuk yaw PID
+static constexpr const char* YAW_PID_NVS_NS = "yaw_pid";
+
+// Default values
+static constexpr float YAW_PID_DEFAULT_KP = 2.5f;
+static constexpr float YAW_PID_DEFAULT_KI = 0.01f;
+static constexpr float YAW_PID_DEFAULT_KD = 0.1f;
+
+
 // ============================================================
 // NVS PID Load/Save
 // ============================================================
+
+// Load yaw PID dari NVS (jika belum ada, pakai default)
+void initYawPid() {
+    Preferences prefs;
+    prefs.begin(YAW_PID_NVS_NS, true);  // read-only
+
+    pidKinematicYaw.kp = prefs.getFloat("kp", YAW_PID_DEFAULT_KP);
+    pidKinematicYaw.ki = prefs.getFloat("ki", YAW_PID_DEFAULT_KI);
+    pidKinematicYaw.kd = prefs.getFloat("kd", YAW_PID_DEFAULT_KD);
+    pidKinematicYaw.reset();
+    pidKinematicYaw.lastTarget = 0.0f;
+
+    prefs.end();
+
+    Serial.printf("Yaw PID loaded: Kp=%.3f Ki=%.3f Kd=%.3f\n",
+        pidKinematicYaw.kp, pidKinematicYaw.ki, pidKinematicYaw.kd);
+}
+
+// Simpan yaw PID ke NVS
+void saveYawPid() {
+    Preferences prefs;
+    prefs.begin(YAW_PID_NVS_NS, false);  // read-write
+
+    prefs.putFloat("kp", pidKinematicYaw.kp);
+    prefs.putFloat("ki", pidKinematicYaw.ki);
+    prefs.putFloat("kd", pidKinematicYaw.kd);
+
+    prefs.end();
+
+    Serial.printf("Yaw PID saved: Kp=%.3f Ki=%.3f Kd=%.3f\n",
+        pidKinematicYaw.kp, pidKinematicYaw.ki, pidKinematicYaw.kd);
+}
+
+// Print current yaw PID values
+void showYawPid() {
+    Serial.printf("Yaw PID: Kp=%.3f Ki=%.3f Kd=%.3f\n",
+        pidKinematicYaw.kp, pidKinematicYaw.ki, pidKinematicYaw.kd);
+}
 
 void pidLoadFromNVS(int motorIdx, float &kp, float &ki, float &kd) {
     if (motorIdx < 0 || (size_t)motorIdx >= motors.size()) {
@@ -137,22 +187,15 @@ void motorStopAll() {
 // Anti-windup proporsional terhadap Ki, bukan hardcoded
 // ============================================================
 
-int pidCompute(int motorIdx, float targetRPM, float dt) {
-    if (motorIdx < 0 || (size_t)motorIdx >= pidStates.size()) {
-        return 0;
-    }
-
-    PIDState &pid = pidStates[motorIdx];
-
+// Modular generic PID compute function
+int pidCompute(PIDState &pid, float target, float current, float dt) {
     // DETEKSI PERUBAHAN TARGET BESAR: reset integral jika target berubah > 20%
-    // Ini mencegah "overshoot" saat tiba-tiba turun dari 100 RPM ke 30 RPM
-    if (pid.lastTargetRPM != 0.0f && fabs(targetRPM - pid.lastTargetRPM) > fabs(pid.lastTargetRPM) * 0.20f) {
+    if (pid.lastTarget != 0.0f && fabs(target - pid.lastTarget) > fabs(pid.lastTarget) * 0.20f) {
         pid.integral = 0.0f;  // Reset integral agar tidak ada windup dari target lama
     }
-    pid.lastTargetRPM = targetRPM;
+    pid.lastTarget = target;
 
-    float currentRPM = getEncoderVelocityRpm(motorIdx);
-    float error = targetRPM - currentRPM;
+    float error = target - current;
 
     // Proportional
     float pOut = pid.kp * error;
@@ -166,18 +209,61 @@ int pidCompute(int motorIdx, float targetRPM, float dt) {
     // Derivative on MEASUREMENT (bukan error) → mencegah derivative kick
     float dOut = 0.0f;
     if (dt > 0.0f && pid.lastTime > 0.0f) {
-        // Negative derivative karena jika currentRPM naik, kita kurangi output
-        dOut = -pid.kd * (currentRPM - pid.lastError) / dt;
+        dOut = -pid.kd * (current - pid.lastError) / dt;
     }
 
     float output = pOut + iOut + dOut;
     int pwmOutput = (int)constrain(output, (float)minPwm, (float)maxPwm);
 
-    // Simpan currentRPM sebagai "lastError" untuk derivative next cycle
-    pid.lastError = currentRPM;
+    // Simpan current sebagai "lastError" untuk derivative next cycle
+    pid.lastError = current;
     pid.lastTime  = millis();
 
     return pwmOutput;
+}
+
+// Overload untuk kecocokan kode motor eksis
+int pidCompute(int motorIdx, float targetRPM, float dt) {
+    if (motorIdx < 0 || (size_t)motorIdx >= pidStates.size()) {
+        return 0;
+    }
+    float currentRPM = getEncoderVelocityRpm(motorIdx);
+    return pidCompute(pidStates[motorIdx], targetRPM, currentRPM, dt);
+}
+
+// ============================================================
+// pidComputeYaw — PID khusus yaw dengan shortest-path wrapping
+// ============================================================
+int pidComputeYaw(PIDState &pid, float target, float current, float dt) {
+  // 1. Error shortest path [-180, 180]
+  float error = target - current;
+  while (error > 180.0f) error -= 360.0f;
+  while (error < -180.0f) error += 360.0f;
+
+  // 2. Proportional
+  float pOut = pid.kp * error;
+
+  // 3. Integral dengan anti-windup
+  float integralLimit = (pid.ki > 0.0001f) ? 200.0f / pid.ki : 2000.0f;
+  pid.integral += error * dt;
+  pid.integral = constrain(pid.integral, -integralLimit, integralLimit);
+  float iOut = pid.ki * pid.integral;
+
+  // 4. Derivative on Measurement (diff juga di-wrap agar tidak spike)
+  float dOut = 0.0f;
+  if (dt > 0.0f && pid.lastTime > 0.0f) {
+    float diff = current - pid.lastError;
+    while (diff > 180.0f) diff -= 360.0f;
+    while (diff < -180.0f) diff += 360.0f;
+    dOut = -pid.kd * diff / dt;
+  }
+
+  pid.lastError = current;
+  pid.lastTime = millis();
+
+  float output = pOut + iOut + dOut;
+  // Constrain ke ±maxPwm (sama format return dengan pidCompute motor)
+  return (int)constrain(output, (float)-maxPwm, (float)maxPwm);
 }
 
 // ============================================================

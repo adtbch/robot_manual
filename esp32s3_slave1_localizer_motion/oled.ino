@@ -33,7 +33,14 @@ bool setupOLED() {
 }
 
 void displayYaw(float yawDeg, const char* status) {
+    static uint32_t lastPrintMs = 0;
+    if (millis() - lastPrintMs >= 1000) {
+        lastPrintMs = millis();
+        Serial.printf("[OLED Debug] displayYaw called: Yaw=%.2f, Status=%s\n", yawDeg, status ? status : "NULL");
+    }
+
     display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
 
     // --- Yaw compass dial ---
     int cx = 40, cy = 32, r = 22;

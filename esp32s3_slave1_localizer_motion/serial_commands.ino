@@ -579,6 +579,26 @@ void processSerialCommands() {
         return;
     }
 
+    // ==================== SET_YAW_PID <kp> <ki> <kd> ====================
+    if (strncmp(cmd, "SET_YAW_PID", 11) == 0) {
+        float kp, ki, kd;
+        if (sscanf(cmd + 12, "%f %f %f", &kp, &ki, &kd) == 3) {
+            pidKinematicYaw.kp = kp;
+            pidKinematicYaw.ki = ki;
+            pidKinematicYaw.kd = kd;
+            saveYawPid();
+        } else {
+            Serial.println("Usage: SET_YAW_PID <kp> <ki> <kd>");
+        }
+        return;
+    }
+
+    // ==================== SHOW_YAW_PID ====================
+    if (strncmp(cmd, "SHOW_YAW_PID", 12) == 0) {
+        showYawPid();
+        return;
+    }
+
     // ==================== UNKNOWN COMMAND ====================
     Serial.println("Unknown command. Type HELP for usage.");
 }

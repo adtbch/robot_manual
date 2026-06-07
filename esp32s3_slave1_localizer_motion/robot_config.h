@@ -53,13 +53,13 @@ typedef struct {
 	float integral;
 	float lastError;
 	float lastTime;
-	float lastTargetRPM;  // Track previous target untuk deteksi perubahan
+	float lastTarget;  // Track previous target untuk deteksi perubahan
 
 	void reset() {
 		integral = 0.0f;
 		lastError = 0.0f;
 		lastTime = 0.0f;
-		lastTargetRPM = 0.0f;
+		lastTarget = 0.0f;
 	}
 } PIDState;
 
@@ -191,6 +191,8 @@ extern uint16_t rpmMotorBelakangKiri;
 void pwmMotor(int idMotor, int pwmValue);
 void rpmMotor(int rpm1, int rpm2, int rpm3, int rpm4);
 void pidControllerInit();
+int pidCompute(PIDState &pid, float target, float current, float dt);
+int pidCompute(int motorIdx, float targetRPM, float dt);
 double computePID(int index, double setpoint, double input, double Kp, double Ki, double Kd, double Minintegral, double Maxintegral);
 void rpmMotorControl(int targetRPM0, int targetRPM1, int targetRPM2, int targetRPM3);
 void rpmMotorControlTargets(const std::vector<float> &targetRpm);
@@ -211,7 +213,31 @@ void processSerialCommands();
 // Kinematik functions
 void driveRobotCentric(int vx, int vy, int vtheta);
 void driveFieldCentric(int vx, int vy, int vtheta);
+void driveFieldCentricWithYawCorrection(int vx, int vy, int yawTarget);
+int pidComputeYaw(PIDState &pid, float target, float current, float dt);
+void initYawPid();
+void saveYawPid();
+void showYawPid();
+extern PIDState pidKinematicYaw;
 void skalaKecepatan(int motor1, int motor2, int motor3, int motor4);
+
+// ============================================================
+// IMU / MPU9250 Declarations
+// ============================================================
+bool setupMPUWithMagnetic();  // fused gyro+mag (yaw relatif dari heading awal)
+bool setupMPUGyro();          // gyro only, manual integration (drift accumulate)
+bool setupMPU();              // alias ke WithMagnetic (compatibilitas)
+void calibrateGyro();         // kalibrasi accel+gyro+mag (skip mag jika gyro-only)
+void calibrateGyroHot();      // hot recalibration via serial
+void updateYaw();             // panggil setiap loop
+float getYaw();              // return yaw dalam derajat, rentang -180..180
+float getFilteredGyroZ();     // return filtered gyro Z (untuk debugging/diagnostic)
+void resetYaw();             // reset reference ke heading saat ini (yaw=0)
+
+// Tuning filter gyro-only (sesuaikan dengan noise motor)
+// Nilai: 0.05 (sangat smooth) - 0.5 (responsive)
+// default 0.2 di mpu.ino (GYRO_FILTER_ALPHA)
+void setGyroFilterAlpha(float alpha);
 
 bool espNowControlInit();
 void espNowControlTick();
