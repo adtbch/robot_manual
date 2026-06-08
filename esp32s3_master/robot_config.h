@@ -28,8 +28,11 @@
 #define motion_serial_rxPin 7
 #define motion_serial_txPin 6
 
-#define serial_2_rxPin 4
-#define serial_2_txPin 5
+#define manipulator_serial_rxPin 4
+#define manipulator_serial_txPin 5
+
+// HardwareSerial object for manipulator
+#define manipulator_serial Serial2
 
 // ============================================================
 // PID & NVS Configuration
@@ -51,9 +54,9 @@ const float kdMax = 10.0f;
 // ESP-NOW Manual Control Configuration
 // ============================================================
 #define ESPNOW_PACKET_MAGIC  0xA5B4
-const bool espNowEnableMacWhitelist = true; 
-const uint8_t espNowAllowedTransmitterStaMac[6] = {0xD4, 0xE9, 0xF4, 0x8A, 0xBC, 0x3C};
-const uint8_t espNowAllowedTransmitterApMac[6] = {0xD4, 0xE9, 0xF4, 0x8A, 0xBC, 0x3C};
+const bool espNowEnableMacWhitelist = true;
+const uint8_t espNowAllowedTransmitterStaMac[6] = {0x00, 0x70, 0x07, 0xE7, 0x80, 0xF0};
+const uint8_t espNowAllowedTransmitterApMac[6] = {0x00, 0x70, 0x07, 0xE7, 0x80, 0xF0};
 const uint8_t espNowChannel = 1;
 const unsigned long espNowLinkAliveMs = 180;
 const unsigned long espNowStatsIntervalMs = 1000;
@@ -78,9 +81,9 @@ const unsigned long espNowStatsIntervalMs = 1000;
 #define BTN_PS       (1u << 16)
 #define BTN_TOUCHPAD (1u << 17)
 
-#define SPEED_MODE_FAST    300
-#define SPEED_MODE_DEFAULT 100
-#define SPEED_MODE_SLOW    50
+#define SPEED_MODE_FAST    800
+#define SPEED_MODE_DEFAULT 500
+#define SPEED_MODE_SLOW    200
 
 // ============================================================
 // Shared types and extern globals
@@ -182,10 +185,13 @@ void motion_serial_tick();
 bool motion_serialReadPacket(ControlPacket &outPacket);
 void motion_serialPrintStats();
 void motion_serial_checkLinkTimeout();
+void manipulator_serial_init();
+void manipulator_serial_tick();
 void mecanum_control_tick(const ControlPacket &pkt);
 void gripper_init();
 void gripper_tick(const ControlPacket &pkt);
 void gripper_motor_tick(const ControlPacket &pkt);
+void armbox_control_tick(const ControlPacket &pkt);
 void setServoAngle(int idServo, int angle);
 void SetupMotors();
 void setupServos();
