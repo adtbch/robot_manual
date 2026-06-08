@@ -15,7 +15,7 @@ void setup() {
 
   Wire.begin(sdaPin,sclPin);
   Wire.setTimeOut(100);  // Timeout 100ms agar I2C tidak hang jika bus error
-  Wire.setClock(100000);
+  Wire.setClock(400000);
   pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP);
   if (!setupOLED()) {
     Serial.println("OLED: init failed, display disabled");
@@ -31,15 +31,6 @@ void setup() {
     Serial.println("MPU: not ready, yaw will stay 0");
   } else {
     Serial.println("MPU: ready");
-  }
-  // Reinit I2C bus — MPU9250 library may leave bus in bad state
-  Wire.begin(sdaPin, sclPin);
-  Wire.setTimeOut(100);  // Timeout 100ms
-  Wire.setClock(100000); // << Set to 100kHz for OLED stability
-  if (!setupOLED()) {
-    Serial.println("OLED reinit: FAILED");
-  } else {
-    Serial.println("OLED reinit: SUCCESS");
   }
   Serial.println("=== Robot Slave — WSN-31 Relay ===");
 }

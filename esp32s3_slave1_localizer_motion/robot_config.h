@@ -3,7 +3,8 @@
 #include <vector> // Tambahkan header untuk std::vector
 #include <Preferences.h>
 
-#include "MPU9250.h"
+#include "I2Cdev.h"
+#include "MPU6050_6Axis_MotionApps612.h"
 
 // ============================================================
 // PID & NVS Configuration
@@ -44,6 +45,7 @@ typedef struct {
 	volatile long count;
 	long prev_count; // Tambahkan prev_count untuk kalkulasi delta
 	unsigned long last_time; // Tambahkan last_time untuk dt dinamis
+	long last_delta;  // delta tick terakhir (untuk confidence filter encoder)
 } EncoderConfig;
 
 typedef struct {
@@ -141,8 +143,12 @@ extern std::vector<PIDData> pidData;
 // ============================================================
 // PARAMETER ROBOT — sesuaikan dengan hardware
 // ============================================================
-const float radiusRoda = 0.0635;   // radius roda dalam meter
+const float radiusRoda = 0.0635f;   // radius roda dalam meter
 const int encoderMotorPpr = 270;    // pulses per revolution encoder
+
+// Robot geometry (wheelbase) — setengah jarak antar roda
+constexpr float ROBOT_Lx = 0.1325f; // (0.265/2) setengah lebar kiri-kanan dalam meter
+constexpr float ROBOT_Ly = 0.0925f; // (0.185/2) setengah panjang depan-belakang dalam meter
 
 const int maxPwm = 1023;
 const int minPwm = -1023;
@@ -201,6 +207,8 @@ void motorStopAll();
 void convertEncoderToRPM();
 float getEncoderVelocityRpm(int motorIdx);
 float getEncoderVelocityRadS(int motorIdx);
+float getEncoderYawRateRads(); // yaw rate dari 4 encoder (rad/s)
+float getEncoderConfidence();  // confidence [0-1] dari max delta tick
 bool autoTunerIsActive();
 void autoTunerStart();
 void autoTunerTick(bool bootPressed);
@@ -239,6 +247,12 @@ void resetYaw();             // reset reference ke heading saat ini (yaw=0)
 // Nilai: 0.05 (sangat smooth) - 0.5 (responsive)
 // default 0.2 di mpu.ino (GYRO_FILTER_ALPHA)
 void setGyroFilterAlpha(float alpha);
+
+// ============================================================
+// Gyro + Encoder Complementary Filter (gyro-only mode)
+// ============================================================
+float getEncoderYawRateRads();  // yaw rate dari 4 encoder (rad/s)
+float getEncoderConfidence();   // confidence [0-1] dari max delta tick
 
 bool espNowControlInit();
 void espNowControlTick();

@@ -117,7 +117,7 @@ void serialCommandsTick() {
     static uint32_t lastJoyDriveMs = 0;
     if (g_joystickActive && (millis() - lastJoyDriveMs >= 40)) {
         lastJoyDriveMs = millis();
-        driveFieldCentric(g_cmdVx, g_cmdVy, g_cmdVtheta);
+        driveFieldCentricWithYawCorrection(g_cmdVx, g_cmdVy, g_cmdVtheta);
     }
 
     switch (g_cmdState) {
@@ -207,7 +207,7 @@ void serialCommandsTick() {
             Serial.println("Done.");
             break;
         }
-        driveFieldCentric(g_cmdVx, g_cmdVy, g_cmdVtheta);
+        driveFieldCentricWithYawCorrection(g_cmdVx, g_cmdVy, g_cmdVtheta);
         break;
     }
 
@@ -524,11 +524,25 @@ void processSerialCommands() {
         char *svy = strtok(NULL, " \t");
         char *sw  = strtok(NULL, " \t");
         char *sdur = strtok(NULL, " \t");
-        if (!svx || !svy || !sw) { Serial.println("Usage: ROBOT <vx> <vy> <w> <ms>"); return; }
-        long dur = (sdur) ? atol(sdur) : 2000;
-
-        serialContinuousStop();
-        serialTestRobotCentric(atoi(svx), atoi(svy), atoi(sw), (unsigned long)dur);
+        
+        // Cek jika perintah memiliki durasi
+        if (sdur) {
+            long dur = atol(sdur);
+            serialContinuousStop();
+            serialTestRobotCentric(atoi(svx), atoi(svy), atoi(sw), (unsigned long)dur);
+        } else {
+            // Jika tidak ada durasi, jalankan tanpa henti hingga perintah STOP diterima
+            serialContinuousStop();
+            g_cmdState = CmdState::CMD_ROBOT;
+            g_cmdVx = atoi(svx);
+            g_cmdVy = atoi(svy);
+            g_cmdVtheta = atoi(sw);
+            // Memberikan durasi maksimum yang sangat besar (mendekati tak terhingga)
+            g_cmdDurationMs = 0xFFFFFFFF; 
+            g_cmdStartMs = millis();
+            Serial.printf("Robot-Centric (Continuous): vx=%d vy=%d w=%d\n", g_cmdVx, g_cmdVy, g_cmdVtheta);
+            Serial.println("Send STOP to stop the motors.");
+        }
         return;
     }
 
@@ -538,11 +552,25 @@ void processSerialCommands() {
         char *svy = strtok(NULL, " \t");
         char *sw  = strtok(NULL, " \t");
         char *sdur = strtok(NULL, " \t");
-        if (!svx || !svy || !sw) { Serial.println("Usage: FIELD <vx> <vy> <w> <ms>"); return; }
-        long dur = (sdur) ? atol(sdur) : 2000;
-
-        serialContinuousStop();
-        serialTestFieldCentric(atoi(svx), atoi(svy), atoi(sw), (unsigned long)dur);
+        
+        // Cek jika perintah memiliki durasi
+        if (sdur) {
+            long dur = atol(sdur);
+            serialContinuousStop();
+            serialTestFieldCentric(atoi(svx), atoi(svy), atoi(sw), (unsigned long)dur);
+        } else {
+            // Jika tidak ada durasi, jalankan tanpa henti hingga perintah STOP diterima
+            serialContinuousStop();
+            g_cmdState = CmdState::CMD_FIELD;
+            g_cmdVx = atoi(svx);
+            g_cmdVy = atoi(svy);
+            g_cmdVtheta = atoi(sw);
+            // Memberikan durasi maksimum yang sangat besar (mendekati tak terhingga)
+            g_cmdDurationMs = 0xFFFFFFFF; 
+            g_cmdStartMs = millis();
+            Serial.printf("Field-Centric (Continuous): vx=%d vy=%d w=%d\n", g_cmdVx, g_cmdVy, g_cmdVtheta);
+            Serial.println("Send STOP to stop the motors.");
+        }
         return;
     }
 
@@ -593,9 +621,20 @@ void processSerialCommands() {
         return;
     }
 
-    // ==================== SHOW_YAW_PID ====================
+        // ==================== SHOW_YAW_PID ====================
     if (strncmp(cmd, "SHOW_YAW_PID", 12) == 0) {
         showYawPid();
+        return;
+    }
+
+    // ==================== SET_GYRO_ALPHA <val> ====================
+    if (strncmp(cmd, "SET_GYRO_ALPHA", 14) == 0) {
+        float alpha;
+        if (sscanf(cmd + 15, "%f", &alpha) == 1) {
+            setGyroFilterAlpha(alpha);
+        } else {
+            Serial.println("Usage: SET_GYRO_ALPHA <val>");
+        }
         return;
     }
 

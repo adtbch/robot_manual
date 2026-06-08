@@ -68,7 +68,7 @@ const int servoMinPulseUs = 500;
 const int servoMaxPulseUs = 2500;
 const int servoMinAngle = 0;
 const int servoMaxAngle = 180;
-const int servoHomeAngle = 0;
+const int servoHomeAngle = 180;
 
 // ============================================================
 // ENCODER CONSTANTS

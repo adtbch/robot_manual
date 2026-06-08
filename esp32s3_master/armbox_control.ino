@@ -40,8 +40,8 @@
 #define SERVO_STEP_DEFAULT    5
 #define SERVO_STEP_FAST       10
 #define SERVO_STEP_SLOW       2
-#define SERVO_MIN             0
-#define SERVO_MAX             90
+#define SERVO_MIN             90
+#define SERVO_MAX             180
 
 // Konversi derajat → encoder count (sesuaikan dengan hardware)
 // Contoh: 900 counts = 360° → 1 count = 0.4°
