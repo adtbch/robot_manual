@@ -46,10 +46,10 @@
 #define RELAY_2_PIN    13
 
 // ============================================================
-// PIN UART
+// PIN UART (Master Serial)
 // ============================================================
-#define UART_RX_PIN    21
-#define UART_TX_PIN    38
+#define master_serial_rxPin    21
+#define master_serial_txPin    38
 
 // ============================================================
 // PWM CONSTANTS
@@ -68,7 +68,7 @@ const int servoMinPulseUs = 500;
 const int servoMaxPulseUs = 2500;
 const int servoMinAngle = 0;
 const int servoMaxAngle = 180;
-const int servoHomeAngle = 90;
+const int servoHomeAngle = 0;
 
 // ============================================================
 // ENCODER CONSTANTS
