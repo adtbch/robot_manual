@@ -24,8 +24,8 @@
 // MAC Bluetooth PS4 DualShock 4.
 // Cara cari: flash sketch GetBDAddress (dari contoh library PS4Controller),
 // lalu baca output Serial Monitor.
-// Format: "xx:xx:xx:xx:xx:xx" (huruf kecil, dipisah titik dua)
-static const char kPs4BluetoothMac[] = "4c:11:ae:75:d7:32"; // PS4 DualShock 4
+// Format: "xx:xx:xx:xx:xx:xx" (huruf kecil, dipisah titik dua)58:BF:25:8B:DB:1A
+static const char kPs4BluetoothMac[] = "58:bf:25:8b:db:1a"; // PS4 DualShock 4
 
 // MAC WiFi STA ESP32-S3 penerima (target ESP-NOW).ard
 // Cara cari: lihat Serial Monitor ESP32-S3 saat boot, baris "MAC STA".
