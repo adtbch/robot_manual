@@ -71,6 +71,7 @@ void convertEncoderToRPM() {
 
         // 1. Kalkulasi Delta (Akurat 100%, pulsa tidak pernah hilang)
         long delta = current_count - encoders[i].prev_count;
+        encoders[i].last_delta = delta;  // simpan untuk confidence filter
         encoders[i].prev_count = current_count;
 
         // 2. Dapatkan waktu aktual untuk kalkulasi dinamis
@@ -124,4 +125,42 @@ float getEncoderVelocityRpm(int motorIdx) {
 float getEncoderVelocityRadS(int motorIdx) {
   float rpm = getEncoderVelocityRpm(motorIdx);
   return rpm * kRpmToRadPerSec;
+}
+
+// ============================================================
+// Yaw rate dari 4 encoder (rad/s) — untuk complementary filter
+// Formula dari kinematik balik Mecanum:
+//   yaw_rate = (-vFL + vFR + vBL -vBR) / (2 * (Lx + Ly))
+// ============================================================
+
+float getEncoderYawRateRads() {
+    // Linear wheel velocities in m/s
+    float vFR = getEncoderVelocityRadS(0) * radiusRoda;  // Front Right
+    float vFL = getEncoderVelocityRadS(1) * radiusRoda;  // Front Left
+    float vBR = getEncoderVelocityRadS(2) * radiusRoda;  // Back Right
+    float vBL = getEncoderVelocityRadS(3) * radiusRoda;  // Back Left
+
+    float denom = 2.0f * (ROBOT_Lx + ROBOT_Ly);
+    if (fabs(denom) < 0.001f) return 0.0f;
+
+    return (-vFL + vFR + vBL - vBR) / denom;
+}
+
+// ============================================================
+// Confidence encoder berdasarkan delta tick maksimum
+// Lebih banyak tick → SNR lebih baik → lebih percaya encoder
+// ============================================================
+
+float getEncoderConfidence() {
+    long maxTick = 0;
+    for (size_t i = 0; i < encoders.size(); i++) {
+        long absTick = labs(encoders[i].last_delta);
+        if (absTick > maxTick) maxTick = absTick;
+    }
+
+    if (maxTick < 2)   return 0.0f;   // noise floor → percaya gyro saja
+    if (maxTick < 5)   return 0.2f;   // sangat lambat
+    if (maxTick < 15)  return 0.5f;   // lambat
+    if (maxTick < 40)  return 0.7f;   // sedang
+    return 0.9f;                       // cepat, akurat (risiko slip kecil)
 }

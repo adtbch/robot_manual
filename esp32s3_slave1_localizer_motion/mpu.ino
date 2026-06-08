@@ -1,21 +1,16 @@
 // ============================================================
-// MPU9250 IMU - Yaw/Gyro Reading (DMP-based)
+// MPU6050 IMU - Yaw/Gyro Reading (DMP MotionApps v6.12)
 // ============================================================
-// Library: MPU9250 by hideakitai
-// DMP menyediakan yaw/pitch/roll yang sudah fused accel+gyro
-// Tidak perlu manual integrasi — DMP handle drift compensation
-//
-// Flow:
-//   Boot → load NVS/default → konvergensi 5s di setup → yaw siap
-//   CALIB_GYRO → kalibrasi full → simpan NVS → rekonvergensi
-//   RESET_GYRO → hapus NVS → next boot pakai default lagi
+// Library: MPU6050v2 (Jeff Rowberg i2cdevlib)
+// Menggunakan DMP (Digital Motion Processor) internal chip
+// untuk estimasi Yaw 6-Axis (Gyro + Accel) secara pure.
 // ============================================================
 
-#include <Wire.h>
-#include "MPU9250.h"
+#include "I2Cdev.h"
+#include "MPU6050_6Axis_MotionApps612.h"
 #include <Preferences.h>
 
-static MPU9250 mpu;
+static MPU6050 mpu;
 
 // NVS namespace for calibration data
 static constexpr const char* GYRO_NVS_NS = "gyro_cal";
@@ -29,33 +24,37 @@ static float yaw = 0.0f;
 // Flag: true after mpu.setup succeeds
 static bool mpuReady = false;
 
-// Flag: true = gyro-only yaw (manual integration), false = fused gyro+mag
-static bool gyroOnlyMode = false;
+// DMP control/status vars
+static bool dmpReady = false;
+static uint8_t devStatus;      // status device (0 = success, !0 = error)
+static uint16_t packetSize;    // ukuran packet FIFO DMP
+static uint8_t fifoBuffer[64]; // buffer FIFO
 
-// Filter smoothing untuk gyro-only mode (low-pass EMA)
-// Tuning runtime via setGyroFilterAlpha(alpha), default 0.2
-static float gyroFilterAlpha = 0.2f;
+// Orientation vars
+static Quaternion q;           // [w, x, y, z]
+static VectorFloat gravity;    // [x, y, z] gravity
+static float ypr[3];           // [yaw, pitch, roll]
 
-// Filtered gyro Z (smoothing untuk reduksi noise/getaran motor)
-static float filteredGyroZ = 0.0f;
+// Interrupt flag
+static volatile bool mpuInterrupt = false;
 
-// Last timestamp untuk gyro integration
-static uint32_t lastYawUpdateMs = 0;
-
-// Konvergensi filter quaternion
-static constexpr unsigned long YAW_CONVERGE_MS = 10000;
-static constexpr unsigned long YAW_CONVERGE_MS_GYRO_ONLY = 5000; // 5 detik
+void IRAM_ATTR dmpDataReady() {
+    mpuInterrupt = true;
+}
 
 // ============================================================
-// Default calibration values (hasil kalibrasi dari contoh)
+// Default calibration values (sesuai offset chip Anda)
 // ============================================================
 
 static void calibApplyDefaults() {
-    mpu.setGyroBias(7.31f, -4.46f, -1.32f);
-    mpu.setAccBias(-473.41f, 667.36f, -256.87f);
-    mpu.setMagBias(186.34f, 244.73f, -427.56f);
-    mpu.setMagScale(0.91f, 1.00f, 1.11f);
-    Serial.println("Applied default calibration values");
+    mpu.setXAccelOffset(-4810);
+    mpu.setYAccelOffset(7218);
+    mpu.setZAccelOffset(11146);
+    mpu.setXGyroOffset(-238);
+    mpu.setYGyroOffset(136);
+    mpu.setZGyroOffset(146);
+
+    Serial.println("Applied default test-chip offsets");
 }
 
 // ============================================================
@@ -65,18 +64,12 @@ static void calibApplyDefaults() {
 static void calibSaveToNVS() {
     Preferences prefs;
     prefs.begin(GYRO_NVS_NS, false);
-    prefs.putFloat("gbx", mpu.getGyroBiasX());
-    prefs.putFloat("gby", mpu.getGyroBiasY());
-    prefs.putFloat("gbz", mpu.getGyroBiasZ());
-    prefs.putFloat("abx", mpu.getAccBiasX());
-    prefs.putFloat("aby", mpu.getAccBiasY());
-    prefs.putFloat("abz", mpu.getAccBiasZ());
-    prefs.putFloat("mbx", mpu.getMagBiasX());
-    prefs.putFloat("mby", mpu.getMagBiasY());
-    prefs.putFloat("mbz", mpu.getMagBiasZ());
-    prefs.putFloat("msx", mpu.getMagScaleX());
-    prefs.putFloat("msy", mpu.getMagScaleY());
-    prefs.putFloat("msz", mpu.getMagScaleZ());
+    prefs.putInt("ax", mpu.getXAccelOffset());
+    prefs.putInt("ay", mpu.getYAccelOffset());
+    prefs.putInt("az", mpu.getZAccelOffset());
+    prefs.putInt("gx", mpu.getXGyroOffset());
+    prefs.putInt("gy", mpu.getYGyroOffset());
+    prefs.putInt("gz", mpu.getZGyroOffset());
     prefs.putBool("cal", true);
     prefs.end();
     Serial.println("Calibration saved to NVS");
@@ -87,18 +80,12 @@ static bool calibLoadFromNVS() {
     prefs.begin(GYRO_NVS_NS, true);
     bool found = prefs.getBool("cal", false);
     if (found) {
-        mpu.setGyroBias(prefs.getFloat("gbx", 0.0f),
-                        prefs.getFloat("gby", 0.0f),
-                        prefs.getFloat("gbz", 0.0f));
-        mpu.setAccBias(prefs.getFloat("abx", 0.0f),
-                       prefs.getFloat("aby", 0.0f),
-                       prefs.getFloat("abz", 0.0f));
-        mpu.setMagBias(prefs.getFloat("mbx", 0.0f),
-                       prefs.getFloat("mby", 0.0f),
-                       prefs.getFloat("mbz", 0.0f));
-        mpu.setMagScale(prefs.getFloat("msx", 1.0f),
-                        prefs.getFloat("msy", 1.0f),
-                        prefs.getFloat("msz", 1.0f));
+        mpu.setXAccelOffset(prefs.getInt("ax", 0));
+        mpu.setYAccelOffset(prefs.getInt("ay", 0));
+        mpu.setZAccelOffset(prefs.getInt("az", 0));
+        mpu.setXGyroOffset(prefs.getInt("gx", 0));
+        mpu.setYGyroOffset(prefs.getInt("gy", 0));
+        mpu.setZGyroOffset(prefs.getInt("gz", 0));
     }
     prefs.end();
     return found;
@@ -113,138 +100,99 @@ static void calibClearNVS() {
 }
 
 // ============================================================
-// Setup — Fused gyro + magnetometer (yaw absolute relatif dari heading awal)
+// Fungsi Normalize Angle (Wrapping)
+// Di-overload dengan float agar presisi desimal yaw tidak hilang
+// ============================================================
+float normalizeAngle(float angle, float minAngle, float maxAngle) {
+    float range = maxAngle - minAngle;
+    while (angle < minAngle) {
+        angle += range;
+    }
+    while (angle >= maxAngle) {
+        angle -= range;
+    }
+    return angle;
+}
+
+// ============================================================
+// Shared MPU init + konvergensi
 // ============================================================
 
-bool setupMPUWithMagnetic() {
-    gyroOnlyMode = false;
-    delay(150);
+static bool mpuInitCommon() {
+    Serial.println(F("Initializing MPU6050 (DMP)..."));
+    mpu.initialize();
+    pinMode(INTERRUPT_PIN, INPUT);
 
-    // Deklarasi lokal static untuk menjamin lifetime memori aman
-    static MPU9250Setting setting;
-    setting.accel_fs_sel = ACCEL_FS_SEL::A16G;
-    setting.gyro_fs_sel = GYRO_FS_SEL::G2000DPS;
-    setting.mag_output_bits = MAG_OUTPUT_BITS::M16BITS;
-    setting.fifo_sample_rate = FIFO_SAMPLE_RATE::SMPL_200HZ;
-    setting.gyro_fchoice = 0x03;
-    setting.gyro_dlpf_cfg = GYRO_DLPF_CFG::DLPF_41HZ;
-    setting.accel_fchoice = 0x01;
-    setting.accel_dlpf_cfg = ACCEL_DLPF_CFG::DLPF_45HZ;
-
-    const int maxRetries = 3;
-    bool ok = false;
-    for (int i = 0; i < maxRetries && !ok; i++) {
-        if (mpu.setup(0x68, setting)) {
-            ok = true;
-        } else {
-            Serial.println("MPU9250: not found – retrying...");
-            delay(200);
-        }
-    }
-    if (!ok) {
-        Serial.println("MPU9250: not found after retries");
-        mpuReady = false;
-        return false;
-    }
     mpuReady = true;
-    Serial.println("MPU9250: OK");
+    Serial.println(F("MPU6050 connection successful"));
 
+    // Muat offset dari NVS atau default
     if (calibLoadFromNVS()) {
-        Serial.println("Loaded calibration from NVS:");
+        Serial.println("Loaded calibration offsets from NVS:");
     } else {
         Serial.println("No calibration in NVS — using defaults:");
         calibApplyDefaults();
     }
-    Serial.printf("  Gyro bias: %.4f %.4f %.4f deg/s\n",
-                  mpu.getGyroBiasX(), mpu.getGyroBiasY(), mpu.getGyroBiasZ());
-    Serial.printf("  Acc bias:  %.4f %.4f %.4f mg\n",
-                  mpu.getAccBiasX(), mpu.getAccBiasY(), mpu.getAccBiasZ());
-    Serial.printf("  Mag bias:  %.4f %.4f %.4f mG\n",
-                  mpu.getMagBiasX(), mpu.getMagBiasY(), mpu.getMagBiasZ());
-    Serial.printf("  Mag scale: %.4f %.4f %.4f\n",
-                  mpu.getMagScaleX(), mpu.getMagScaleY(), mpu.getMagScaleZ());
+    
+    Serial.printf("  Offsets: Ax=%d Ay=%d Az=%d Gx=%d Gy=%d Gz=%d\n",
+                  mpu.getXAccelOffset(), mpu.getYAccelOffset(), mpu.getZAccelOffset(),
+                  mpu.getXGyroOffset(), mpu.getYGyroOffset(), mpu.getZGyroOffset());
 
-    // Konvergensi filter quaternion — blokir di setup
-    Serial.printf("Quaternion filter converging (%lus)...", YAW_CONVERGE_MS / 1000);
-    unsigned long startMs = millis();
-    while (millis() - startMs < YAW_CONVERGE_MS) {
-        mpu.update();
-        delay(10);
-    }
-    yawOffset = mpu.getYaw();
-    yaw = 0.0f;
-    lastYawUpdateMs = millis();
-    Serial.printf(" done. Reference: %.2f deg\n", yawOffset);
-    return true;
-}
+    // Inisialisasi DMP
+    Serial.println(F("Initializing DMP..."));
+    devStatus = mpu.dmpInitialize();
 
-// ============================================================
-// Setup — Gyro only (yaw dari integrasi gyro Z, drift akan accumulate)
-// ============================================================
+    if (devStatus == 0) {
+        // Auto-kalibrasi internal untuk fine-tuning offset
+        mpu.CalibrateAccel(15);
+        mpu.CalibrateGyro(15);
+        Serial.println(F("Active offsets after calibration:"));
+        mpu.PrintActiveOffsets();
 
-bool setupMPUGyro() {
-    gyroOnlyMode = true;
-    delay(150);
+        Serial.println(F("Enabling DMP..."));
+        mpu.setDMPEnabled(true);
 
-    // Deklarasi lokal static untuk menjamin lifetime memori aman
-    static MPU9250Setting setting;
-    setting.accel_fs_sel = ACCEL_FS_SEL::A16G;
-    setting.gyro_fs_sel = GYRO_FS_SEL::G2000DPS;
-    setting.mag_output_bits = MAG_OUTPUT_BITS::M16BITS; // Mag diabaikan pada gyro-only mode
-    setting.fifo_sample_rate = FIFO_SAMPLE_RATE::SMPL_200HZ;
-    setting.gyro_fchoice = 0x03;
-    setting.gyro_dlpf_cfg = GYRO_DLPF_CFG::DLPF_41HZ;
-    setting.accel_fchoice = 0x01;
-    setting.accel_dlpf_cfg = ACCEL_DLPF_CFG::DLPF_45HZ;
-
-    const int maxRetries = 3;
-    bool ok = false;
-    for (int i = 0; i < maxRetries && !ok; i++) {
-        if (mpu.setup(0x68, setting)) {
-            ok = true;
-        } else {
-            Serial.println("MPU9250: not found – retrying...");
-            delay(200);
-        }
-    }
-    if (!ok) {
-        Serial.println("MPU9250: not found after retries");
-        mpuReady = false;
+        // Pasang hardware interrupt
+        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
+        
+        dmpReady = true;
+        packetSize = mpu.dmpGetFIFOPacketSize();
+    } else {
+        Serial.printf("DMP Initialization failed (code %d)\n", devStatus);
+        dmpReady = false;
         return false;
     }
-    mpuReady = true;
-    Serial.println("MPU9250: OK");
 
-    // Load cal tapi tanpa mag
-    if (calibLoadFromNVS()) {
-        Serial.println("Loaded gyro/accel cal from NVS (magnetometer ignored):");
-    } else {
-        Serial.println("No calibration in NVS — using defaults (gyro only mode):");
-        calibApplyDefaults();
-    }
-    Serial.printf("  Gyro bias: %.4f %.4f %.4f deg/s\n",
-                  mpu.getGyroBiasX(), mpu.getGyroBiasY(), mpu.getGyroBiasZ());
-
-    // Konvergensi filter quaternion
-    Serial.printf("Quaternion filter converging (%lus)...", YAW_CONVERGE_MS_GYRO_ONLY / 1000);
+    // Capture reference awal (tunggu 2 detik agar dmp stabil)
+    yawOffset = 0.0f;
     unsigned long startMs = millis();
-    while (millis() - startMs < YAW_CONVERGE_MS_GYRO_ONLY) {
-        mpu.update();
+    while (millis() - startMs < 2000) {
+        if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+            mpu.dmpGetQuaternion(&q, fifoBuffer);
+            mpu.dmpGetGravity(&gravity, &q);
+            mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+            yawOffset = ypr[0] * (180.0f / M_PI);
+        }
         delay(10);
     }
-    yawOffset = mpu.getYaw();
+    
     yaw = 0.0f;
-    lastYawUpdateMs = millis();
-    Serial.printf(" done (gyro-only). Reference: %.2f deg\n", yawOffset);
+    Serial.printf("DMP Ready. Reference Yaw: %.2f deg\n", yawOffset);
     return true;
 }
 
-// ============================================================
-// Legacy alias — default ke fused (compatibilitas)
-// ============================================================
+bool setupMPUWithMagnetic() {
+    delay(150);
+    return mpuInitCommon();
+}
+
+bool setupMPUGyro() {
+    delay(150);
+    return mpuInitCommon();
+}
 
 bool setupMPU() {
-    return setupMPUGyro();
+    return mpuInitCommon();
 }
 
 // ============================================================
@@ -252,41 +200,30 @@ bool setupMPU() {
 // ============================================================
 
 void calibrateGyro() {
-    Serial.println("Calibrating accel+gyro... keep robot still!");
-    mpu.verbose(true);
-    mpu.calibrateAccelGyro();
-    if (!gyroOnlyMode) {
-        mpu.calibrateMag();
-    } else {
-        Serial.println("Skipping mag calibration (gyro-only mode)");
-    }
-    mpu.verbose(false);
-
-    Serial.println("Calibration complete:");
-    Serial.printf("  Gyro bias: %.4f %.4f %.4f deg/s\n",
-                  mpu.getGyroBiasX(), mpu.getGyroBiasY(), mpu.getGyroBiasZ());
-    Serial.printf("  Acc bias:  %.4f %.4f %.4f mg\n",
-                  mpu.getAccBiasX(), mpu.getAccBiasY(), mpu.getAccBiasZ());
-    if (!gyroOnlyMode) {
-        Serial.printf("  Mag bias:  %.4f %.4f %.4f mG\n",
-                      mpu.getMagBiasX(), mpu.getMagBiasY(), mpu.getMagBiasZ());
-        Serial.printf("  Mag scale: %.4f %.4f %.4f\n",
-                      mpu.getMagScaleX(), mpu.getMagScaleY(), mpu.getMagScaleZ());
-    }
+    Serial.println("Calibrating MPU6050... KEEP ROBOT COMPLETELY STILL!");
+    
+    mpu.CalibrateAccel(15);
+    mpu.CalibrateGyro(15);
+    
+    Serial.println("Calibration complete. Active offsets:");
+    mpu.PrintActiveOffsets();
 
     calibSaveToNVS();
 
-    // Rekonvergensi setelah kalibrasi
-    Serial.printf("Reconverging filter (%lus)...", YAW_CONVERGE_MS / 1000);
+    // Re-capture yaw reference (tunggu 2 detik)
+    yawOffset = 0.0f;
     unsigned long startMs = millis();
-    while (millis() - startMs < YAW_CONVERGE_MS) {
-        mpu.update();
+    while (millis() - startMs < 2000) {
+        if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+            mpu.dmpGetQuaternion(&q, fifoBuffer);
+            mpu.dmpGetGravity(&gravity, &q);
+            mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+            yawOffset = ypr[0] * (180.0f / M_PI);
+        }
         delay(10);
     }
-    yawOffset = mpu.getYaw();
     yaw = 0.0f;
-    lastYawUpdateMs = millis();
-    Serial.printf(" done. Reference: %.2f deg\n", yawOffset);
+    Serial.printf("Re-calibrated. New Reference Yaw: %.2f deg\n", yawOffset);
 }
 
 void calibrateGyroHot() {
@@ -301,57 +238,50 @@ float getYaw() {
 }
 
 void resetYaw() {
-    if (mpuReady && mpu.update()) {
-        yawOffset = mpu.getYaw();
+    if (mpuReady && dmpReady && mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+        mpu.dmpGetQuaternion(&q, fifoBuffer);
+        mpu.dmpGetGravity(&gravity, &q);
+        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+        yawOffset = ypr[0] * (180.0f / M_PI);
     }
     yaw = 0.0f;
-    lastYawUpdateMs = millis();
 }
 
 float getFilteredGyroZ() {
-    return filteredGyroZ;
+    return 0.0f; // placeholder karena filter dinonaktifkan
 }
 
 void setGyroFilterAlpha(float alpha) {
-    gyroFilterAlpha = constrain(alpha, 0.01f, 0.99f);
-    Serial.printf("Gyro filter alpha set to: %.2f\n", gyroFilterAlpha);
+    // dummy karena filter dinonaktifkan
 }
 
 // ============================================================
-// Update Yaw — auto-switch berdasarkan mode
+// Update Yaw — Pure DMP 6-Axis (Fused)
 // ============================================================
 
 void updateYaw() {
-    if (!mpuReady) return;
+    if (!mpuReady || !dmpReady) return;
 
-    if (mpu.update()) {
-        if (gyroOnlyMode) {
-            float rawGyroZ = mpu.getGyroZ();
-            if (!isnan(rawGyroZ) && !isinf(rawGyroZ)) {
-                // Low-pass filter (EMA) — smoothing noise/getaran motor PG45
-                filteredGyroZ = gyroFilterAlpha * rawGyroZ + (1.0f - gyroFilterAlpha) * filteredGyroZ;
-            }
-
-            uint32_t nowMs = millis();
-            float dt_sec = (lastYawUpdateMs > 0) ? (nowMs - lastYawUpdateMs) / 1000.0f : 0.0f;
-            lastYawUpdateMs = nowMs;
-
-            if (dt_sec > 0.0f && dt_sec < 0.5f) {
-                yaw += filteredGyroZ * dt_sec;
-            }
-        } else {
-            float rawYaw = mpu.getYaw();
-            if (!isnan(rawYaw) && !isinf(rawYaw)) {
-                yaw = rawYaw - yawOffset;
-            }
+    // Baca data terbaru dari FIFO DMP
+    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+        mpu.dmpGetQuaternion(&q, fifoBuffer);
+        mpu.dmpGetGravity(&gravity, &q);
+        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+        
+        // ypr[0] = yaw (dalam radian). Konversi ke derajat.
+        // Kiri = + (CCW), Kanan = - (CW)
+        float rawYaw = ypr[0] * (180.0f / M_PI);
+        
+        if (!isnan(rawYaw) && !isinf(rawYaw)) {
+            float tempYaw = rawYaw - yawOffset;
+            
+            // Normalize ke range [-180, 180] menggunakan normalizeAngle
+            yaw = normalizeAngle(tempYaw, -180.0f, 180.0f);
         }
-
-        // Guard terhadap NaN/Inf
+        
+        // Safety guard
         if (isnan(yaw) || isinf(yaw)) {
             yaw = 0.0f;
         }
-
-        while (yaw > 180.0f)  yaw -= 360.0f;
-        while (yaw < -180.0f) yaw += 360.0f;
     }
 }

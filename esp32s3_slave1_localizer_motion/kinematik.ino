@@ -32,7 +32,7 @@ void driveFieldCentricWithYawCorrection(int vx, int vy, int yawTarget) {
   float currentYaw = getYaw();
   // pidComputeYaw return int PWM — langsung sebagai vtheta
   int correctionYaw = pidComputeYaw(pidKinematicYaw, (float)yawTarget, currentYaw, 0.04f);
-  driveFieldCentric(vx, vy, correctionYaw);
+  driveFieldCentric(vx, vy, -correctionYaw);
 }
 
 // 3. FUNGSI SCALING (Memastikan rasio kecepatan tetap sama jika melebihi maxrpm)

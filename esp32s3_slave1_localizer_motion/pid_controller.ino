@@ -263,7 +263,7 @@ int pidComputeYaw(PIDState &pid, float target, float current, float dt) {
 
   float output = pOut + iOut + dOut;
   // Constrain ke ±maxPwm (sama format return dengan pidCompute motor)
-  return (int)constrain(output, (float)-maxPwm, (float)maxPwm);
+  return (int)constrain(output, (float)-500, (float)500);
 }
 
 // ============================================================

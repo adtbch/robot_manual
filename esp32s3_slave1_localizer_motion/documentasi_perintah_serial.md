@@ -127,28 +127,34 @@ Sistem menggunakan parameter PID RPM terpisah untuk masing-masing roda. Gunakan 
 
 ### D. Perintah Pengujian Gerakan Kinematik Sasis
 
-#### 1. `ROBOT <vx> <vy> <w> <ms>`
-* **Deskripsi:** Menggerakkan sasis robot berdasarkan **Robot-Centric Kinematics** (relatif terhadap badan robot) selama durasi waktu tertentu.
+#### 1. `ROBOT <vx> <vy> <w> [ms]`
+* **Deskripsi:** Menggerakkan sasis robot berdasarkan **Robot-Centric Kinematics** (relatif terhadap badan robot). Jika durasi `[ms]` tidak diisi, robot akan bergerak terus menerus hingga perintah `STOP` dikirim.
 * **Parameter:**
   * `<vx>`: Kecepatan linear maju-mundur.
   * `<vy>`: Kecepatan linear geser kanan-kiri.
   * `<w>`: Kecepatan putar sasis.
-  * `<ms>`: Durasi pergerakan dalam milidetik.
+  * `[ms]` *(Opsional)*: Durasi pergerakan dalam milidetik.
 * **Contoh:**
   ```text
   ROBOT 100 0 0 2000
   ```
+  ```text
+  ROBOT 100 0 0
+  ```
 
-#### 2. `FIELD <vx> <vy> <w> <ms>`
-* **Deskripsi:** Menggerakkan sasis robot berdasarkan **Field-Centric Kinematics** (relatif terhadap koordinat lapangan global, menggunakan data yaw dari IMU MPU9250) selama durasi waktu tertentu.
+#### 2. `FIELD <vx> <vy> <w> [ms]`
+* **Deskripsi:** Menggerakkan sasis robot berdasarkan **Field-Centric Kinematics** (relatif terhadap koordinat lapangan global, menggunakan data yaw dari IMU MPU6050/MPU9250). Jika durasi `[ms]` tidak diisi, robot akan bergerak terus menerus hingga perintah `STOP` dikirim.
 * **Parameter:**
   * `<vx>`: Kecepatan linear maju-mundur relatif lapangan.
   * `<vy>`: Kecepatan linear geser kanan-kiri relatif lapangan.
   * `<w>`: Kecepatan putar sasis.
-  * `<ms>`: Durasi pergerakan dalam milidetik.
+  * `[ms]` *(Opsional)*: Durasi pergerakan dalam milidetik.
 * **Contoh:**
   ```text
   FIELD 100 0 0 2500
+  ```
+  ```text
+  FIELD 100 0 0
   ```
 
 ---
@@ -191,6 +197,14 @@ Sistem menggunakan parameter PID RPM terpisah untuk masing-masing roda. Gunakan 
   SHOW_YAW_PID
   ```
 * **Respon Serial:** `Yaw PID: Kp=2.500 Ki=0.010 Kd=0.100`
+
+#### 6. `SET_GYRO_ALPHA <val>`
+* **Deskripsi:** Mengubah nilai koefisien filter EMA low-pass sensor gyro secara real-time untuk mereduksi getaran motor PG45 (rentang `0.01` s.d `0.99`).
+* **Contoh:**
+  ```text
+  SET_GYRO_ALPHA 0.05
+  ```
+* **Respon Serial:** `Gyro filter alpha set to: 0.05`
 
 ---
 
