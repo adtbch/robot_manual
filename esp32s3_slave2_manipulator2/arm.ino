@@ -130,7 +130,7 @@ void updateMotorPositioning() {
         int pwmOutput = pidCompute(pidW, motorTargets[i].targetPosition, current, dt);
 
         // Limit output PWM ke +/- 150 (setengah kecepatan)
-        pwmOutput = constrain(pwmOutput, -MOVE_SPEED * 0.5, MOVE_SPEED * 0.5);
+        pwmOutput = constrain(pwmOutput, -MOVE_SPEED * 1.5, MOVE_SPEED * 1.5);
 
         pwmMotor(i, pwmOutput);
       } else {
@@ -166,7 +166,7 @@ bool setHoming() {
   
   // Gerakkan motor yang belum homing
   if (!motorArm.homed[0]) {
-    pwmMotor(0, -HOMING_SPEED);
+    pwmMotor(0, -HOMING_SPEED * 2.5);
   }
 
   if (!motorArm.homed[1]) {
@@ -258,7 +258,7 @@ void moveToPosition(long posW, long posZ, long posY) {
 
 // Singleton helper: move satu sumbu, return false jika masih bergerak
 bool moveTargetPosition(uint8_t motorIndex, long targetPosition) {
-  setMotorTarget(motorIndex, targetPosition);
+  // setMotorTarget(motorIndex, targetPosition);
   updateMotorPositioning();
   return !motorTargets[motorIndex].active;
 }

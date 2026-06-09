@@ -13,20 +13,14 @@ void driveRobotCentric(int vx, int vy, int vtheta) {
 }
 
 // 2. FIELD-CENTRIC (Maju/Geser berdasarkan arah lapangan, menggunakan data YAW)
-void driveFieldCentric(int vx, int vy, int vtheta) {
-  // Rotasi vx/vy dari field frame ke robot frame berdasarkan yaw
-  // vx_r =  vx_f * cos(yaw) + vy_f * sin(yaw)
-  // vy_r = -vx_f * sin(yaw) + vy_f * cos(yaw)
-  float yawRad = getYaw() * (PI / 180.0f);
-  float c = cosf(yawRad);
-  float s = sinf(yawRad);
 
-  int vxRot = roundf(vx * c + vy * s);
-  int vyRot = roundf(-vx * s + vy * c);
 
-  // vtheta (rotasi) tetap robot-relative (standard field-centric convention)
-  driveRobotCentric(vxRot, vyRot, vtheta);
-}
+
+
+
+
+
+
 
 void driveFieldCentricWithYawCorrection(int vx, int vy, int yawTarget) {
   float currentYaw = getYaw();

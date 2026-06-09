@@ -51,3 +51,4 @@ Menghentikan paksa semua motor dan membatalkan seluruh target posisi aktif.
 *   **Homing & Centering:** Saat pertama kali menyala (setup), robot akan otomatis melakukan homing (mundur sampai menyentuh limit switch), lalu bergerak ke posisi tengah (`CENTER_POSITION`). Tunggu sampai muncul pesan **`Robot ready!`** di Serial Monitor sebelum mengirimkan perintah.
 *   **Proportional Speed:** Kecepatan motor akan melambat secara otomatis saat mendekati target koordinat untuk mencegah overshoot/benturan fisik.
 *   **Toleransi Posisi:** Target dianggap tercapai jika selisih posisi encoder dengan target kurang dari `30` count (`MOTOR_POSITION_TOLERANCE`).
+servo2 0

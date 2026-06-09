@@ -4,10 +4,6 @@
  * PERAN   : 1. Toggle servo gripper buka/tutup dengan tombol Triangle
  *           2. Kontrol manual motor capit (axis X & Z) via D-pad
  *           3. Kontrol manual servo rotation (servo 0) via R2 + D-pad
- *           4. X + D-pad → recall preset sudut (tersimpan di NVS)
- *           5. Save/Reset via command byte dari Controller
- *           6. Share + Circle/Square → save servo+motor (via command byte)
- *           7. Circle/Square → recall servo+motor sequence
  *
  *           ** HANYA AKTIF DI MODE_GRIPPING **
  *
@@ -16,15 +12,10 @@
  *   - Tekan Triangle → toggle (BUKA ↔ TUTUP)
  *
  * SERVO ROTATION:
- *   R2 + D-pad Right/Left → manual angle (step 5°)
- *   X + D-pad Up/Left/Right → recall preset (NVS)
- *   Save/Reset dikirim dari Controller via command byte
- *
- * SEMI-AUTO PRESETS:
- *   Share + Circle → simpan servo angle + motor height ke Circle slot
- *   Share + Square → simpan servo angle + motor height ke Square slot
- *   Circle → recall: servo dulu, baru motor
- *   Square → recall: servo dulu, baru motor
+ *   R2 + D-pad Up/Down → manual angle (step 10°)
+ *   X + D-pad Right    → preset 185°
+ *   X + D-pad Up       → preset 95°
+ *   X + D-pad Left     → preset 5°
  *
  * MOTOR GRIPPER (D-pad tanpa R2/X):
  *   - D-pad Atas  → Motor 1 (axis X) maju
@@ -43,10 +34,13 @@
 #define GRIPPER_SERVO_ID       1     // index di vector servos (servoGrib)
 #define ROTATION_SERVO_ID      0     // index di vector servos (servoRotation)
 #define GRIPPER_ANGLE_OPEN     0
-#define GRIPPER_ANGLE_CLOSED   85
+#define GRIPPER_ANGLE_CLOSED   95
 #define ROTATION_STEP          5     // derajat per langkah R2+Dpad
-#define ROTATION_MIN           0
-#define ROTATION_MAX           185
+#define ROTATION_MIN           26
+#define ROTATION_MAX           154
+#define ROTATION_PRESET_LEFT   26
+#define ROTATION_PRESET_UP     90
+#define ROTATION_PRESET_RIGHT  154
 #define GRIPPER_SPEED_DEFAULT  300
 #define GRIPPER_SPEED_FAST     600
 #define GRIPPER_SPEED_SLOW     200
@@ -60,12 +54,10 @@ static int  gRotationAngle = 0;         // sudut servo rotation saat ini
 static unsigned long gLastToggleMs = 0;
 
 // =====================================================================
-//  SERVO GRIPPER — toggle buka/tutup dengan Circle
+//  SERVO GRIPPER — toggle buka/tutup dengan Triangle
 // =====================================================================
 
 void gripper_init() {
-    servoPresetsLoad();
-    semiAutoPresetsLoad();
     setServoAngle(GRIPPER_SERVO_ID, GRIPPER_ANGLE_OPEN);
     gGripperOpen = true;
 }
@@ -73,33 +65,10 @@ void gripper_init() {
 void gripper_tick(const ControlPacket &pkt) {
     if (currentMode != MODE_GRIPPING) return;
 
-    bool circleNow = (pkt.buttons & BTN_CIRCLE)  != 0;
-    bool squareNow = (pkt.buttons & BTN_SQUARE)  != 0;
-    bool shareHeld = (pkt.buttons & BTN_SHARE)   != 0;
+    static bool lastTriangle = false;
     bool triangleNow = (pkt.buttons & BTN_TRIANGLE) != 0;
 
-    // Circle (tanpa Share) → recall semi-auto preset (jika tidak sedang sequence)
-    if (circleNow && !shareHeld && !semiAutoPresetIsActive()) {
-        static bool lastCircleRecall = false;
-        if (!lastCircleRecall) {
-            semiAutoPresetRecallCircle();
-        }
-        lastCircleRecall = true;
-        return;
-    }
-
-    // Square (tanpa Share) → recall semi-auto preset (jika tidak sedang sequence)
-    if (squareNow && !shareHeld && !semiAutoPresetIsActive()) {
-        static bool lastSquareRecall = false;
-        if (!lastSquareRecall) {
-            semiAutoPresetRecallSquare();
-        }
-        lastSquareRecall = true;
-        return;
-    }
-
     // Toggle servo gripper (Triangle)
-    static bool lastTriangle = false;
     if (triangleNow && !lastTriangle) {
         unsigned long nowMs = millis();
         if (nowMs - gLastToggleMs >= GRIPPER_DEBOUNCE_MS) {
@@ -147,20 +116,20 @@ void gripper_motor_tick(const ControlPacket &pkt) {
         return;
     }
 
-    // X + D-pad → recall preset servo rotation angle (Up/Left/Right saja)
+    // X + D-pad → preset servo rotation angle
     bool xHeld = (pkt.buttons & BTN_CROSS) != 0;
     if (xHeld) {
         static bool lastUp = false, lastLeft = false, lastRight = false;
         bool upNow = up, leftNow = left, rightNow = right;
 
         if (upNow && !lastUp) {
-            gRotationAngle = servoPresetsGetUp();
+            gRotationAngle = ROTATION_PRESET_UP;
             setServoAngle(ROTATION_SERVO_ID, gRotationAngle);
         } else if (leftNow && !lastLeft) {
-            gRotationAngle = servoPresetsGetLeft();
+            gRotationAngle = ROTATION_PRESET_LEFT;
             setServoAngle(ROTATION_SERVO_ID, gRotationAngle);
         } else if (rightNow && !lastRight) {
-            gRotationAngle = servoPresetsGetRight();
+            gRotationAngle = ROTATION_PRESET_RIGHT;
             setServoAngle(ROTATION_SERVO_ID, gRotationAngle);
         }
 
