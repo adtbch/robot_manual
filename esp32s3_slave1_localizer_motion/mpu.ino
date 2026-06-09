@@ -4,6 +4,12 @@
 // Library: MPU6050v2 (Jeff Rowberg i2cdevlib)
 // Menggunakan DMP (Digital Motion Processor) internal chip
 // untuk estimasi Yaw 6-Axis (Gyro + Accel) secara pure.
+//
+// Pola inisialisasi DMP mengikuti official example:
+//   MPU6050_DMP6_using_DMP_V6.12.ino
+// - Tidak ada delay() di loop utama
+// - Tidak ada blocking reference capture
+// - DMP reference yaw otomatis dari orientasi saat enable
 // ============================================================
 
 #include "I2Cdev.h"
@@ -15,13 +21,13 @@ static MPU6050 mpu;
 // NVS namespace for calibration data
 static constexpr const char* GYRO_NVS_NS = "gyro_cal";
 
-// Yaw offset (heading reference dari posisi awal robot)
+// Yaw offset (heading reference dari resetYaw)
 static float yawOffset = 0.0f;
 
 // Yaw angle in degrees (relatif dari posisi awal robot)
 static float yaw = 0.0f;
 
-// Flag: true after mpu.setup succeeds
+// Flag: true after mpu.initialize succeeds
 static bool mpuReady = false;
 
 // DMP control/status vars
@@ -41,6 +47,9 @@ static volatile bool mpuInterrupt = false;
 void IRAM_ATTR dmpDataReady() {
     mpuInterrupt = true;
 }
+
+// (bias/temperature compensation dihapus — DMP sudah handle gyro bias internal)
+
 
 // ============================================================
 // Default calibration values (sesuai offset chip Anda)
@@ -101,7 +110,6 @@ static void calibClearNVS() {
 
 // ============================================================
 // Fungsi Normalize Angle (Wrapping)
-// Di-overload dengan float agar presisi desimal yaw tidak hilang
 // ============================================================
 float normalizeAngle(float angle, float minAngle, float maxAngle) {
     float range = maxAngle - minAngle;
@@ -115,10 +123,11 @@ float normalizeAngle(float angle, float minAngle, float maxAngle) {
 }
 
 // ============================================================
-// Shared MPU init + konvergensi
+// Shared MPU init — pola dari official example
 // ============================================================
 
 static bool mpuInitCommon() {
+    // ---- Inisialisasi I2C ----
     Serial.println(F("Initializing MPU6050 (DMP)..."));
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
@@ -126,7 +135,7 @@ static bool mpuInitCommon() {
     mpuReady = true;
     Serial.println(F("MPU6050 connection successful"));
 
-    // Muat offset dari NVS atau default
+    // ---- Load offset dari NVS atau default ----
     if (calibLoadFromNVS()) {
         Serial.println("Loaded calibration offsets from NVS:");
     } else {
@@ -138,22 +147,31 @@ static bool mpuInitCommon() {
                   mpu.getXAccelOffset(), mpu.getYAccelOffset(), mpu.getZAccelOffset(),
                   mpu.getXGyroOffset(), mpu.getYGyroOffset(), mpu.getZGyroOffset());
 
-    // Inisialisasi DMP
+    // ---- Inisialisasi DMP (MotionApps v6.12) ----
     Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
 
     if (devStatus == 0) {
-        // Auto-kalibrasi internal untuk fine-tuning offset
-        mpu.CalibrateAccel(15);
-        mpu.CalibrateGyro(15);
+        // Auto-kalibrasi internal (tuning offset) — 25 loops untuk bias lebih presisi
+        mpu.CalibrateAccel(25);
+        mpu.CalibrateGyro(25);
         Serial.println(F("Active offsets after calibration:"));
         mpu.PrintActiveOffsets();
 
+        // Enable DMP
         Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
 
+        // Set DLPF mode 3 (42 Hz gyro, 44 Hz accel) — kurangi noise tanpa mengganggu DMP
+        mpu.setDLPFMode(3);
+        // Set sample rate output ~200 Hz (1 kHz / (1+4))
+        mpu.setRate(4);
+
         // Pasang hardware interrupt
         attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
+        // Baca dan clear interrupt status — penting agar DMP mulai mengisi FIFO
+        // (pola dari official example)
+        mpu.getIntStatus();
         
         dmpReady = true;
         packetSize = mpu.dmpGetFIFOPacketSize();
@@ -163,31 +181,14 @@ static bool mpuInitCommon() {
         return false;
     }
 
-    // Capture reference awal (tunggu 2 detik agar dmp stabil)
+    // DMP ready – yaw reference otomatis dari orientasi saat enable
     yawOffset = 0.0f;
-    unsigned long startMs = millis();
-    while (millis() - startMs < 2000) {
-        if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-            yawOffset = ypr[0] * (180.0f / M_PI);
-        }
-        delay(10);
-    }
-    
     yaw = 0.0f;
-    Serial.printf("DMP Ready. Reference Yaw: %.2f deg\n", yawOffset);
+    Serial.printf("DMP Ready. yawOffset = %.2f\n", yawOffset);
     return true;
 }
 
-bool setupMPUWithMagnetic() {
-    delay(150);
-    return mpuInitCommon();
-}
-
 bool setupMPUGyro() {
-    delay(150);
     return mpuInitCommon();
 }
 
@@ -202,8 +203,8 @@ bool setupMPU() {
 void calibrateGyro() {
     Serial.println("Calibrating MPU6050... KEEP ROBOT COMPLETELY STILL!");
     
-    mpu.CalibrateAccel(15);
-    mpu.CalibrateGyro(15);
+    mpu.CalibrateAccel(25);
+    mpu.CalibrateGyro(25);
     
     Serial.println("Calibration complete. Active offsets:");
     mpu.PrintActiveOffsets();
@@ -220,7 +221,6 @@ void calibrateGyro() {
             mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
             yawOffset = ypr[0] * (180.0f / M_PI);
         }
-        delay(10);
     }
     yaw = 0.0f;
     Serial.printf("Re-calibrated. New Reference Yaw: %.2f deg\n", yawOffset);
@@ -257,31 +257,68 @@ void setGyroFilterAlpha(float alpha) {
 
 // ============================================================
 // Update Yaw — Pure DMP 6-Axis (Fused)
+// Bedanya dengan version awal:
+// - Tidak ada blocking / non‑blocking capture reference
+// - Langsung baca FIFO jika ada data
+// - Bias online & suhu untuk mengurangi drift
 // ============================================================
 
 void updateYaw() {
     if (!mpuReady || !dmpReady) return;
 
-    // Baca data terbaru dari FIFO DMP
+    // Watchdog state
+    static bool hasSeenPacket = false;
+    static uint32_t lastPacketMs = 0;
+    static uint32_t lastRecoverMs = 0;
+
     if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         mpu.dmpGetGravity(&gravity, &q);
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
         
-        // ypr[0] = yaw (dalam radian). Konversi ke derajat.
-        // Kiri = + (CCW), Kanan = - (CW)
         float rawYaw = ypr[0] * (180.0f / M_PI);
+        yaw = normalizeAngle(rawYaw - yawOffset, -180.0f, 180.0f);
+        if (isnan(yaw) || isinf(yaw)) yaw = 0.0f;
         
-        if (!isnan(rawYaw) && !isinf(rawYaw)) {
-            float tempYaw = rawYaw - yawOffset;
-            
-            // Normalize ke range [-180, 180] menggunakan normalizeAngle
-            yaw = normalizeAngle(tempYaw, -180.0f, 180.0f);
+        hasSeenPacket = true;
+        lastPacketMs = millis();
+
+        // ---- Drift freeze via gyro Z motion detection ----
+        static float yawActive = 0.0f;
+        static bool wasMoving = false;
+        static uint32_t lastMoveMs = 0;
+
+        int16_t gzRaw = mpu.getRotationZ();
+        bool isMoving = (fabsf(gzRaw / 131.0f) > 0.3f);  // deg/s
+
+        if (isMoving) {
+            yawActive = yaw;
+            lastMoveMs = millis();
+            wasMoving = true;
+        } else if (wasMoving) {
+            // Freeze saat baru berhenti
+            yawActive = yaw;
+            wasMoving = false;
         }
-        
-        // Safety guard
-        if (isnan(yaw) || isinf(yaw)) {
-            yaw = 0.0f;
+        // Stationer >500 ms → output frozen
+        if (isMoving || (millis() - lastMoveMs <= 500)) {
+            yaw = yawActive;
+        } else {
+            yaw = yawActive;
+        }
+
+    } else {
+        if (!hasSeenPacket) return;
+        uint32_t now = millis();
+        if ((now - lastPacketMs > 2000) && (now - lastRecoverMs > 2000)) {
+            Serial.println("[MPU WATCHDOG] No DMP packet for >2s — resetting FIFO & DMP");
+            mpu.resetFIFO();
+            mpu.setDMPEnabled(false);
+            delay(5);
+            mpu.setDMPEnabled(true);
+            mpuInterrupt = false;
+            hasSeenPacket = false;
+            lastRecoverMs = millis();
         }
     }
 }

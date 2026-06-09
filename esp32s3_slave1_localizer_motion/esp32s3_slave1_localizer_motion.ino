@@ -54,9 +54,9 @@ void loop() {
   serialCommandsTick();
   serialContinuousTick();
 
-  // Update OLED — rate limit 200ms supaya tidak starve I2C bus MPU9250
+  // Update OLED — rate limit 200ms supaya tidak starve I2C bus MPU6050
   static uint32_t lastOledMs = 0;
-  if (millis() - lastOledMs >= 50) {
+  if (millis() - lastOledMs >= 200) {
     lastOledMs = millis();
     const char* status = autoTunerIsActive() ? "AUTOTUNE" : "READY";
     displayYaw(getYaw(), status);
