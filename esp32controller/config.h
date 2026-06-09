@@ -130,19 +130,7 @@ struct __attribute__((packed)) ControlPacket {
     // --- Metadata paket ---
     uint16_t seq;        // Nomor urut (counter). Dipakai penerima untuk deteksi packet loss.
     uint8_t  connected;  // 1 = PS4 terhubung & aktif, 0 = disconnect / stop
-    uint8_t  command;    // Perintah aksi dari Controller (0=none, save/reset/etc)
 };
-
-// ============================================================
-// COMMAND BYTE — perintah dari Controller ke Master
-// ============================================================
-#define CMD_NONE          0x00
-#define CMD_SAVE_UP       0x01   // Save preset servo Up
-#define CMD_SAVE_LEFT     0x02   // Save preset servo Left
-#define CMD_SAVE_RIGHT    0x03   // Save preset servo Right
-#define CMD_SAVE_CIRCLE   0x10   // Save semi-auto Circle (servo+motor)
-#define CMD_SAVE_SQUARE   0x11   // Save semi-auto Square (servo+motor)
-#define CMD_RESET         0x20   // Reset semua preset ke default
 
 // =====================================================================
 //  VARIABEL GLOBAL BERSAMA (definisi ada di esp32controller.ino)

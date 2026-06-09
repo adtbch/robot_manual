@@ -65,8 +65,7 @@ void debug_cetak_info_boot(bool espnow_ok) {
     Serial.printf("Interval kirim           : %lu ms (%lu Hz)\n",
         kSendIntervalMs, 1000UL / kSendIntervalMs);
     Serial.println("-----------------------------------------");
-    Serial.println("Jalur default            : A — WSN-31 (radio UART)");
-    Serial.println("Tekan tombol BOOT (GPIO0): toggle jalur A <-> B");
+    Serial.println("Tekan tombol BOOT (GPIO0): toggle jalur B <-> A");
     Serial.println("=========================================");
 }
 

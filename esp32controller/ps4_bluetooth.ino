@@ -42,10 +42,6 @@ static const uint8_t led_palet[][3] = {
 };
 static const uint8_t kLedPaletCount = sizeof(led_palet) / sizeof(led_palet[0]);
 
-// --- State untuk LED warna saat Share held ---
-static bool     share_held_prev       = false;
-static bool     led_share_mode        = false;
-
 // =====================================================================
 //  FUNGSI: INISIALISASI BLUETOOTH PS4
 // =====================================================================
@@ -205,82 +201,16 @@ void ps4_baca_paket(ControlPacket &paket) {
     // --- Deteksi edge tombol Options → ganti warna LED PS4 ---
     bool options_sekarang = PS4.Options();
     if (options_sekarang && !options_prev) {
+        // Rising edge: baru saja ditekan
         led_color_index = (led_color_index + 1) % kLedPaletCount;
         uint8_t r = led_palet[led_color_index][0];
         uint8_t g = led_palet[led_color_index][1];
         uint8_t b = led_palet[led_color_index][2];
         PS4.setLed(r, g, b);
         PS4.sendToController();
+        Serial.printf("[PS4] Options ditekan → LED: R=%u G=%u B=%u\n", r, g, b);
     }
     options_prev = options_sekarang;
-
-    // --- Set command byte + LED feedback ---
-    bool share_now = PS4.Share();
-    paket.command = CMD_NONE;  // default
-
-    // Share dilepas → kembalikan ke warna normal
-    if (!share_now && share_held_prev) {
-        if (led_share_mode) {
-            uint8_t r = led_palet[led_color_index][0];
-            uint8_t g = led_palet[led_color_index][1];
-            uint8_t b = led_palet[led_color_index][2];
-            PS4.setLed(r, g, b);
-            PS4.sendToController();
-        }
-        led_share_mode = false;
-    }
-    share_held_prev = share_now;
-
-    if (share_now) {
-        bool x_now     = PS4.Cross();
-        bool circleNow = PS4.Circle();
-        bool squareNow = PS4.Square();
-        bool up_now    = PS4.Up();
-        bool left_now  = PS4.Left();
-        bool right_now = PS4.Right();
-        bool down_now  = PS4.Down();
-
-        // Share + Circle → save semi-auto Circle
-        if (circleNow) {
-            paket.command = CMD_SAVE_CIRCLE;
-            PS4.setLed(255, 255, 0);
-            PS4.sendToController();
-            led_share_mode = true;
-        }
-        // Share + Square → save semi-auto Square
-        else if (squareNow) {
-            paket.command = CMD_SAVE_SQUARE;
-            PS4.setLed(255, 255, 0);
-            PS4.sendToController();
-            led_share_mode = true;
-        }
-        // Share + X + Down hold 2 detik → reset
-        else if (x_now && down_now) {
-            static uint32_t reset_hold_start = 0;
-            static bool reset_hold_prev_local = false;
-            bool reset_combo = true;
-            if (reset_combo && !reset_hold_prev_local) {
-                reset_hold_start = millis();
-            }
-            if (millis() - reset_hold_start >= 2000) {
-                paket.command = CMD_RESET;
-                PS4.setLed(0, 255, 0);
-                PS4.sendToController();
-                led_share_mode = true;
-                reset_hold_start = millis();
-            }
-            reset_hold_prev_local = reset_combo;
-        }
-        // Share + X + Dpad (Up/Left/Right) → save preset servo
-        else if (x_now && (up_now || left_now || right_now)) {
-            if (up_now)        paket.command = CMD_SAVE_UP;
-            else if (left_now)  paket.command = CMD_SAVE_LEFT;
-            else if (right_now) paket.command = CMD_SAVE_RIGHT;
-            PS4.setLed(255, 255, 0);
-            PS4.sendToController();
-            led_share_mode = true;
-        }
-    }
 
     // --- Metadata ---
     nomor_urut_paket++;
