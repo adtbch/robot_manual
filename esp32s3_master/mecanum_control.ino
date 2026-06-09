@@ -14,8 +14,15 @@
  *   R1 hold (tahan) → cepat (tidak scale ulang — sudah dari controller)
  *   L1 hold (tahan) → lambat (50% dari nilai pkt)
  *
+ * L2 + ANALOG KANAN → ROTASI ABSOLUT:
+ *   L2 + Stick Atas  → 0°
+ *   L2 + Stick Kanan → 90°
+ *   L2 + Stick Bawah → 180°
+ *   L2 + Stick Kiri  → -90°
+ *
  * PROTOKOL KE SLAVE:
- *   "Vx Vy W\n"    (tanpa durasi — slave auto-stop 2 detik)
+ *   "Vx Vy W\n"          (tanpa durasi — slave auto-stop 2 detik)
+ *   "ROTATE <yaw>\n"     (rotasi absolut ke sudut target)
  *
  * SAFETY:
  *   - Deadzone kecil 20 (dari -1023..1023) untuk noise tengah stik
@@ -28,7 +35,8 @@
 #define SLAVE_SERIAL Serial1
 
 static const int16_t DEADZONE_RAW    = 10;   // deadzone untuk raw int8_t -128..127
-static const unsigned long SEND_INTERVAL_MS = 50;
+static const int16_t DEADZONE_STICK  = 50;   // deadzone untuk L2+Rx rotasi absolut
+static const unsigned long SEND_INTERVAL_MS = 2;
 
 // =====================================================================
 //  STATE
@@ -38,6 +46,11 @@ static int16_t gLastVx = 0;
 static int16_t gLastVy = 0;
 static int16_t gLastW  = 0;
 static unsigned long gLastSendMs = 0;
+static bool gL2RotationActive = false;
+
+// --- Yaw angle saved in RAM (untuk L2 + manual increment) ---
+static int16_t gSavedYaw = 0;
+static bool gL2WasHeld = false;
 
 // =====================================================================
 //  HELPER
@@ -57,13 +70,40 @@ static int16_t getSpeedMode(uint32_t buttons) {
 static int16_t scaleSpeed(int8_t val, int16_t maxSpeed) {
     return map((int16_t)val, -128, 127, -maxSpeed, maxSpeed);
 }
+
+// =====================================================================
+//  L2 + ANALOG KANAN → ROTASI ABSOLUT
+// =====================================================================
+
+static void sendRotateCommand(int yawTarget) {
+    // Pakai format "0 0 <yaw> <duration>" yang sudah dipahami Slave1
+    // Slave1 akan panggil driveFieldCentricWithYawCorrection(0, 0, yawTarget)
+    char cmd[32];
+    snprintf(cmd, sizeof(cmd), "0 0 %d\n", yawTarget);
+    SLAVE_SERIAL.print(cmd);
+}
+
+static int mapStickToYawTarget(int8_t rx, int8_t ry) {
+    // Stick atasan → 0°, kanan → 90°, bawah → 180°, kiri → -90°
+    // Menggunakan atan2 untuk menentukan sudut dari stick
+    float angle = atan2f((float)rx, (float)(-ry)) * (180.0f / PI);
+
+    // Snap ke 4 arah terdekat
+    if (angle >= -45.0f && angle < 45.0f)    return 0;    // atas
+    if (angle >= 45.0f && angle < 135.0f)    return 90;   // kanan
+    if (angle >= -135.0f && angle < -45.0f)  return -90;  // kiri
+    return 180;  // bawah (angle >= 135 atau < -135)
+}
+
 // =====================================================================
 //  KIRIM PERINTAH KE SLAVE
 // =====================================================================
 
-static void sendMecanumCommand(int16_t vx, int16_t vy, int16_t w) {
+static void sendMecanumCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
+    // Kirim sebagai "0 0 <yaw> <duration>" agar Slave1 pakai
+    // driveFieldCentricWithYawCorrection (PID yaw lock)
     char cmd[32];
-    snprintf(cmd, sizeof(cmd), "%d %d %d\n", vx, vy, w);
+    snprintf(cmd, sizeof(cmd), "%d %d %d 2000\n", vx, vy, yawTarget);
     SLAVE_SERIAL.print(cmd);
 }
 
@@ -78,28 +118,58 @@ void mecanum_control_tick(const ControlPacket &pkt) {
             sendMecanumCommand(0, 0, 0);
             gLastSendMs = millis();
         }
+        gL2RotationActive = false;
         return;
     }
-    
+
+    bool l2Held = (pkt.buttons & BTN_L2) != 0;
+
+    // ============================================================
+    // MANUAL ROTASI (tanpa L2) — increment yaw
+    // ============================================================
     int16_t maxSpeed = getSpeedMode(pkt.buttons);
-    
+
     // Ambil dari pkt.lx/ly/rx (raw int8_t -128..127 dari controller), olah di sini
     int8_t rawVx = applyDeadzoneRaw(pkt.ly);    // maju/mundur (ly: push maju = negatif)
     int8_t rawVy = applyDeadzoneRaw(pkt.lx);    // geser kiri/kanan
     int8_t rawW  = applyDeadzoneRaw(pkt.rx);    // rotasi
 
-    int16_t vx = scaleSpeed(-rawVx, maxSpeed);  // invert Y: push maju → vx positif
+    int16_t vx = scaleSpeed(rawVx, maxSpeed);  // invert Y: push maju → vx positif
     int16_t vy = scaleSpeed(rawVy,  maxSpeed);
-    int16_t w  = scaleSpeed(rawW,   maxSpeed);
-    
-    bool changed = (vx != gLastVx || vy != gLastVy || w != gLastW);
-    unsigned long nowMs = millis();
 
+    // Increment yaw: kanan +1°, kiri -1° per tick
+    if (rawW > 0) {
+        gSavedYaw++;
+        if (gSavedYaw > 180) gSavedYaw = -179;
+    } else if (rawW < 0) {
+        gSavedYaw--;
+        if (gSavedYaw < -179) gSavedYaw = 180;
+    }
+
+    // Kirim Vx, Vy, dan yaw absolut ke Slave1
+    unsigned long nowMs = millis();
+    bool changed = (vx != gLastVx || vy != gLastVy);
     if (changed || (nowMs - gLastSendMs >= SEND_INTERVAL_MS)) {
         gLastVx = vx;
         gLastVy = vy;
-        gLastW  = w;
         gLastSendMs = nowMs;
-        sendMecanumCommand(vx, vy, w);
+        sendMecanumCommand(-vx, vy, gSavedYaw);
+    }
+    // ============================================================
+    // L2 + ANALOG KANAN → ROTASI ABSOLUT
+    // ============================================================
+    if (l2Held) {
+        int8_t rx = pkt.rx;
+        int8_t ry = -pkt.ry;
+
+         // Cek apakah stick cukup defleksi (melewati deadzone)
+        if (abs(rx) > DEADZONE_STICK || abs(ry) > DEADZONE_STICK) {
+            gSavedYaw = mapStickToYawTarget(rx, ry);
+            sendMecanumCommand(vx, vy, gSavedYaw);
+            gL2RotationActive = true;
+            gLastVx = gLastVy = gLastW = 0;
+            gLastSendMs = millis();
+            return;
+        }
     }
 }

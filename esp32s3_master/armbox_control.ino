@@ -11,10 +11,10 @@
  *   Square + D-pad Up/Down → Motor Y (Maju Mundur) maju/mundur (manual PWM)
  *   R1 = cepat, L1 = lambat (untuk motor)
  *
- *   D-pad Down  → Motor 0 (MOTOR_W) 0°
- *   D-pad Left  → Motor 0 (MOTOR_W) 90°
- *   D-pad Up    → Motor 0 (MOTOR_W) 180°
- *   D-pad Right → Motor 0 (MOTOR_W) 270°
+ *   D-pad Down  → Motor 0 (MOTOR_W) posisi depan
+ *   D-pad Left  → Motor 0 (MOTOR_W) posisi kiri
+ *   D-pad Up    → Motor 0 (MOTOR_W) posisi belakang
+ *   D-pad Right → Motor 0 (MOTOR_W) posisi kanan
  *
  *   R2 + D-pad Up    → Servo 0 tambah derajat
  *   R2 + D-pad Down  → Servo 0 kurang derajat
@@ -37,21 +37,18 @@
 #define ARMBOX_SPEED_FAST     600
 #define ARMBOX_SPEED_SLOW     200
 
-#define SERVO_STEP_DEFAULT    5
-#define SERVO_STEP_FAST       10
-#define SERVO_STEP_SLOW       2
-#define SERVO_MIN             90
+#define SERVO_STEP_DEFAULT    40
+#define SERVO_STEP_FAST       50
+#define SERVO_STEP_SLOW       10
+#define SERVO_MIN             70
 #define SERVO_MAX             180
 
-// Konversi derajat → encoder count (sesuaikan dengan hardware)
-// Contoh: 900 counts = 360° → 1 count = 0.4°
-#define DEG_TO_COUNT(deg) ((long)((deg) * 900L / 360L))
-
-// Preset derajat motor 0 (MOTOR_W): D-pad = 1 tombol = 1 derajat
-#define W_DEG_DOWN    0
-#define W_DEG_LEFT    180
-#define W_DEG_UP      360
-#define W_DEG_RIGHT   540
+// Preset encoder count motor 0 (MOTOR_W) — SESUAIKAN DENGAN HARDWARE
+// D-pad Down/Left/Up/Right → posisi motor
+#define W_POS_DOWN    0       // posisi depan (default)
+#define W_POS_LEFT    1290    // posisi kiri (test: 1300 = nengok kiri)
+#define W_POS_UP      2640    // posisi belakang
+#define W_POS_RIGHT   3940    // posisi kanan
 
 // =====================================================================
 //  HELPER: kirim perintah ke Slave2 via manipulator_serial
@@ -107,6 +104,27 @@ void armbox_control_tick(const ControlPacket &pkt) {
         }
     }
     lastTriangle = triangleNow;
+
+    // ================================================================
+    // RELAY 0 — pulse ON sebentar via Circle
+    // ================================================================
+    static bool lastCircle = false;
+    static bool pulsingRelay0Circle = false;
+    static unsigned long pulseCircleStartMs = 0;
+    bool circleNow = (pkt.buttons & BTN_CIRCLE) != 0;
+
+    // Non-blocking pulse relay0
+    if (pulsingRelay0Circle && (millis() - pulseCircleStartMs >= 100)) {
+        armbox_send("relay0 1");  // relay0 OFF
+        pulsingRelay0Circle = false;
+    }
+
+    if (circleNow && !lastCircle) {
+        armbox_send("relay0 0");  // relay0 ON
+        pulseCircleStartMs = millis();
+        pulsingRelay0Circle = true;
+    }
+    lastCircle = circleNow;
 
     // ================================================================
     // SERVO 0 — manual step via R2 + D-pad Up/Down
@@ -215,19 +233,19 @@ void armbox_control_tick(const ControlPacket &pkt) {
 
     if (up && !lastUpW) {
         char cmd[32];
-        snprintf(cmd, sizeof(cmd), "motorw %d", W_DEG_UP);
+        snprintf(cmd, sizeof(cmd), "motorw %d", W_POS_UP);
         armbox_send(cmd);
     } else if (down && !lastDownW) {
         char cmd[32];
-        snprintf(cmd, sizeof(cmd), "motorw %d", W_DEG_DOWN);
+        snprintf(cmd, sizeof(cmd), "motorw %d", W_POS_DOWN);
         armbox_send(cmd);
     } else if (left && !lastLeftW) {
         char cmd[32];
-        snprintf(cmd, sizeof(cmd), "motorw %d", W_DEG_LEFT);
+        snprintf(cmd, sizeof(cmd), "motorw %d", W_POS_LEFT);
         armbox_send(cmd);
     } else if (right && !lastRightW) {
         char cmd[32];
-        snprintf(cmd, sizeof(cmd), "motorw %d", W_DEG_RIGHT);
+        snprintf(cmd, sizeof(cmd), "motorw %d", W_POS_RIGHT);
         armbox_send(cmd);
     }
 

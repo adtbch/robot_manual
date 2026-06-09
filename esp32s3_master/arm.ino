@@ -37,7 +37,7 @@ bool setHoming() {
         pwmMotor(1, -HOMING_SPEED);
     }
 
-    setServoAngle(0, 95);   // Servo rotation → 0 derajat
+    setServoAngle(0, 90);   // Servo rotation → 0 derajat
     setServoAngle(1, 0);  // Servo gripper → 90 derajat
     // Return true hanya jika kedua motor sudah selesai homing
     return (motorArm.xhoming && motorArm.zhoming);
