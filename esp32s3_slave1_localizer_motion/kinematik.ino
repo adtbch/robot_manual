@@ -21,8 +21,8 @@ void driveFieldCentric(int vx, int vy, int vtheta) {
   float c = cosf(yawRad);
   float s = sinf(yawRad);
 
-  int vxRot = roundf(vx * c + vy * s);
-  int vyRot = roundf(-vx * s + vy * c);
+  int vxRot = roundf(vx * c - vy * s);
+  int vyRot = roundf(vx * s + vy * c);
 
   // vtheta (rotasi) tetap robot-relative (standard field-centric convention)
   driveRobotCentric(vxRot, vyRot, vtheta);

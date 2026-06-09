@@ -237,6 +237,7 @@ int pidCompute(int motorIdx, float targetRPM, float dt) {
 int pidComputeYaw(PIDState &pid, float target, float current, float dt) {
   // 1. Error shortest path [-180, 180]
   float error = target - current;
+  if (error < 2 && error > -2) error = 0;
   while (error > 180.0f) error -= 360.0f;
   while (error < -180.0f) error += 360.0f;
 
