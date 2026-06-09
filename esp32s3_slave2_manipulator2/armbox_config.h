@@ -46,10 +46,10 @@
 #define RELAY_2_PIN    13
 
 // ============================================================
-// PIN UART
+// PIN UART (Master Serial)
 // ============================================================
-#define UART_RX_PIN    21
-#define UART_TX_PIN    38
+#define master_serial_rxPin    21
+#define master_serial_txPin    38
 
 // ============================================================
 // PWM CONSTANTS
@@ -98,7 +98,7 @@ const long MAX_ENCODER_POSITION = 2000; // fallback, dipakai per-axis di bawah
 const int MOVE_SPEED = 400;
 
 // Safety limits per-axis (max encoder count, hardware limit)
-const long MAX_POS_W =  500;  // Sumbu W (Rotasi) — range terbatas
+const long MAX_POS_W =  4000;  // Sumbu W (Rotasi) — range terbatas
 const long MAX_POS_Y = 2900;  // Sumbu Y (Maju Mundur)
 const long MAX_POS_Z = 4000; 
 

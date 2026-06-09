@@ -19,26 +19,31 @@ static bool uartComplete = false;
 void setupSerialCommand() {
   Serial.println("Serial Command Handler Ready!");
   Serial.println("Commands:");
-  Serial.println("  motorW <pos>  - Move Motor W (Putar) to position");
-  Serial.println("  motorZ <pos>  - Move Motor Z (Naik Turun) to position");
-  Serial.println("  motorY <pos>  - Move Motor Y (Maju Mundur) to position");
-  Serial.println("  servo0 <angle> - Set servo angle (0-180)");
-  Serial.println("  relay0 <0/1>  - Set relay 1 (0=ON, 1=OFF)");
-  Serial.println("  relay1 <0/1>  - Set relay 2 (0=ON, 1=OFF)");
-  Serial.println("  homing        - Start homing all motors");
-  Serial.println("  status        - Show motor positions");
-  Serial.println("  encoders      - Show encoder counts");
+  Serial.println("  motorW <pos>    - Move Motor W (Putar) to position");
+  Serial.println("  motorZ <pos>    - Move Motor Z (Naik Turun) to position");
+  Serial.println("  motorY <pos>    - Move Motor Y (Maju Mundur) to position");
+  Serial.println("  pwmw <value>    - Motor W direct PWM (-1023..1023)");
+  Serial.println("  pwmz <value>    - Motor Z direct PWM (-1023..1023)");
+  Serial.println("  pwmy <value>    - Motor Y direct PWM (-1023..1023)");
+  Serial.println("  servo0 <angle>  - Set servo angle (0-180)");
+  Serial.println("  relay0 <0/1>    - Set relay 1 (0=ON, 1=OFF)");
+  Serial.println("  relay1 <0/1>    - Set relay 2 (0=ON, 1=OFF)");
+  Serial.println("  homing          - Start homing all motors");
+  Serial.println("  status          - Show motor positions");
+  Serial.println("  encoders        - Show encoder counts");
   Serial.println("  setpid <p> <i> <d> - Set & Save PID constants for Motor W");
-  Serial.println("  showpid       - Print current PID constants");
-  Serial.println("  monitor       - Toggle continuous encoder print (every 500ms)");
-  Serial.println("  stop          - Stop all motors");
+  Serial.println("  showpid         - Print current PID constants");
+  Serial.println("  monitor         - Toggle continuous encoder print (every 500ms)");
+  Serial.println("  stop            - Stop all motors");
   Serial.println();
 }
 
+#define master_serial Serial1
+
 void initUART() {
-  Serial1.begin(115200, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
+  master_serial.begin(921600, SERIAL_8N1, master_serial_rxPin, master_serial_txPin);
   uartInput.reserve(200);
-  Serial.println("  UART initialized");
+  Serial.println("  UART initialized (master_serial @ 921600)");
 }
 
 // ============================================================
@@ -50,7 +55,7 @@ void parseAndExecuteCommand(char* cmd) {
 
   for (char* p = token; *p; ++p) *p = tolower(*p);
 
-  // MOTOR COMMANDS
+  // MOTOR COMMANDS (position target)
   if (strcmp(token, "motor0") == 0 || strcmp(token, "motor1") == 0 || strcmp(token, "motor2") == 0 ||
       strcmp(token, "motorw") == 0 || strcmp(token, "motorz") == 0 || strcmp(token, "motory") == 0) {
     uint8_t motorId = 0;
@@ -66,6 +71,23 @@ void parseAndExecuteCommand(char* cmd) {
       Serial.printf("Motor %c target set to: %ld\n", axis, targetPos);
     } else {
       Serial.println("Error: motor requires position value");
+    }
+  }
+
+  // MOTOR PWM COMMANDS (direct PWM — untuk manual jog dari Master)
+  else if (strcmp(token, "pwmw") == 0 || strcmp(token, "pwmz") == 0 || strcmp(token, "pwmy") == 0) {
+    uint8_t motorId = 0;
+    if (token[3] == 'z') motorId = MOTOR_Z;
+    else if (token[3] == 'y') motorId = MOTOR_Y;
+    else motorId = MOTOR_W;
+
+    char* valueStr = strtok(NULL, " ");
+    if (valueStr != NULL) {
+      int pwm = atoi(valueStr);
+      stopMotorTarget(motorId);  // stop position control dulu
+      pwmMotor(motorId, pwm);
+    } else {
+      Serial.println("Error: pwm requires value (-1023..1023)");
     }
   }
 
@@ -212,8 +234,8 @@ void serialCommandTick() {
 // UART Handling (non-blocking)
 // ============================================================
 void readUART() {
-  while (Serial1.available()) {
-    char c = (char)Serial1.read();
+  while (master_serial.available()) {
+    char c = (char)master_serial.read();
     if (c == '\n') uartComplete = true;
     else if (c != '\r') uartInput += c;
   }
@@ -226,10 +248,11 @@ void processUARTCommand() {
   uartInput = "";
   uartComplete = false;
 
+  Serial.printf("[MASTER-RX] %s\n", cmd.c_str());
+
   // Convert to char array for strtok
   char cmdBuf[SERIAL_BUFFER_SIZE];
   cmd.toCharArray(cmdBuf, SERIAL_BUFFER_SIZE);
 
-  Serial.printf("UART CMD: %s\n", cmdBuf);
   parseAndExecuteCommand(cmdBuf);
 }

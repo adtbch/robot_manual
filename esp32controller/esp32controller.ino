@@ -44,7 +44,7 @@
 //  Hanya didefinisikan satu kali di sini — file lain pakai extern.
 // =====================================================================
 
-JalurAktif jalur_aktif       = JalurAktif::WSN31; // default: Jalur A
+JalurAktif jalur_aktif       = JalurAktif::ESPNOW; // default: Jalur B (ESP-NOW)
 uint16_t   nomor_urut_paket  = 0;
 
 uint32_t stat_kirim_wsn      = 0;

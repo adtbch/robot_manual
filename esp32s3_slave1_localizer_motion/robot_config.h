@@ -105,6 +105,7 @@ struct __attribute__((packed)) ControlPacket {
 	uint32_t buttons;    // Bitmask semua tombol
 	uint16_t seq;        // Nomor urut paket
 	uint8_t  connected;  // 1 = PS4 terhubung, 0 = disconnect
+	uint8_t  command;    // Perintah aksi dari Controller
 };
 
 // Forward declarations for globals (defined in motor.ino / encoder.ino)

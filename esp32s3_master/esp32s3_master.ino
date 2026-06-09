@@ -7,6 +7,46 @@ static ControlPacket gLastRxPacket = {};
 // Edge detection untuk tombol Options (mode toggle)
 static bool optionsPrev = false;
 
+// Extern dari gripper_control.ino
+extern int gRotationAngle;
+
+// =====================================================================
+//  COMMAND HANDLER — eksekusi aksi dari Controller
+// =====================================================================
+
+static void handleCommand(uint8_t cmd) {
+  if (cmd == CMD_NONE) return;
+
+  switch (cmd) {
+    case CMD_SAVE_UP:
+      servoPresetsSaveUp(gRotationAngle);
+      break;
+    case CMD_SAVE_LEFT:
+      servoPresetsSaveLeft(gRotationAngle);
+      break;
+    case CMD_SAVE_RIGHT:
+      servoPresetsSaveRight(gRotationAngle);
+      break;
+    case CMD_SAVE_CIRCLE: {
+      extern long getEncoderCount(uint8_t motorIndex);
+      semiAutoPresetSaveCircle(gRotationAngle, getEncoderCount(1));
+      break;
+    }
+    case CMD_SAVE_SQUARE: {
+      extern long getEncoderCount(uint8_t motorIndex);
+      semiAutoPresetSaveSquare(gRotationAngle, getEncoderCount(1));
+      break;
+    }
+    case CMD_RESET:
+      servoPresetsReset();
+      break;
+    default:
+      break;
+  }
+}
+
+// =====================================================================
+//  SETUP — dijalankan sekali saat ESP32 menyala / reset
 // =====================================================================
 //  SHARED: consume packet + print throttled (tiap 20 paket)
 // =====================================================================
@@ -63,6 +103,7 @@ void setup() {
   Serial.printf("ESP-NOW control: %s\n", espNowReady ? "READY" : "ERROR");
   
   motion_serial_init();
+  manipulator_serial_init();
   setupSerialCommand();
   mode_init();
   
@@ -74,19 +115,25 @@ void loop() {
   espNowControlTick();
   motion_serial_tick();
   motion_serial_checkLinkTimeout();
+  manipulator_serial_tick();
+  semiAutoPresetTick();
 
   if (espNowControlReadPacket(gLastRxPacket)) {
     consumePacket("ESPNOW-RX", gLastRxPacket);
+    handleCommand(gLastRxPacket.command);
     mecanum_control_tick(gLastRxPacket);
     gripper_tick(gLastRxPacket);
     gripper_motor_tick(gLastRxPacket);
+    armbox_control_tick(gLastRxPacket);
   }
 
   if (motion_serialReadPacket(gLastRxPacket)) {
     consumePacket("MOTION-RX", gLastRxPacket);
+    handleCommand(gLastRxPacket.command);
     mecanum_control_tick(gLastRxPacket);
     gripper_tick(gLastRxPacket);
     gripper_motor_tick(gLastRxPacket);
+    armbox_control_tick(gLastRxPacket);
   }
 
   if (digitalRead(limitSwitchAxisX) == LOW){

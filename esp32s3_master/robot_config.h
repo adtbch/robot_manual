@@ -133,7 +133,19 @@ struct __attribute__((packed)) ControlPacket {
 	uint32_t buttons;    // Bitmask semua tombol
 	uint16_t seq;        // Nomor urut paket
 	uint8_t  connected;  // 1 = PS4 terhubung, 0 = disconnect
+	uint8_t  command;    // Perintah aksi dari Controller
 };
+
+// ============================================================
+// COMMAND BYTE — perintah dari Controller ke Master
+// ============================================================
+#define CMD_NONE          0x00
+#define CMD_SAVE_UP       0x01
+#define CMD_SAVE_LEFT     0x02
+#define CMD_SAVE_RIGHT    0x03
+#define CMD_SAVE_CIRCLE   0x10
+#define CMD_SAVE_SQUARE   0x11
+#define CMD_RESET         0x20
 
 extern std::vector<MotorConfig> motors;
 extern std::vector<EncoderConfig> encoders;
@@ -218,3 +230,25 @@ void serialCommandTick();
 void mode_init();
 void mode_toggle();
 const char* mode_name();
+
+// Servo preset functions (NVS)
+void servoPresetsLoad();
+void servoPresetsSave();
+void servoPresetsReset();
+void servoPresetsSaveUp(int angle);
+void servoPresetsSaveDown(int angle);
+void servoPresetsSaveLeft(int angle);
+void servoPresetsSaveRight(int angle);
+int servoPresetsGetUp();
+int servoPresetsGetDown();
+int servoPresetsGetLeft();
+int servoPresetsGetRight();
+
+// Semi-auto preset functions (servo + motor height)
+void semiAutoPresetsLoad();
+void semiAutoPresetSaveCircle(int servoAngle, long motorHeight);
+void semiAutoPresetSaveSquare(int servoAngle, long motorHeight);
+void semiAutoPresetRecallCircle();
+void semiAutoPresetRecallSquare();
+void semiAutoPresetTick();
+bool semiAutoPresetIsActive();
