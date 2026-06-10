@@ -64,8 +64,8 @@ void debug_cetak_info_boot(bool espnow_ok) {
         kWsnTxPin, kWsnRxPin, kWsnSetPin, kWsnBaudrate);
     ESP_LOGI("system", "ESP-NOW channel    : %d", kEspNowChannel);
     ESP_LOGI("system", "ESP-NOW init       : %s", espnow_ok ? "OK" : "GAGAL");
-    ESP_LOGI("system", "Interval kirim     : WSN31=%lu ms ESP-NOW=%lu ms",
-        (unsigned long)kSendIntervalMsWsn31, (unsigned long)kSendIntervalMsEspnow);
+    ESP_LOGI("system", "Interval kirim     : %lu ms (%lu Hz)",
+        (unsigned long)kSendIntervalMs, 1000UL / kSendIntervalMs);
     ESP_LOGI("system", "----------------------------------------");
     ESP_LOGI("system", "Tekan BOOT GPIO0   : toggle jalur B <-> A");
     ESP_LOGI("system", "========================================");

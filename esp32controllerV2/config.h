@@ -91,9 +91,8 @@ constexpr uint8_t kFrameStart1 = 0x55;
 //  KONFIGURASI TIMING
 // =====================================================================
 
-// Interval kirim data — tergantung jalur aktif
-constexpr uint32_t kSendIntervalMsWsn31  = 50;  // UART 9600 baud
-constexpr uint32_t kSendIntervalMsEspnow = 25;  // ESP-NOW
+// Interval kirim data ke ESP32-S3 (ms) — 50ms = 20 Hz
+constexpr uint32_t kSendIntervalMs = 50;
 
 // Debounce tombol BOOT (ms)
 constexpr uint32_t kDebounceMs = 25;

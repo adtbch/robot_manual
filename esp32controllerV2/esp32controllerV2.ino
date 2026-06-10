@@ -126,12 +126,8 @@ static void control_task(void *pvParameters) {
         // --- 2. Cek status PS4 — CACHE, call ONCE ---
         const bool ps4_aktif = ps4_is_aktif(sekarang);
 
-        // --- 3. Kirim data — interval dinamis per jalur ---
-        const uint32_t interval = (jalur_aktif == JalurAktif::WSN31)
-                                ? kSendIntervalMsWsn31
-                                : kSendIntervalMsEspnow;
-
-        if (sekarang - waktu_kirim_terakhir >= interval) {
+        // --- 3. Kirim data (50ms interval) ---
+        if (sekarang - waktu_kirim_terakhir >= kSendIntervalMs) {
             waktu_kirim_terakhir = sekarang;
 
             ControlPacket paket = {};
@@ -148,22 +144,16 @@ static void control_task(void *pvParameters) {
             }
         }
 
-        // --- 4. LED status onboard ---
+        // --- 4. LED status onboard (gpio_set_level, non-blocking) ---
         led_ps4_update(ps4_aktif, sekarang);
 
-        // --- 5. Flush LED PS4 (deferred) ---
+        // --- 5. Flush LED PS4 (deferred — tidak blocking di send path) ---
         ps4_led_flush();
 
-        // --- 6. Statistik periodik ---
+        // --- 6. Statistik periodik (timer internal) ---
         debug_cetak_statistik(sekarang, ps4_aktif);
 
-        // --- 7. Dynamic sleep: tidur sampai 3ms sebelum next send ---
-        uint32_t next_send = waktu_kirim_terakhir + interval;
-        int32_t sisa = (int32_t)(next_send - millis());
-        if (sisa > 5) {
-            delay((uint32_t)(sisa - 3));
-        } else if (sisa > 0) {
-            delay(1);
-        }
+        // --- 7. Yield — minimal, tidak blocking lama ---
+        delay(1);
     }
 }

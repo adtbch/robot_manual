@@ -88,20 +88,16 @@ void kirim_via_wsn31(const ControlPacket &paket) {
     const uint16_t  panjang  = static_cast<uint16_t>(sizeof(ControlPacket));
     const uint8_t   checksum = hitung_checksum(payload, panjang);
 
-    // Header (4 byte)
-    const uint8_t header[] = {
-        kFrameStart0,
-        kFrameStart1,
-        static_cast<uint8_t>(panjang & 0xFF),
-        static_cast<uint8_t>((panjang >> 8) & 0xFF),
-    };
-    uart_write_bytes(UART_NUM_2, header, sizeof(header));
+    // Single buffer: header(4) + payload + checksum(1) — 1 write, 1 context switch
+    const uint16_t total = 4 + panjang + 1;
+    uint8_t buf[total];
+    buf[0] = kFrameStart0;
+    buf[1] = kFrameStart1;
+    buf[2] = static_cast<uint8_t>(panjang & 0xFF);
+    buf[3] = static_cast<uint8_t>((panjang >> 8) & 0xFF);
+    memcpy(&buf[4], payload, panjang);
+    buf[4 + panjang] = checksum;
 
-    // Payload
-    uart_write_bytes(UART_NUM_2, payload, panjang);
-
-    // Checksum
-    uart_write_bytes(UART_NUM_2, &checksum, 1);
-
+    uart_write_bytes(UART_NUM_2, buf, total);
     stat_kirim_wsn++;
 }

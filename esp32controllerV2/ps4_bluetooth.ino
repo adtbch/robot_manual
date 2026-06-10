@@ -42,11 +42,11 @@ static const uint8_t led_palet[][3] = {
 };
 static const uint8_t kLedPaletCount = sizeof(led_palet) / sizeof(led_palet[0]);
 
-// --- Deferred PS4 LED send (agar tidak blocking di send path) ---
-static bool     ps4_led_pending   = false;
-static uint8_t  ps4_led_r         = 0;
-static uint8_t  ps4_led_g         = 0;
-static uint8_t  ps4_led_b         = 0;
+// --- PS4 LED state — rate-limited di control_task ---
+static bool     ps4_led_pending = false;
+static uint8_t  ps4_led_r       = 0;
+static uint8_t  ps4_led_g       = 0;
+static uint8_t  ps4_led_b       = 0;
 
 // =====================================================================
 //  FUNGSI: INISIALISASI BLUETOOTH PS4
@@ -124,7 +124,7 @@ bool ps4_is_aktif(uint32_t sekarang) {
     if (PS4.isConnected()) {
         waktu_ps4_terakhir = sekarang;
 
-        // Edge detection: baru connect → set flag LED pending (deferred send)
+        // Edge detection: baru connect → flag LED (rate-limited via control_task)
         if (!ps4_status_sebelumnya) {
             ps4_status_sebelumnya = true;
             ESP_LOGI("ps4_bt", "Terhubung!");
@@ -220,7 +220,7 @@ void ps4_baca_paket(ControlPacket &paket) {
 }
 
 // =====================================================================
-//  FUNGSI: FLUSH LED PS4 (deferred — non-blocking di send path)
+//  FUNGSI: FLUSH LED PS4 (deferred — tidak blocking di send path)
 // =====================================================================
 
 /**
