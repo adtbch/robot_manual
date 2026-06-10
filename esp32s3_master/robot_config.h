@@ -54,9 +54,9 @@ const float kdMax = 10.0f;
 // ESP-NOW Manual Control Configuration
 // ============================================================
 #define ESPNOW_PACKET_MAGIC  0xA5B4
-const bool espNowEnableMacWhitelist = true;
-const uint8_t espNowAllowedTransmitterStaMac[6] = {0x68, 0x09, 0x47, 0x5E, 0xF3, 0x04};
-const uint8_t espNowAllowedTransmitterApMac[6] = {0x68, 0x09, 0x47, 0x5E, 0xF3, 0x04};
+const bool espNowEnableMacWhitelist = true; 
+const uint8_t espNowAllowedTransmitterStaMac[6] = {0x68, 0x09, 0x47, 0x2C, 0x24, 0x54};
+const uint8_t espNowAllowedTransmitterApMac[6] = {0x68, 0x09, 0x47, 0x2C, 0x24, 0x54};
 const uint8_t espNowChannel = 1;
 const unsigned long espNowLinkAliveMs = 180;
 const unsigned long espNowStatsIntervalMs = 1000;
