@@ -26,6 +26,7 @@ static float yawOffset = 0.0f;
 
 // Yaw angle in degrees (relatif dari posisi awal robot)
 static float yaw = 0.0f;
+static float yawActive = 0.0f;
 
 // Flag: true after mpu.initialize succeeds
 static bool mpuReady = false;
@@ -240,6 +241,7 @@ float getYaw() {
 void setYawReference(float targetYaw) {
     yawOffset = normalizeAngle(yaw + yawOffset - targetYaw, -180.0f, 180.0f);
     yaw = targetYaw;
+    yawActive = targetYaw;
 }
 
 void snapYaw() {
@@ -291,7 +293,6 @@ void updateYaw() {
         lastPacketMs = millis();
 
         // ---- Drift freeze via gyro Z motion detection ----
-        static float yawActive = 0.0f;
         static bool wasMoving = false;
         static uint32_t lastMoveMs = 0;
 
@@ -309,8 +310,6 @@ void updateYaw() {
         }
         // Stationer >500 ms → output frozen
         if (isMoving || (millis() - lastMoveMs <= 500)) {
-            yaw = yawActive;
-        } else {
             yaw = yawActive;
         }
 
