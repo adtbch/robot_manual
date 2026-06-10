@@ -223,12 +223,41 @@ void processSerialCommands();
 void driveRobotCentric(int vx, int vy, int vtheta);
 void driveFieldCentric(int vx, int vy, int vtheta);
 void driveFieldCentricWithYawCorrection(int vx, int vy, int yawTarget);
+void driveRobotCentricRpm(int vx, int vy, int vtheta);
 int pidComputeYaw(PIDState &pid, float target, float current, float dt);
 void initYawPid();
 void saveYawPid();
 void showYawPid();
 extern PIDState pidKinematicYaw;
 void skalaKecepatan(int motor1, int motor2, int motor3, int motor4);
+
+// ============================================================
+// Odometry — encoder RPM → (x, y) field coordinates
+// ============================================================
+extern float robotPosX_mm;
+extern float robotPosY_mm;
+void updateOdometry();
+void resetOdometry();
+void setOdometry(float x_mm, float y_mm);
+
+// ============================================================
+// Waypoint Navigation — PID position + state machine
+// ============================================================
+extern PIDState pidWaypointX;
+extern PIDState pidWaypointY;
+void initWaypointPid();
+void setWaypoint(float targetX_mm, float targetY_mm, float targetYaw_deg,
+                 int maxSpeedXY, int maxSpeedYaw,
+                 float thresholdXY_mm, float thresholdYaw_deg);
+void cancelWaypoint();
+bool isWaypointActive();
+bool executewaypoint();
+bool executewaypoint(float targetX_mm, float targetY_mm, float targetYaw_deg,
+                     int maxSpeedXY, int maxSpeedYaw,
+                     float thresholdXY_mm, float thresholdYaw_deg);
+void getWaypointTarget(float &x_mm, float &y_mm, float &yaw_deg);
+void getWaypointStatus(float &deltaX_mm, float &deltaY_mm, float &distance_mm,
+                       int &vx_cmd, int &vy_cmd, int &vtheta_cmd);
 
 // ============================================================
 // IMU / MPU9250 Declarations
@@ -242,6 +271,7 @@ void updateYaw();             // panggil setiap loop
 float getYaw();              // return yaw dalam derajat, rentang -180..180
 float getFilteredGyroZ();     // return filtered gyro Z (untuk debugging/diagnostic)
 void resetYaw();             // reset reference ke heading saat ini (yaw=0)
+void setYawReference(float targetYaw); // set heading saat ini ke nilai yaw tertentu
 
 // Tuning filter gyro-only (sesuaikan dengan noise motor)
 // Nilai: 0.05 (sangat smooth) - 0.5 (responsive)

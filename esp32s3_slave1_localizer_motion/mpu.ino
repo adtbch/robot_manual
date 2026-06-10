@@ -237,14 +237,9 @@ float getYaw() {
     return yaw;
 }
 
-void resetYaw() {
-    if (mpuReady && dmpReady && mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
-        mpu.dmpGetGravity(&gravity, &q);
-        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-        yawOffset = ypr[0] * (180.0f / M_PI);
-    }
-    yaw = 0.0f;
+void setYawReference(float targetYaw) {
+    yawOffset = normalizeAngle(yaw + yawOffset - targetYaw, -180.0f, 180.0f);
+    yaw = targetYaw;
 }
 
 float getFilteredGyroZ() {

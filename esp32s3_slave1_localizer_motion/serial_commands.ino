@@ -69,6 +69,18 @@ void serialCommandsTick() {
             if (pos > 0) {
                 buf1[pos] = '\0';
 
+                // Text command dari Master — handle langsung
+                if (isalpha((unsigned char)buf1[0])) {
+                    if (strncmp(buf1, "set_yaw_reference", 17) == 0) {
+                        float targetYaw;
+                        if (sscanf(buf1 + 18, "%f", &targetYaw) == 1) {
+                            setYawReference(targetYaw);
+                        }
+                    }
+                    pos = 0;
+                    continue;
+                }
+
                 // Expected format: vx vy w [durationMs]
                 int vx, vy, w;
                 unsigned long dur = 0;
@@ -349,6 +361,7 @@ void printSerialUsage() {
     Serial.println("  CALIB_GYRO                                 - recalibrate accel+gyro+mag (auto-save to NVS)");
     Serial.println("  RESET_GYRO                                 - clear saved calibration, force recalib on next boot");
     Serial.println("  YAW                                        - print current yaw angle");
+    Serial.println("  SET_YAW_REFERENCE <deg>                    - set current heading to value");
     Serial.println("\nOTHER:");
     Serial.println("  STOP                                       - emergency stop");
     Serial.println("  HELP                                       - show this help");
@@ -634,6 +647,18 @@ void processSerialCommands() {
             setGyroFilterAlpha(alpha);
         } else {
             Serial.println("Usage: SET_GYRO_ALPHA <val>");
+        }
+        return;
+    }
+
+    // ==================== SET_YAW_REFERENCE <deg> ====================
+    if (strncmp(cmd, "SET_YAW_REFERENCE", 17) == 0) {
+        float targetYaw;
+        if (sscanf(cmd + 18, "%f", &targetYaw) == 1) {
+            setYawReference(targetYaw);
+            Serial.printf("Yaw reference set to: %.1f deg\n", targetYaw);
+        } else {
+            Serial.println("Usage: SET_YAW_REFERENCE <deg>");
         }
         return;
     }

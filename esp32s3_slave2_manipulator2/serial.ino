@@ -236,8 +236,14 @@ void serialCommandTick() {
 void readUART() {
   while (master_serial.available()) {
     char c = (char)master_serial.read();
-    if (c == '\n') uartComplete = true;
-    else if (c != '\r') uartInput += c;
+    if (c == '\n') {
+      if (uartInput.length() > 0) {
+        uartComplete = true;
+        break;
+      }
+    } else if (c != '\r') {
+      uartInput += c;
+    }
   }
 }
 
