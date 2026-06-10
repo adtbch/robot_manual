@@ -92,22 +92,19 @@ void gripper_motor_tick(const ControlPacket &pkt) {
         return;
     }
 
-    bool r2Held = (pkt.buttons & BTN_R2) != 0;
-    bool up     = (pkt.buttons & BTN_UP)    != 0;
-    bool down   = (pkt.buttons & BTN_DOWN)  != 0;
-    bool left   = (pkt.buttons & BTN_LEFT)  != 0;
-    bool right  = (pkt.buttons & BTN_RIGHT) != 0;
+    ActionInput ai = getActionInput(pkt);
+    bool r2Held = ai.r2;
 
-    // R2 + D-pad Up/Down → kontrol servo rotation manual
+    // R2 + D-pad/analog → kontrol servo rotation manual
     if (r2Held) {
         static unsigned long lastServoMoveMs = 0;
         unsigned long nowMs = millis();
         if (nowMs - lastServoMoveMs >= 50) {
             lastServoMoveMs = nowMs;
-            if (right) {
+            if (ai.right) {
                 gRotationAngle = min(gRotationAngle + ROTATION_STEP, ROTATION_MAX);
                 setServoAngle(ROTATION_SERVO_ID, gRotationAngle);
-            } else if (left) {
+            } else if (ai.left) {
                 gRotationAngle = max(gRotationAngle - ROTATION_STEP, ROTATION_MIN);
                 setServoAngle(ROTATION_SERVO_ID, gRotationAngle);
             }
@@ -116,11 +113,10 @@ void gripper_motor_tick(const ControlPacket &pkt) {
         return;
     }
 
-    // X + D-pad → preset servo rotation angle
-    bool xHeld = (pkt.buttons & BTN_CROSS) != 0;
-    if (xHeld) {
+    // X + D-pad/analog → preset servo rotation angle
+    if (ai.x) {
         static bool lastUp = false, lastLeft = false, lastRight = false;
-        bool upNow = up, leftNow = left, rightNow = right;
+        bool upNow = ai.up, leftNow = ai.left, rightNow = ai.right;
 
         if (upNow && !lastUp) {
             gRotationAngle = ROTATION_PRESET_UP;
@@ -140,11 +136,11 @@ void gripper_motor_tick(const ControlPacket &pkt) {
         return;
     }
 
-    // Tanpa R2/X → motor jog via D-pad
+    // Tanpa R2/X → motor jog via D-pad/analog
     int speed = GRIPPER_SPEED_DEFAULT;
-    if (pkt.buttons & BTN_R1) {
+    if (ai.r1) {
         speed = GRIPPER_SPEED_FAST;
-    } else if (pkt.buttons & BTN_L1) {
+    } else if (ai.l1) {
         speed = GRIPPER_SPEED_SLOW;
     }
 
@@ -155,23 +151,23 @@ void gripper_motor_tick(const ControlPacket &pkt) {
     int enc0 = getEncoderCount(0);
     int enc1 = getEncoderCount(1);
 
-    if (up || down || left || right) {
+    if (ai.up || ai.down || ai.left || ai.right) {
         stopAllMotorTargets();
     }
 
     // Motor 1: axis X (atas/bawah) — limitY = tidak bisa ke atas
-    if (up) {
+    if (ai.up) {
         pwmMotor(1, limitY ? 0 : -speed);
-    } else if (down) {
+    } else if (ai.down) {
         pwmMotor(1, enc1 >= 1257 ? 0 : speed);
     } else {
         pwmMotor(1, 0);
     }
 
     // Motor 0: axis Z (kiri/kanan) — limitX = tidak bisa ke kanan
-    if (right) {
+    if (ai.right) {
         pwmMotor(0, limitX ? 0 : -speed*2);
-    } else if (left) {
+    } else if (ai.left) {
         pwmMotor(0, enc0 >= 4695 ? 0 : speed*2);
     } else {
         pwmMotor(0, 0);

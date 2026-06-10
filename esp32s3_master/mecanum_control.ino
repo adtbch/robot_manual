@@ -34,8 +34,10 @@
 
 #define SLAVE_SERIAL Serial1
 
-static const int16_t DEADZONE_RAW    = 10;   // deadzone untuk raw int8_t -128..127
-static const int16_t DEADZONE_STICK  = 50;   // deadzone untuk L2+Rx rotasi absolut
+InputMode currentInputMode = INPUT_DPAD;
+
+static const int16_t DEADZONE_RAW    = 10;
+static const int16_t DEADZONE_STICK  = 50;
 static const unsigned long SEND_INTERVAL_MS = 2;
 
 // =====================================================================
@@ -69,6 +71,35 @@ static int16_t getSpeedMode(uint32_t buttons) {
 
 static int16_t scaleSpeed(int8_t val, int16_t maxSpeed) {
     return map((int16_t)val, -128, 127, -maxSpeed, maxSpeed);
+}
+
+// =====================================================================
+//  ACTION INPUT — D-pad atau analog kiri tergantung inputMode
+// =====================================================================
+
+ActionInput getActionInput(const ControlPacket &pkt) {
+    ActionInput ai = {};
+    if (currentInputMode == INPUT_ANALOG) {
+        int8_t lx = pkt.lx;
+        int8_t ly = pkt.ly;
+        ai.up    = (ly > 30);
+        ai.down  = (ly < -30);
+        ai.left  = (lx < -30);
+        ai.right = (lx > 30);
+        if (ai.up && ai.down)   { ai.up = false; ai.down = false; }
+        if (ai.left && ai.right) { ai.left = false; ai.right = false; }
+    } else {
+        ai.up    = (pkt.buttons & BTN_UP)    != 0;
+        ai.down  = (pkt.buttons & BTN_DOWN)  != 0;
+        ai.left  = (pkt.buttons & BTN_LEFT)  != 0;
+        ai.right = (pkt.buttons & BTN_RIGHT) != 0;
+    }
+    ai.r2     = (pkt.buttons & BTN_R2)     != 0;
+    ai.x      = (pkt.buttons & BTN_CROSS)  != 0;
+    ai.square = (pkt.buttons & BTN_SQUARE) != 0;
+    ai.r1     = (pkt.buttons & BTN_R1)     != 0;
+    ai.l1     = (pkt.buttons & BTN_L1)     != 0;
+    return ai;
 }
 
 // =====================================================================
@@ -116,33 +147,68 @@ void mecanum_control_tick(const ControlPacket &pkt) {
         if (gLastVx != 0 || gLastVy != 0 || gLastW != 0) {
             gLastVx = gLastVy = gLastW = 0;
             sendMecanumCommand(0, 0, 0);
-            gLastSendMs = millis();
         }
         gL2RotationActive = false;
         return;
     }
 
+    // ============================================================
+    // SHARE TOGGLE — edge detection
+    // ============================================================
+    static bool lastShare = false;
+    bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
+    if (shareNow && !lastShare) {
+        currentInputMode = (currentInputMode == INPUT_DPAD) ? INPUT_ANALOG : INPUT_DPAD;
+    }
+    lastShare = shareNow;
+
+    // ============================================================
+    // TOUCHPAD → snap_yaw ke Slave1
+    // ============================================================
+    static bool lastTouchpad = false;
+    bool touchpadNow = (pkt.buttons & BTN_TOUCHPAD) != 0;
+    if (touchpadNow && !lastTouchpad) {
+        SLAVE_SERIAL.print("snap_yaw\n");
+    }
+    lastTouchpad = touchpadNow;
+
     bool l2Held = (pkt.buttons & BTN_L2) != 0;
 
     // ============================================================
-    // MANUAL ROTASI (tanpa L2) — increment yaw
+    // MOVEMENT INPUT — routing berdasarkan inputMode
     // ============================================================
     int16_t maxSpeed = getSpeedMode(pkt.buttons);
+    int8_t rawVx, rawVy, rawW;
 
-    // Ambil dari pkt.lx/ly/rx (raw int8_t -128..127 dari controller), olah di sini
-    int8_t rawVx = applyDeadzoneRaw(pkt.ly);    // maju/mundur (ly: push maju = negatif)
-    int8_t rawVy = applyDeadzoneRaw(pkt.lx);    // geser kiri/kanan
-    int8_t rawW  = applyDeadzoneRaw(pkt.rx);    // rotasi
+    if (currentInputMode == INPUT_ANALOG) {
+        // ANALOG mode: D-pad → movement
+        int8_t dpadVx = 0, dpadVy = 0;
+        if (pkt.buttons & BTN_UP)    dpadVx =  127;
+        if (pkt.buttons & BTN_DOWN)  dpadVx = -127;
+        if (pkt.buttons & BTN_LEFT)  dpadVy = -127;
+        if (pkt.buttons & BTN_RIGHT) dpadVy =  127;
+        if (dpadVx != 0 && dpadVy != 0) { dpadVx = 0; dpadVy = 0; }
+        rawVx = dpadVx;
+        rawVy = dpadVy;
+    } else {
+        // DPAD mode: analog kiri → movement
+        rawVx = applyDeadzoneRaw(pkt.ly);
+        rawVy = applyDeadzoneRaw(pkt.lx);
+    }
 
-    int16_t vx = scaleSpeed(rawVx, maxSpeed);  // invert Y: push maju → vx positif
-    int16_t vy = scaleSpeed(rawVy,  maxSpeed);
+    rawW = applyDeadzoneRaw(pkt.rx);  // selalu dari analog kanan
 
-    // Increment yaw: kanan +1°, kiri -1° per tick
+    int16_t vx = scaleSpeed(rawVx, maxSpeed);
+    int16_t vy = scaleSpeed(rawVy, maxSpeed);
+
+    // Increment yaw: stick deflection → speed (1°..5° per tick)
     if (rawW > 0) {
-        gSavedYaw++;
+        int inc = map(rawW, DEADZONE_RAW, 127, 1, 5);
+        gSavedYaw += inc;
         if (gSavedYaw > 180) gSavedYaw = -179;
     } else if (rawW < 0) {
-        gSavedYaw--;
+        int inc = map(-rawW, DEADZONE_RAW, 127, 1, 5);
+        gSavedYaw -= inc;
         if (gSavedYaw < -179) gSavedYaw = 180;
     }
 

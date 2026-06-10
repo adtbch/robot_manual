@@ -81,9 +81,9 @@ const unsigned long espNowStatsIntervalMs = 1000;
 #define BTN_PS       (1u << 16)
 #define BTN_TOUCHPAD (1u << 17)
 
-#define SPEED_MODE_FAST    800
-#define SPEED_MODE_DEFAULT 500
-#define SPEED_MODE_SLOW    200
+#define SPEED_MODE_FAST    600
+#define SPEED_MODE_DEFAULT 300
+#define SPEED_MODE_SLOW    150
 
 // ============================================================
 // Shared types and extern globals
@@ -170,6 +170,21 @@ enum RobotMode : uint8_t {
     MODE_ARM_BOX  = 1,  // Mode arm box
 };
 extern RobotMode currentMode;
+
+// ============================================================
+// INPUT MODE — toggle via Share: D-pad ↔ analog kiri
+// ============================================================
+enum InputMode : uint8_t {
+    INPUT_DPAD   = 0,  // D-pad → action, stick → movement
+    INPUT_ANALOG = 1,  // Stick → action, D-pad → movement
+};
+extern InputMode currentInputMode;
+
+struct ActionInput {
+    bool up, down, left, right;
+    bool r2, x, square, r1, l1;
+};
+ActionInput getActionInput(const ControlPacket &pkt);
 
 // ============================================================
 // Shared function declarations

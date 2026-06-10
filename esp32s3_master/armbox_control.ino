@@ -40,7 +40,7 @@
 #define SERVO_STEP_DEFAULT    40
 #define SERVO_STEP_FAST       50
 #define SERVO_STEP_SLOW       10
-#define SERVO_MIN             70
+#define SERVO_MIN             60
 #define SERVO_MAX             180
 
 // Preset encoder count motor 0 (MOTOR_W) — SESUAIKAN DENGAN HARDWARE
@@ -65,12 +65,7 @@ static void armbox_send(const char* cmd) {
 void armbox_control_tick(const ControlPacket &pkt) {
     if (currentMode != MODE_ARM_BOX) return;
 
-    bool xHeld   = (pkt.buttons & BTN_CROSS)   != 0;
-    bool sqHeld  = (pkt.buttons & BTN_SQUARE)  != 0;
-    bool up    = (pkt.buttons & BTN_UP)    != 0;
-    bool down  = (pkt.buttons & BTN_DOWN)  != 0;
-    bool left  = (pkt.buttons & BTN_LEFT)  != 0;
-    bool right = (pkt.buttons & BTN_RIGHT) != 0;
+    ActionInput ai = getActionInput(pkt);
 
     // ================================================================
     // RELAY 1 — toggle ON/OFF via Triangle
@@ -127,57 +122,55 @@ void armbox_control_tick(const ControlPacket &pkt) {
     lastCircle = circleNow;
 
     // ================================================================
-    // SERVO 0 — manual step via R2 + D-pad Up/Down
+    // SERVO 0 — manual step via R2 + D-pad/analog Up/Down
     // ================================================================
-    bool r2Held = (pkt.buttons & BTN_R2) != 0;
-
-    if (r2Held) {
+    if (ai.r2) {
         static unsigned long lastServoMs = 0;
         static int servoAngle = 0;
         unsigned long nowMs = millis();
 
         int step = SERVO_STEP_DEFAULT;
-        if (pkt.buttons & BTN_R1) {
+        if (ai.r1) {
             step = SERVO_STEP_FAST;
-        } else if (pkt.buttons & BTN_L1) {
+        } else if (ai.l1) {
             step = SERVO_STEP_SLOW;
         }
 
         if (nowMs - lastServoMs >= 50) {
             lastServoMs = nowMs;
-            if (up) {
+            if (ai.up) {
                 servoAngle = min(servoAngle + step, SERVO_MAX);
                 char cmd[32];
                 snprintf(cmd, sizeof(cmd), "servo0 %d", servoAngle);
                 armbox_send(cmd);
-            } else if (down) {
+            } else if (ai.down) {
                 servoAngle = max(servoAngle - step, SERVO_MIN);
                 char cmd[32];
                 snprintf(cmd, sizeof(cmd), "servo0 %d", servoAngle);
                 armbox_send(cmd);
             }
         }
-        return;  // R2 aktif → tidak proses motor
+        return;
     }
 
     // ================================================================
-    // MOTOR 1 (MOTOR_Z) — manual jog via X + D-pad Up/Down
+    // MOTOR 1 (MOTOR_Z) — manual jog via X + D-pad/analog Up/Down
     // ================================================================
     static bool lastUp = false, lastDown = false;
 
-    if (xHeld) {
+    if (ai.x) {
         int speed = ARMBOX_SPEED_DEFAULT;
-        if (pkt.buttons & BTN_R1) {
+        if (ai.r1) {
             speed = ARMBOX_SPEED_FAST;
-        } else if (pkt.buttons & BTN_L1) {
+        } else if (ai.l1) {
             speed = ARMBOX_SPEED_SLOW;
         }
 
-        if (up) {
+        if (ai.up) {
             char cmd[32];
             snprintf(cmd, sizeof(cmd), "pwmz %d", speed);
             armbox_send(cmd);
-        } else if (down) {
+        } else if (ai.down) {
             char cmd[32];
             snprintf(cmd, sizeof(cmd), "pwmz %d", -speed);
             armbox_send(cmd);
@@ -185,32 +178,32 @@ void armbox_control_tick(const ControlPacket &pkt) {
             armbox_send("pwmz 0");
         }
 
-        lastUp = up;
-        lastDown = down;
-        return;  // X aktif → tidak proses motor 0
+        lastUp = ai.up;
+        lastDown = ai.down;
+        return;
     }
 
     lastUp = false;
     lastDown = false;
 
     // ================================================================
-    // MOTOR Y — manual jog via Square + D-pad Up/Down
+    // MOTOR Y — manual jog via Square + D-pad/analog Up/Down
     // ================================================================
     static bool lastUpY = false, lastDownY = false;
 
-    if (sqHeld) {
+    if (ai.square) {
         int speed = ARMBOX_SPEED_DEFAULT;
-        if (pkt.buttons & BTN_R1) {
+        if (ai.r1) {
             speed = ARMBOX_SPEED_FAST;
-        } else if (pkt.buttons & BTN_L1) {
+        } else if (ai.l1) {
             speed = ARMBOX_SPEED_SLOW;
         }
 
-        if (up) {
+        if (ai.up) {
             char cmd[32];
             snprintf(cmd, sizeof(cmd), "pwmy %d", speed);
             armbox_send(cmd);
-        } else if (down) {
+        } else if (ai.down) {
             char cmd[32];
             snprintf(cmd, sizeof(cmd), "pwmy %d", -speed);
             armbox_send(cmd);
@@ -218,39 +211,39 @@ void armbox_control_tick(const ControlPacket &pkt) {
             armbox_send("pwmy 0");
         }
 
-        lastUpY = up;
-        lastDownY = down;
-        return;  // Square aktif → tidak proses motor 0
+        lastUpY = ai.up;
+        lastDownY = ai.down;
+        return;
     }
 
     lastUpY = false;
     lastDownY = false;
 
     // ================================================================
-    // MOTOR 0 (MOTOR_W) — preset via D-pad (tanpa R2/X/Square)
+    // MOTOR 0 (MOTOR_W) — preset via D-pad/analog (tanpa R2/X/Square)
     // ================================================================
     static bool lastUpW = false, lastDownW = false, lastLeftW = false, lastRightW = false;
 
-    if (up && !lastUpW) {
+    if (ai.up && !lastUpW) {
         char cmd[32];
         snprintf(cmd, sizeof(cmd), "motorw %d", W_POS_UP);
         armbox_send(cmd);
-    } else if (down && !lastDownW) {
+    } else if (ai.down && !lastDownW) {
         char cmd[32];
         snprintf(cmd, sizeof(cmd), "motorw %d", W_POS_DOWN);
         armbox_send(cmd);
-    } else if (left && !lastLeftW) {
+    } else if (ai.left && !lastLeftW) {
         char cmd[32];
         snprintf(cmd, sizeof(cmd), "motorw %d", W_POS_LEFT);
         armbox_send(cmd);
-    } else if (right && !lastRightW) {
+    } else if (ai.right && !lastRightW) {
         char cmd[32];
         snprintf(cmd, sizeof(cmd), "motorw %d", W_POS_RIGHT);
         armbox_send(cmd);
     }
 
-    lastUpW = up;
-    lastDownW = down;
-    lastLeftW = left;
-    lastRightW = right;
+    lastUpW = ai.up;
+    lastDownW = ai.down;
+    lastLeftW = ai.left;
+    lastRightW = ai.right;
 }
