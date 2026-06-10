@@ -76,6 +76,8 @@ void serialCommandsTick() {
                         if (sscanf(buf1 + 18, "%f", &targetYaw) == 1) {
                             setYawReference(targetYaw);
                         }
+                    } else if (strcmp(buf1, "snap_yaw") == 0) {
+                        snapYaw();
                     }
                     pos = 0;
                     continue;
@@ -362,6 +364,7 @@ void printSerialUsage() {
     Serial.println("  RESET_GYRO                                 - clear saved calibration, force recalib on next boot");
     Serial.println("  YAW                                        - print current yaw angle");
     Serial.println("  SET_YAW_REFERENCE <deg>                    - set current heading to value");
+    Serial.println("  SNAP_YAW                                   - snap heading to nearest 0/90/-90/180");
     Serial.println("\nOTHER:");
     Serial.println("  STOP                                       - emergency stop");
     Serial.println("  HELP                                       - show this help");
@@ -660,6 +663,13 @@ void processSerialCommands() {
         } else {
             Serial.println("Usage: SET_YAW_REFERENCE <deg>");
         }
+        return;
+    }
+
+    // ==================== SNAP_YAW ====================
+    if (strcmp(cmd, "SNAP_YAW") == 0) {
+        snapYaw();
+        Serial.printf("Yaw snapped to nearest cardinal: %.1f deg\n", getYaw());
         return;
     }
 

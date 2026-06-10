@@ -272,6 +272,7 @@ float getYaw();              // return yaw dalam derajat, rentang -180..180
 float getFilteredGyroZ();     // return filtered gyro Z (untuk debugging/diagnostic)
 void resetYaw();             // reset reference ke heading saat ini (yaw=0)
 void setYawReference(float targetYaw); // set heading saat ini ke nilai yaw tertentu
+void snapYaw(); // snap ke cardinal terdekat (0/90/-90/180)
 
 // Tuning filter gyro-only (sesuaikan dengan noise motor)
 // Nilai: 0.05 (sangat smooth) - 0.5 (responsive)

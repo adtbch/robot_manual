@@ -242,6 +242,18 @@ void setYawReference(float targetYaw) {
     yaw = targetYaw;
 }
 
+void snapYaw() {
+    if (yaw < 20 && yaw > -20) {
+        setYawReference(0.0f);
+    } else if (yaw < 110 && yaw > 70) {
+        setYawReference(90.0f);
+    } else if (yaw < -110 && yaw > -70) {
+        setYawReference(-90.0f);
+    } else if (yaw < -160 || yaw > 160) {
+        setYawReference(180.0f);
+    }
+}
+
 float getFilteredGyroZ() {
     return 0.0f; // placeholder karena filter dinonaktifkan
 }
