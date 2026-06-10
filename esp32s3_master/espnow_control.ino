@@ -78,7 +78,16 @@ bool fetchPacket(ControlPacket &outPacket) {
 
   portENTER_CRITICAL(&espNowPacketMux);
   if (gEspNow.packetAvailable) {
-    if (isNewSequence(gEspNow.latestPacket.seq)) {
+    const uint32_t nowMs = millis();
+    const bool gapTooLong = (nowMs - gEspNow.lastPacketRxMs) > espNowLinkAliveMs;
+    gEspNow.lastPacketRxMs = nowMs;
+
+    if (gapTooLong) {
+      gEspNow.lastSequence = gEspNow.latestPacket.seq;
+      gEspNow.sequenceInitialized = true;
+      outPacket = gEspNow.latestPacket;
+      hasPacket = true;
+    } else if (isNewSequence(gEspNow.latestPacket.seq)) {
       outPacket = gEspNow.latestPacket;
       gEspNow.lastSequence = gEspNow.latestPacket.seq;
       gEspNow.sequenceInitialized = true;
@@ -227,11 +236,7 @@ bool espNowControlReadPacket(ControlPacket &outPacket) {
     return false;
   }
 
-  const bool hasPacket = fetchPacket(outPacket);
-  if (hasPacket) {
-    gEspNow.lastPacketRxMs = millis();
-  }
-  return hasPacket;
+  return fetchPacket(outPacket);
 }
 
 bool espNowControlIsLinkAlive() {
