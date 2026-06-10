@@ -90,7 +90,7 @@ void loop() {
     const uint32_t sekarang = millis();
 
     // --- 1. Cek tombol BOOT → toggle jalur jika ditekan ---
-    tombol_update(sekarang);
+    // tombol_update(sekarang);
 
     // --- 2. Tentukan status koneksi PS4 ---
     const bool ps4_aktif = ps4_is_aktif(sekarang);
@@ -111,12 +111,12 @@ void loop() {
             buat_paket_stop(paket);
         }
 
-        // Kirim ke jalur yang sedang aktif
-        if (jalur_aktif == JalurAktif::WSN31) {
-            kirim_via_wsn31(paket);
-        } else {
+        // // Kirim ke jalur yang sedang aktif
+        // if (jalur_aktif == JalurAktif::WSN31) {
+        //     kirim_via_wsn31(paket);
+        // } else {
             kirim_via_espnow(paket);
-        }
+        // }
     }
 
     // --- 5. Cetak statistik periodik ke Serial Monitor ---
