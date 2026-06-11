@@ -83,7 +83,7 @@ const unsigned long espNowStatsIntervalMs = 1000;
 
 #define SPEED_MODE_FAST    600
 #define SPEED_MODE_DEFAULT 300
-#define SPEED_MODE_SLOW    150
+#define SPEED_MODE_SLOW    200
 
 // ============================================================
 // Shared types and extern globals

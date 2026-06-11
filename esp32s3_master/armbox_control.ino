@@ -40,7 +40,7 @@
 #define SERVO_STEP_DEFAULT    40
 #define SERVO_STEP_FAST       50
 #define SERVO_STEP_SLOW       10
-#define SERVO_MIN             60
+#define SERVO_MIN             70
 #define SERVO_MAX             180
 
 // Preset encoder count motor 0 (MOTOR_W) — SESUAIKAN DENGAN HARDWARE
@@ -138,12 +138,12 @@ void armbox_control_tick(const ControlPacket &pkt) {
 
         if (nowMs - lastServoMs >= 50) {
             lastServoMs = nowMs;
-            if (ai.up) {
+            if (ai.down) {
                 servoAngle = min(servoAngle + step, SERVO_MAX);
                 char cmd[32];
                 snprintf(cmd, sizeof(cmd), "servo0 %d", servoAngle);
                 armbox_send(cmd);
-            } else if (ai.down) {
+            } else if (ai.up) {
                 servoAngle = max(servoAngle - step, SERVO_MIN);
                 char cmd[32];
                 snprintf(cmd, sizeof(cmd), "servo0 %d", servoAngle);

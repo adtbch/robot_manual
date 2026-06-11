@@ -168,7 +168,9 @@ void mecanum_control_tick(const ControlPacket &pkt) {
     static bool lastTouchpad = false;
     bool touchpadNow = (pkt.buttons & BTN_TOUCHPAD) != 0;
     if (touchpadNow && !lastTouchpad) {
-        SLAVE_SERIAL.print("snap_yaw\n");
+        char cmd[32];
+        snprintf(cmd, sizeof(cmd), "snap_yaw");
+        SLAVE_SERIAL.println(cmd);
     }
     lastTouchpad = touchpadNow;
 
