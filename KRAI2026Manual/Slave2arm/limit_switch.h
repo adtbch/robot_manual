@@ -3,7 +3,7 @@
  * FILE    : limit_switch.h
  * PERAN   : Konfigurasi modul limit switch (pin).
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave2 Arm)
  * =====================================================================
  */
 
@@ -15,10 +15,10 @@
 // =====================================================================
 //  PIN LIMIT SWITCH — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t LIMIT_SWITCH_1 = 6;
-constexpr uint8_t LIMIT_SWITCH_2 = 7;
-constexpr uint8_t LIMIT_SWITCH_3 = 15;
-constexpr uint8_t LIMIT_SWITCH_4 = 16;
+constexpr uint8_t LIMIT_SWITCH_1 = 40;
+constexpr uint8_t LIMIT_SWITCH_2 = 39;
+constexpr uint8_t LIMIT_SWITCH_3 = 38;
+constexpr uint8_t LIMIT_SWITCH_4 = 37;
 
 // =====================================================================
 //  JUMLAH LIMIT SWITCH

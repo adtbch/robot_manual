@@ -1,34 +1,33 @@
 /*
  * =====================================================================
- * FILE    : limit_switch.h
- * PERAN   : Konfigurasi modul limit switch (pin).
+ * FILE    : serial.h
+ * PERAN   : Konfigurasi modul serial (UART1).
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave2 Arm)
  * =====================================================================
  */
 
-#ifndef LIMIT_SWITCH_H
-#define LIMIT_SWITCH_H
+#ifndef SERIAL_H
+#define SERIAL_H
 
 #include "config.h"
 
 // =====================================================================
-//  PIN LIMIT SWITCH — berdasarkan schematic KRAI 2026
+//  PIN SERIAL — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t LIMIT_SWITCH_1 = 6;
-constexpr uint8_t LIMIT_SWITCH_2 = 7;
-constexpr uint8_t LIMIT_SWITCH_3 = 15;
-constexpr uint8_t LIMIT_SWITCH_4 = 16;
+
+// Serial1 (UART1) — komunikasi ke master
+constexpr uint8_t SERIAL1_RX = 36;
+constexpr uint8_t SERIAL1_TX = 35;
 
 // =====================================================================
-//  JUMLAH LIMIT SWITCH
+//  BAUD RATE
 // =====================================================================
-constexpr size_t LIMIT_COUNT = 4;
+constexpr uint32_t SERIAL1_BAUD = 115200;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
-void setupLimits();
-bool readLimitSwitch(uint8_t index);
+void setupSerial();
 
-#endif // LIMIT_SWITCH_H
+#endif // SERIAL_H

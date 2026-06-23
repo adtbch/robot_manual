@@ -78,17 +78,12 @@ void setup() {
 // =====================================================================
 
 void loop() {
-    // 1. Update limit switches (non-blocking debounce)
-    updateLimitSwitches();
-
     // ESP-NOW receiver
-    // 2. Cetak statistik periodik
+    // 1. Cetak statistik periodik
     espNowControlTick();
     // 2. Ambil paket terbaru & cetak
     ControlPacket gLastRxPacket = {};
     if (espNowControlReadPacket(gLastRxPacket)) {
         espNowControlPrintPacket(gLastRxPacket);
     }
-    
-    
 }

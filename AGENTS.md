@@ -13,6 +13,7 @@ Firmware multi-board ESP32/ESP32-S3 untuk robot kompetisi KRAI 2026. Setiap boar
 | `esp32s3_slave1_localizer_motion/` | ESP32-S3 | IMU MPU9250 yaw, odometri, kinematik |
 | `esp32s3_slave2_manipulator2/` | ESP32-S3 | Encoder motor arm, limit switch, PID position hold |
 | `KRAI2026Manual/master/` | ESP32-S3 | **NEW** — Master board KRAI 2026, flat .ino build |
+| `KRAI2026Manual/Slave2arm/` | ESP32-S3 | **NEW** — Slave2 arm manipulator, 4 motor, flat .ino build |
 
 ## KRAI2026Manual/master — Arsitektur Flat .ino
 
@@ -32,6 +33,7 @@ KRAI2026Manual/master/
 ├── servo.h                     ← Servo config: pin, PWM 50Hz, ServoConfig struct
 ├── relay.h                     ← Relay config: pin
 ├── proximity.h                 ← Proximity sensor config: pin
+├── serial.h                    ← Serial config: UART1 (RX45/TX48), UART2 (RX47/TX21)
 │
 ├── espnow.ino                  ← ESP-NOW: init, WiFi channel, peer, callback, fetchPacket, stats
 ├── motor.ino                   ← SetupMotors(), pwmMotor(), motorStopAll()
@@ -40,6 +42,7 @@ KRAI2026Manual/master/
 ├── servo.ino                   ← setupServos(), setServoAngle()
 ├── relay.ino                   ← setupRelay(), relayOn(), relayOff(), relayToggle(), relayState()
 ├── proximity.ino               ← setupProximity(), readProximity()
+├── serial.ino                  ← setupSerial() — UART1 + UART2 init
 ├── arm_control.ino             ← setHoming(), moveToCenter(), updateMotorPositioning()
 │
 ├── mecanum_control.ino         ← kinematik mecanum ke slave1
@@ -97,6 +100,54 @@ Port aktual: cek dengan `arduino-cli board list`.
 - Internal functions pakai **anonymous namespace** (bukan `static`).
 - Global variable: **definition** di `.ino` modul, **`extern` declaration** di `config.h`.
 - ESP-NOW `ControlPacket` struct di `config.h` — **identik** dengan `esp_receiver/config.h`.
+
+## KRAI2026Manual/Slave2arm — Slave2 Arm Manipulator
+
+Board slave2 untuk arm manipulator KRAI 2026. Flat .ino approach, 4 motor + 2 encoder + 4 limit switch + 2 proximity + serial.
+
+### Struktur Folder
+
+```
+KRAI2026Manual/Slave2arm/
+├── Slave2arm.ino         ← main entry: setup() + loop() — alphabetical first
+│
+├── config.h              ← shared: Jeda
+├── motor.h               ← Motor: 4 motor pin, PWM, MotorConfig struct
+├── encoder.h             ← Encoder: 2 encoder pin, ESP32Encoder library
+├── limit_switch.h        ← Limit switch: 4 pin
+├── proximity.h           ← Proximity: 2 pin
+├── serial.h              ← Serial: UART1 (RX36/TX35)
+├── pneumatic.h           ← Pneumatic: 4 valve pin
+│
+├── motor.ino             ← SetupMotors(), pwmMotor(), motorStopAll()
+├── encoder.ino           ← setupEncoders(), getEncoderCount(), resetEncoderCount()
+├── limit_switch.ino      ← setupLimits(), updateLimitSwitches(), readLimitSwitch()
+├── proximity.ino         ← setupProximity(), readProximity()
+├── serial.ino            ← setupSerial()
+├── pneumatic.ino         ← setupPneumatic(), pneumaticOn(), pneumaticOff(), pneumaticToggle(), pneumaticAllOff()
+```
+
+### Build & Upload
+
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32s3 KRAI2026Manual/Slave2arm
+arduino-cli upload -p COM3 --fqbn esp32:esp32:esp32s3 KRAI2026Manual/Slave2arm
+```
+
+### Pin Summary
+
+| Modul | Pin |
+|-------|-----|
+| Motor1 | 4, 7 |
+| Motor2 | 6, 5 |
+| Motor3 | 17, 18 |
+| Motor4 | 8, 3 |
+| Encoder1 | 41, 42 |
+| Encoder2 | 1, 2 |
+| Limit 1-4 | 40, 39, 38, 37 |
+| Proximity 1-2 | 15, 16 |
+| Serial1 | RX=36, TX=35 |
+| Pneumatic 1-4 | 49, 9, 10, 11 |
 
 ## Skill Wajib
 

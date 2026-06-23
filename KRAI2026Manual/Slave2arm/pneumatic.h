@@ -1,34 +1,38 @@
 /*
  * =====================================================================
- * FILE    : limit_switch.h
- * PERAN   : Konfigurasi modul limit switch (pin).
+ * FILE    : pneumatic.h
+ * PERAN   : Konfigurasi modul pneumatic valve (pin, state).
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave2 Arm)
  * =====================================================================
  */
 
-#ifndef LIMIT_SWITCH_H
-#define LIMIT_SWITCH_H
+#ifndef PNEUMATIC_H
+#define PNEUMATIC_H
 
 #include "config.h"
 
 // =====================================================================
-//  PIN LIMIT SWITCH — berdasarkan schematic KRAI 2026
+//  PIN PNEUMATIC — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t LIMIT_SWITCH_1 = 6;
-constexpr uint8_t LIMIT_SWITCH_2 = 7;
-constexpr uint8_t LIMIT_SWITCH_3 = 15;
-constexpr uint8_t LIMIT_SWITCH_4 = 16;
+constexpr uint8_t PNEUMATIC_1_PIN = 49;
+constexpr uint8_t PNEUMATIC_2_PIN = 9;
+constexpr uint8_t PNEUMATIC_3_PIN = 10;
+constexpr uint8_t PNEUMATIC_4_PIN = 11;
 
 // =====================================================================
-//  JUMLAH LIMIT SWITCH
+//  JUMLAH PNEUMATIC
 // =====================================================================
-constexpr size_t LIMIT_COUNT = 4;
+constexpr size_t PNEUMATIC_COUNT = 4;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
-void setupLimits();
-bool readLimitSwitch(uint8_t index);
+void setupPneumatic();
+void pneumaticOn(uint8_t index);
+void pneumaticOff(uint8_t index);
+void pneumaticToggle(uint8_t index);
+bool pneumaticState(uint8_t index);
+void pneumaticAllOff();
 
-#endif // LIMIT_SWITCH_H
+#endif // PNEUMATIC_H

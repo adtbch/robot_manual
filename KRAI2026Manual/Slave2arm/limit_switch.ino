@@ -3,7 +3,7 @@
  * FILE    : limit_switch.ino
  * PERAN   : Baca limit switch langsung via digitalRead().
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave2 Arm)
  * =====================================================================
  */
 

@@ -1,34 +1,32 @@
 /*
  * =====================================================================
- * FILE    : limit_switch.h
- * PERAN   : Konfigurasi modul limit switch (pin).
+ * FILE    : proximity.h
+ * PERAN   : Konfigurasi modul proximity sensor (pin).
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave2 Arm)
  * =====================================================================
  */
 
-#ifndef LIMIT_SWITCH_H
-#define LIMIT_SWITCH_H
+#ifndef PROXIMITY_H
+#define PROXIMITY_H
 
 #include "config.h"
 
 // =====================================================================
-//  PIN LIMIT SWITCH — berdasarkan schematic KRAI 2026
+//  PIN PROXIMITY — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t LIMIT_SWITCH_1 = 6;
-constexpr uint8_t LIMIT_SWITCH_2 = 7;
-constexpr uint8_t LIMIT_SWITCH_3 = 15;
-constexpr uint8_t LIMIT_SWITCH_4 = 16;
+constexpr uint8_t PROXIMITY_1_PIN = 15;
+constexpr uint8_t PROXIMITY_2_PIN = 16;
 
 // =====================================================================
-//  JUMLAH LIMIT SWITCH
+//  JUMLAH PROXIMITY
 // =====================================================================
-constexpr size_t LIMIT_COUNT = 4;
+constexpr size_t PROXIMITY_COUNT = 2;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
-void setupLimits();
-bool readLimitSwitch(uint8_t index);
+void setupProximity();
+bool readProximity(uint8_t index);
 
-#endif // LIMIT_SWITCH_H
+#endif // PROXIMITY_H

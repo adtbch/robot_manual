@@ -1,13 +1,13 @@
 /*
  * =====================================================================
- * FILE    : limit_switch.ino
- * PERAN   : Baca limit switch langsung via digitalRead().
+ * FILE    : proximity.ino
+ * PERAN   : Baca proximity sensor (digital).
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave2 Arm)
  * =====================================================================
  */
 
-#include "limit_switch.h"
+#include "proximity.h"
 
 // =====================================================================
 //  STATE
@@ -15,11 +15,9 @@
 
 namespace {
 
-constexpr uint8_t limitPins[LIMIT_COUNT] = {
-    LIMIT_SWITCH_1,
-    LIMIT_SWITCH_2,
-    LIMIT_SWITCH_3,
-    LIMIT_SWITCH_4
+constexpr uint8_t proximityPins[PROXIMITY_COUNT] = {
+    PROXIMITY_1_PIN,
+    PROXIMITY_2_PIN
 };
 
 } // anonymous namespace
@@ -28,19 +26,19 @@ constexpr uint8_t limitPins[LIMIT_COUNT] = {
 //  SETUP
 // =====================================================================
 
-void setupLimits() {
-    for (size_t i = 0; i < LIMIT_COUNT; i++) {
-        pinMode(limitPins[i], INPUT_PULLUP);  // active LOW
+void setupProximity() {
+    for (size_t i = 0; i < PROXIMITY_COUNT; i++) {
+        pinMode(proximityPins[i], INPUT_PULLUP);
     }
 }
 
 // =====================================================================
-//  READ — langsung baca GPIO
+//  READ
 // =====================================================================
 
-bool readLimitSwitch(uint8_t index) {
-    if (index >= LIMIT_COUNT) {
+bool readProximity(uint8_t index) {
+    if (index >= PROXIMITY_COUNT) {
         return false;
     }
-    return (digitalRead(limitPins[index]) == LOW);
+    return (digitalRead(proximityPins[index]) == LOW);  // active LOW
 }

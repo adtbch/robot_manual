@@ -1,34 +1,38 @@
 /*
  * =====================================================================
- * FILE    : limit_switch.h
- * PERAN   : Konfigurasi modul limit switch (pin).
+ * FILE    : encoder.h
+ * PERAN   : Konfigurasi modul encoder (pin, ESP32Encoder library).
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave2 Arm)
  * =====================================================================
  */
 
-#ifndef LIMIT_SWITCH_H
-#define LIMIT_SWITCH_H
+#ifndef ENCODER_H
+#define ENCODER_H
 
 #include "config.h"
 
 // =====================================================================
-//  PIN LIMIT SWITCH — berdasarkan schematic KRAI 2026
+//  PIN ENCODER — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t LIMIT_SWITCH_1 = 6;
-constexpr uint8_t LIMIT_SWITCH_2 = 7;
-constexpr uint8_t LIMIT_SWITCH_3 = 15;
-constexpr uint8_t LIMIT_SWITCH_4 = 16;
+// Encoder1
+constexpr uint8_t ENCODER1_PIN_A = 41;
+constexpr uint8_t ENCODER1_PIN_B = 42;
+
+// Encoder2
+constexpr uint8_t ENCODER2_PIN_A = 1;
+constexpr uint8_t ENCODER2_PIN_B = 2;
 
 // =====================================================================
-//  JUMLAH LIMIT SWITCH
+//  JUMLAH ENCODER
 // =====================================================================
-constexpr size_t LIMIT_COUNT = 4;
+constexpr size_t ENCODER_COUNT = 2;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
-void setupLimits();
-bool readLimitSwitch(uint8_t index);
+void setupEncoders();
+long getEncoderCount(uint8_t encoderIndex);
+void resetEncoderCount(uint8_t encoderIndex);
 
-#endif // LIMIT_SWITCH_H
+#endif // ENCODER_H
