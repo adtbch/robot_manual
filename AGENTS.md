@@ -12,6 +12,91 @@ Firmware multi-board ESP32/ESP32-S3 untuk robot kompetisi KRAI 2026. Setiap boar
 | `esp32s3_master/` | ESP32-S3 | Relay, mecanum + arm manipulator, serial ke slave |
 | `esp32s3_slave1_localizer_motion/` | ESP32-S3 | IMU MPU9250 yaw, odometri, kinematik |
 | `esp32s3_slave2_manipulator2/` | ESP32-S3 | Encoder motor arm, limit switch, PID position hold |
+| `KRAI2026Manual/master/` | ESP32-S3 | **NEW** — Master board KRAI 2026, flat .ino build |
+
+## KRAI2026Manual/master — Arsitektur Flat .ino
+
+Board master baru untuk KRAI 2026. Menggunakan **flat approach**: semua `.ino` dalam satu folder, dikompilasi otomatis oleh Arduino IDE. Tinggal buka `master.ino`, klik Upload.
+
+### Struktur Folder
+
+```
+KRAI2026Manual/master/
+├── master.ino                  ← main entry: setup() + loop() — alphabetical first
+│
+├── config.h                    ← shared types: ControlPacket, BTN_*, Jeda (SEMUA modul)
+├── espnow.h                    ← ESP-NOW config: MAC whitelist, channel, magic, timing
+├── motor.h                     ← Motor config: pin, PWM, MotorConfig struct
+├── encoder.h                   ← Encoder config: pin, ESP32Encoder library
+├── limit_switch.h              ← Limit switch config: pin
+├── servo.h                     ← Servo config: pin, PWM 50Hz, ServoConfig struct
+├── relay.h                     ← Relay config: pin
+├── proximity.h                 ← Proximity sensor config: pin
+│
+├── espnow.ino                  ← ESP-NOW: init, WiFi channel, peer, callback, fetchPacket, stats
+├── motor.ino                   ← SetupMotors(), pwmMotor(), motorStopAll()
+├── encoder.ino                 ← setupEncoders(), getEncoderCount(), resetEncoderCount()
+├── limit_switch.ino            ← setupLimits(), readLimitSwitch() — double-read anti-noise
+├── servo.ino                   ← setupServos(), setServoAngle()
+├── relay.ino                   ← setupRelay(), relayOn(), relayOff(), relayToggle(), relayState()
+├── proximity.ino               ← setupProximity(), readProximity()
+├── arm_control.ino             ← setHoming(), moveToCenter(), updateMotorPositioning()
+│
+├── mecanum_control.ino         ← kinematik mecanum ke slave1
+├── gripper_control.ino         ← toggle servo + motor jog (MODE_GRIPPING)
+├── armbox_control.ino          ← kontrol slave2 (MODE_ARM_BOX)
+│
+├── serial_command.ino          ← serial command parser (motorX, servo, stop)
+├── motion_serial.ino           ← UART1 binary protocol ke slave1
+├── manipulator_serial.ino      ← UART2 ke slave2
+│
+├── jeda.ino                    ← placeholder (struct Jeda sudah di config.h)
+│
+└── mode_control.ino            ← GRIPPING/ARM_BOX toggle, NVS save
+```
+
+### Mapping File Lama → Baru
+
+| File lama (`esp32s3_master/`) | File baru (`KRAI2026Manual/master/`) |
+|---|---|
+| `robot_config.h` | `config.h` + per-module `.h` (`espnow.h`, `motor.h`, dst) |
+| `espnow_control.ino` | `espnow.ino` |
+| `motor.ino` | `motor.ino` |
+| `encoder.ino` | `encoder.ino` |
+| `servo.ino` | `servo.ino` |
+| `limit_switch.ino` | `limit_switch.ino` |
+| `arm.ino` | `arm_control.ino` |
+| `mecanum_control.ino` | `mecanum_control.ino` |
+| `gripper_control.ino` | `gripper_control.ino` |
+| `armbox_control.ino` | `armbox_control.ino` |
+| `serial.ino` | `serial_command.ino` |
+| `motion_serial.ino` | `motion_serial.ino` |
+| `manipulator_serial.ino` | `manipulator_serial.ino` |
+| `mode_control.ino` | `mode_control.ino` |
+
+### Build & Upload
+
+Langsung via Arduino IDE — buka `master.ino`, klik Upload.
+
+Atau via `arduino-cli`:
+
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32s3 KRAI2026Manual/master
+arduino-cli upload -p COM3 --fqbn esp32:esp32:esp32s3 KRAI2026Manual/master
+```
+
+Port aktual: cek dengan `arduino-cli board list`.
+
+### Konvensi Flat .ino
+
+- `master.ino` harus jadi pertama secara alfabet — nama `master` sebelum semua modul.
+- `config.h` berisi shared types, konstanta, `extern` declarations, dan function prototypes cross-file.
+- Per-modul `.h` (`espnow.h`, `motor.h`, dst) berisi konfigurasi spesifik modul itu.
+- Setiap `.ino` `#include` modul `.h` miliknya (misal `motor.ino` → `#include "motor.h"`).
+- `master.ino` `#include` semua modul `.h` yang dipakai.
+- Internal functions pakai **anonymous namespace** (bukan `static`).
+- Global variable: **definition** di `.ino` modul, **`extern` declaration** di `config.h`.
+- ESP-NOW `ControlPacket` struct di `config.h` — **identik** dengan `esp_receiver/config.h`.
 
 ## Skill Wajib
 
@@ -52,7 +137,7 @@ Port bisa berbeda (`/dev/ttyACM0`, `/dev/ttyUSB0`). Cek dengan `arduino-cli boar
 | `MPU9250` (hideakitai) | slave1 | Yaw quaternion-fusion. API: `mpu.setup()`, `mpu.update()`, `mpu.getYaw()` |
 | `Preferences` (ESP32) | semua | NVS flash storage untuk persistensi |
 | `ESP-NOW` (native) | controller, master | Wireless komunikasi |
-| `Encoder` (Encoder.h) | slave2 | Quadrature encoder read |
+| `ESP32Encoder` (lucky68t) | master | Quadrature encoder read. API: `attachHalfQuad()`, `getCount()`, `clearCount()` |
 
 ## MPU9250 Yaw Conventions (slave1)
 
@@ -95,6 +180,31 @@ if (strncmp(cmd, "COMMAND_NAME", N) == 0) {
 - **Encoder adalah single source of truth** — semua fungsi pakai global vars (`encoderMotorW/Z/Y`), bukan baca langsung dari interrupt.
 - **Port serial bisa terputus** jika ESP32-S3 crash I2C — reset fisik diperlukan.
 - **Port `/dev/ttyACM0`** tidak always mounted — cek sebelum upload.
+
+### Limit Switch Double-Read — Penjelasan
+
+**Masalah:** Motor DC menghasilkan electrical noise yang bikin pin GPIO berubah-ubah tanpa sebab.
+
+```
+Sinyal asli:      ──────────LOW──────────HIGH─────────
+Sinyal + noise:   ──LOW──HIGH──LOW──LOW──HIGH──LOW──HIGH──
+                    ↑     ↑     ↑
+                    noise noise noise
+```
+
+**Solusi:** Baca 2 kali dengan jeda 2ms. Kalau kedua bacaan sama → valid. Kalau beda → ditolak (noise).
+
+**Implementasi (non-blocking):**
+- `updateLimitSwitches()` dipanggil di setiap `loop()`
+- State machine per switch: baca pertama → tunggu 2ms via `Jeda` → baca kedua → bandingkan
+- Hasil disimpan di `limitState[]`, dibaca via `readLimitSwitch(idx)`
+
+**Mengapa 2ms?**
+- Terlalu singkat (<1ms) → noise mungkin masih ada
+- Terlalu lama (>10ms) → robot sudah gerak terlalu jauh
+- 2ms → sweet spot untuk motor noise di robot KRAI
+
+**Ref:** `limit_switch.ino` — `updateLimitSwitches()`, `readLimitSwitch()`
 
 ## Referensi Dokumentasi
 
