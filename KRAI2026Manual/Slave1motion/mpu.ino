@@ -54,9 +54,9 @@ namespace {
 
 float normalizeAngle(float angle, float minAngle, float maxAngle) {
     float range = maxAngle - minAngle;
-    while (angle < minAngle) angle += range;
-    while (angle >= maxAngle) angle -= range;
-    return angle;
+    float res = fmod(angle - minAngle, range);
+    if (res < 0) res += range;
+    return res + minAngle;
 }
 
 // =====================================================================
@@ -117,9 +117,7 @@ void calibClearNVS() {
 //  MPU INIT
 // =====================================================================
 
-namespace {
-
-bool mpuInitCommon() {
+bool setupMPU() {
     Serial.println(F("Initializing MPU6050 (DMP)..."));
     mpu.initialize();
     pinMode(MPU_INTERRUPT_PIN, INPUT);
@@ -167,12 +165,6 @@ bool mpuInitCommon() {
     yaw = 0.0f;
     Serial.printf("DMP Ready. yawOffset = %.2f\n", yawOffset);
     return true;
-}
-
-} // anonymous namespace
-
-bool setupMPU() {
-    return mpuInitCommon();
 }
 
 // =====================================================================

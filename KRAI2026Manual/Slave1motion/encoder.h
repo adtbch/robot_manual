@@ -1,8 +1,9 @@
 /*
  * =====================================================================
  * FILE    : encoder.h
- * PERAN   : Konfigurasi modul encoder (pin, ESP32Encoder library).
- *           4 encoder untuk mecanum drive.
+ * PERAN   : Konfigurasi 2 jenis encoder:
+ *           - Internal (motor): ISR interrupt → RPM buat PID
+ *           - External (wheel): PCNT hardware → odometry
  *
  * BOARD   : ESP32-S3 (Slave1 Motion)
  * =====================================================================
@@ -14,42 +15,57 @@
 #include "config.h"
 
 // =====================================================================
-//  PIN ENCODER — berdasarkan schematic KRAI 2026
+//  PIN — INTERNAL MOTOR ENCODER (ISR based)
+//  Baca via interrupt GPIO. RPM feedback untuk PID.
 // =====================================================================
 
-// Encoder Depan Kanan (Front Right)
-constexpr uint8_t ENCODER_FR_A = 40;
-constexpr uint8_t ENCODER_FR_B = 39;
-
-// Encoder Depan Kiri (Front Left)
-constexpr uint8_t ENCODER_FL_A = 4;
-constexpr uint8_t ENCODER_FL_B = 5;
-
-// Encoder Belakang Kanan (Back Right)
-constexpr uint8_t ENCODER_BR_A = 1;
-constexpr uint8_t ENCODER_BR_B = 2;
-
-// Encoder Belakang Kiri (Back Left)
-constexpr uint8_t ENCODER_BL_A = 41;
-constexpr uint8_t ENCODER_BL_B = 42;
+constexpr uint8_t INT_ENC_FR_A = 42;
+constexpr uint8_t INT_ENC_FR_B = 41;
+constexpr uint8_t INT_ENC_FL_A = 4;
+constexpr uint8_t INT_ENC_FL_B = 5;
+constexpr uint8_t INT_ENC_BR_A = 1;
+constexpr uint8_t INT_ENC_BR_B = 2;
+constexpr uint8_t INT_ENC_BL_A = 40;
+constexpr uint8_t INT_ENC_BL_B = 39;
 
 // =====================================================================
-//  JUMLAH ENCODER
+//  PIN — EXTERNAL WHEEL ENCODER (PCNT / ESP32Encoder)
+//  Baca via PCNT hardware counter. Akurat untuk odometry.
 // =====================================================================
-constexpr size_t ENCODER_COUNT = 4;
+
+constexpr uint8_t EXT_ENC_FR_A = 36;
+constexpr uint8_t EXT_ENC_FR_B = 35;
+constexpr uint8_t EXT_ENC_FL_A = 38;
+constexpr uint8_t EXT_ENC_FL_B = 37;
+constexpr uint8_t EXT_ENC_BR_A = 46;
+constexpr uint8_t EXT_ENC_BR_B = 47;
+constexpr uint8_t EXT_ENC_BL_A = 9;
+constexpr uint8_t EXT_ENC_BL_B = 10;
 
 // =====================================================================
-//  RPM CALCULATION
+//  KONSTANTA
 // =====================================================================
+
+constexpr size_t INT_ENCODER_COUNT = 4;
+constexpr size_t EXT_ENCODER_COUNT = 4;
 constexpr uint32_t RPM_INTERVAL_MS = 40;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
-void setupEncoders();
-void convertEncoderToRPM();
-float getEncoderVelocityRpm(int motorIdx);
-float getEncoderVelocityRadS(int motorIdx);
+
+void setupEncoders();                       // Init internal + external
+
+// Internal (ISR) — RPM buat PID
+void convertEncoderToRPM();                 // Hitung RPM dari delta ISR count
+float getEncoderVelocityRpm(int idx);       // Dapatkan RPM motor
+float getEncoderVelocityRadS(int idx);      // Dapatkan kecepatan motor (rad/s)
+
+// External (PCNT) — raw count buat odometry
+int64_t getExtEncoderCount(int idx);
+void resetExtEncoderCount(int idx);
+
+// Yaw rate & confidence (dari internal encoder RPM)
 float getEncoderYawRateRads();
 float getEncoderConfidence();
 
