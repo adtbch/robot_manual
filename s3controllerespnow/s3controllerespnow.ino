@@ -90,9 +90,9 @@ void loop() {
             static uint32_t last_print = 0;
             if (sekarang - last_print >= 1000) {
                 last_print = sekarang;
-                Serial.printf("[GP] LX:%4d LY:%4d RX:%4d RY:%4d L2:%3d R2:%3d BTN:0x%08lX SEQ:%u\n",
-                    gp.lx, gp.ly, gp.rx, gp.ry, gp.l2a, gp.r2a,
-                    (unsigned long)paket.buttons, paket.seq);
+                // Serial.printf("[GP] LX:%4d LY:%4d RX:%4d RY:%4d L2:%3d R2:%3d BTN:0x%08lX SEQ:%u\n",
+                //     gp.lx, gp.ly, gp.rx, gp.ry, gp.l2a, gp.r2a,
+                //     (unsigned long)paket.buttons, paket.seq);
             }
         } else {
             // Gamepad tidak terkirim → paket stop

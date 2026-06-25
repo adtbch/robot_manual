@@ -29,9 +29,9 @@
  * @param mac    MAC address tujuan
  * @param status ESP_NOW_SEND_SUCCESS atau ESP_NOW_SEND_FAIL
  */
-static void saat_espnow_terkirim(const uint8_t *mac, esp_now_send_status_t status) {
+static void saat_espnow_terkirim(const esp_now_send_info_t *info, esp_now_send_status_t status) {
     if (status != ESP_NOW_SEND_SUCCESS) {
-        Serial.println("[ESP-NOW] Send FAILED");
+        // Serial.println("[ESP-NOW] Send FAILED");
     }
 }
 

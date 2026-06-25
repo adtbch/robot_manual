@@ -18,6 +18,7 @@ extern GamepadState gp;
 void parsePacket(uint8_t *d, int len) {
   if (len < 10 || d[0] != 0x01) return;
 
+  gp.connected = true;
   gp.lx = d[1] - 128;
   gp.ly = d[2] - 128;
   gp.rx = d[3] - 128;
