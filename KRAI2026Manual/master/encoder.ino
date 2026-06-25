@@ -42,7 +42,7 @@ void setupEncoders() {
 //  READ
 // =====================================================================
 
-long getEncoderCount(uint8_t encoderIndex) {
+long getEncoderCount(char encoderIndex) {
     if (encoderIndex >= ENCODER_COUNT) {
         return 0;
     }
@@ -53,7 +53,7 @@ long getEncoderCount(uint8_t encoderIndex) {
 //  RESET
 // =====================================================================
 
-void resetEncoderCount(uint8_t encoderIndex) {
+void resetEncoderCount(char encoderIndex) {
     if (encoderIndex >= ENCODER_COUNT) {
         return;
     }

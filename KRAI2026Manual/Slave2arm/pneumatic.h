@@ -29,10 +29,10 @@ constexpr size_t PNEUMATIC_COUNT = 4;
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupPneumatic();
-void pneumaticOn(uint8_t index);
-void pneumaticOff(uint8_t index);
-void pneumaticToggle(uint8_t index);
-bool pneumaticState(uint8_t index);
+void pneumaticOn(char index);
+void pneumaticOff(char index);
+void pneumaticToggle(char index);
+bool pneumaticState(char index);
 void pneumaticAllOff();
 
 #endif // PNEUMATIC_H

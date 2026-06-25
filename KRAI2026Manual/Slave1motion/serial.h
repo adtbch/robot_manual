@@ -1,10 +1,9 @@
 /*
  * =====================================================================
  * FILE    : serial.h
- * PERAN   : Konfigurasi modul serial (UART1 → slave1, UART2 → slave2).
- *           Unified command handler: PC (USB Serial) & slave1 & slave2.
+ * PERAN   : Konfigurasi modul serial (UART1 ke master, UART2 WSN-31).
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave1 Motion)
  * =====================================================================
  */
 
@@ -17,25 +16,27 @@
 //  PIN SERIAL — berdasarkan schematic KRAI 2026
 // =====================================================================
 
-// UART1 — komunikasi ke slave1
-constexpr uint8_t SLAVE1_RX = 45;
-constexpr uint8_t SLAVE1_TX = 48;
+// Serial1 (UART1) — ke master
+constexpr uint8_t SERIAL_MASTER_RX = 21;
+constexpr uint8_t SERIAL_MASTER_TX = 20;
 
-// UART2 — komunikasi ke slave2
-constexpr uint8_t SLAVE2_RX = 47;
-constexpr uint8_t SLAVE2_TX = 21;
+// Serial2 (UART2) — ke WSN-31
+constexpr uint8_t SERIAL_WSN_RX = 12;
+constexpr uint8_t SERIAL_WSN_TX = 11;
+
+// WSN-31 SET pin
+constexpr uint8_t WSN_SET_PIN = 19;
 
 // =====================================================================
 //  BAUD RATE
 // =====================================================================
-constexpr uint32_t SLAVE1_BAUD = 921600;
-constexpr uint32_t SLAVE2_BAUD = 921600;
+constexpr uint32_t SERIAL_MASTER_BAUD = 921600;
+constexpr uint32_t SERIAL_WSN_BAUD = 9600;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupSerial();
-void setupSerialCommand();
-void serialCommandTick();
+void serialRelayTick();
 
 #endif // SERIAL_H

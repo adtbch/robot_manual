@@ -1,7 +1,8 @@
 /*
  * =====================================================================
  * FILE    : serial.h
- * PERAN   : Konfigurasi modul serial (UART1).
+ * PERAN   : Konfigurasi modul serial (UART1 → master).
+ *           Unified command handler: PC (USB Serial) & master sama.
  *
  * BOARD   : ESP32-S3 (Slave2 Arm)
  * =====================================================================
@@ -16,18 +17,20 @@
 //  PIN SERIAL — berdasarkan schematic KRAI 2026
 // =====================================================================
 
-// Serial1 (UART1) — komunikasi ke master
-constexpr uint8_t SERIAL1_RX = 36;
-constexpr uint8_t SERIAL1_TX = 35;
+// UART1 — komunikasi ke master
+constexpr uint8_t MASTER_RX = 36;
+constexpr uint8_t MASTER_TX = 35;
 
 // =====================================================================
 //  BAUD RATE
 // =====================================================================
-constexpr uint32_t SERIAL1_BAUD = 115200;
+constexpr uint32_t MASTER_BAUD = 921600;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupSerial();
+void setupSerialCommand();
+void serialCommandTick();
 
 #endif // SERIAL_H

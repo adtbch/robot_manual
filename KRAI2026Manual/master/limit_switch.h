@@ -29,6 +29,6 @@ constexpr size_t LIMIT_COUNT = 4;
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupLimits();
-bool readLimitSwitch(uint8_t index);
+bool readLimitSwitch(char index);
 
 #endif // LIMIT_SWITCH_H

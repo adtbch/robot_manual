@@ -17,9 +17,9 @@
 //  STRUCT MOTOR CONFIG
 // =====================================================================
 struct MotorConfig {
-    uint8_t pin1;         // pin 1 (direction)
-    uint8_t pin2;         // pin 2 (direction)
-    uint8_t ledc_channel; // LEDC channel
+    char id;            // karakter unik: '1'-'4' atau bebas
+    uint8_t pin1;       // pin 1 (direction)
+    uint8_t pin2;       // pin 2 (direction)
 };
 
 // =====================================================================
@@ -58,7 +58,7 @@ constexpr int PWM_RESOLUTION = 10;      // bit (2^10 = 1024)
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void SetupMotors();
-void pwmMotor(int idMotor, int pwmValue);
+void pwmMotor(char motorId, int pwmValue);
 void motorStopAll();
 
 #endif // MOTOR_H

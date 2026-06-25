@@ -27,6 +27,6 @@ constexpr size_t PROXIMITY_COUNT = 2;
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupProximity();
-bool readProximity(uint8_t index);
+bool readProximity(char index);
 
 #endif // PROXIMITY_H

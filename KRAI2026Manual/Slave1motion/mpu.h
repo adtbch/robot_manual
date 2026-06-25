@@ -1,38 +1,37 @@
 /*
  * =====================================================================
- * FILE    : encoder.h
- * PERAN   : Konfigurasi modul encoder (pin, library ESP32Encoder).
+ * FILE    : mpu.h
+ * PERAN   : Konfigurasi modul MPU6050 IMU (I2C, interrupt).
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave1 Motion)
  * =====================================================================
  */
 
-#ifndef ENCODER_H
-#define ENCODER_H
+#ifndef MPU_H
+#define MPU_H
 
 #include "config.h"
 
 // =====================================================================
-//  PIN ENCODER — berdasarkan schematic KRAI 2026
+//  PIN I2C
 // =====================================================================
-// Encoder1 (axis X / motor1)
-constexpr uint8_t ENCODER1_PIN_A = 40;
-constexpr uint8_t ENCODER1_PIN_B = 39;
-
-// Encoder2 (axis Y / motor2)
-constexpr uint8_t ENCODER2_PIN_A = 38;
-constexpr uint8_t ENCODER2_PIN_B = 37;
+constexpr uint8_t I2C_SDA = 13;
+constexpr uint8_t I2C_SCL = 14;
 
 // =====================================================================
-//  JUMLAH ENCODER
+//  INTERRUPT PIN
 // =====================================================================
-constexpr size_t ENCODER_COUNT = 2;
+constexpr uint8_t MPU_INTERRUPT_PIN = 46;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
-void setupEncoders();
-long getEncoderCount(char encoderIndex);
-void resetEncoderCount(char encoderIndex);
+bool setupMPU();
+void updateYaw();
+float getYaw();
+void calibrateGyro();
+void calibrateGyroHot();
+void setYawReference(float targetYaw);
+void snapYaw();
 
-#endif // ENCODER_H
+#endif // MPU_H

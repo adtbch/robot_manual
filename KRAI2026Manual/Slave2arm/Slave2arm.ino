@@ -41,7 +41,10 @@ void setup() {
 
     // Init serial (UART1)
     setupSerial();
-    Serial.println("Serial: READY");
+    Serial.println("UART1: READY");
+
+    // Init serial command handler
+    setupSerialCommand();
 
     // Init pneumatic
     setupPneumatic();
@@ -53,5 +56,6 @@ void setup() {
 // =====================================================================
 
 void loop() {
-    // TODO: tambah modul (PID, serial)
+    // Serial command handler (USB Serial Monitor)
+    serialCommandTick();
 }

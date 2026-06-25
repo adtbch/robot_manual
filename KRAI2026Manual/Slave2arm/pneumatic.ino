@@ -41,19 +41,19 @@ void setupPneumatic() {
 //  CONTROL
 // =====================================================================
 
-void pneumaticOn(uint8_t index) {
+void pneumaticOn(char index) {
     if (index >= PNEUMATIC_COUNT) return;
     digitalWrite(pneumaticPins[index], HIGH);
     pneumaticActive[index] = true;
 }
 
-void pneumaticOff(uint8_t index) {
+void pneumaticOff(char index) {
     if (index >= PNEUMATIC_COUNT) return;
     digitalWrite(pneumaticPins[index], LOW);
     pneumaticActive[index] = false;
 }
 
-void pneumaticToggle(uint8_t index) {
+void pneumaticToggle(char index) {
     if (index >= PNEUMATIC_COUNT) return;
     if (pneumaticActive[index]) {
         pneumaticOff(index);
@@ -62,7 +62,7 @@ void pneumaticToggle(uint8_t index) {
     }
 }
 
-bool pneumaticState(uint8_t index) {
+bool pneumaticState(char index) {
     if (index >= PNEUMATIC_COUNT) return false;
     return pneumaticActive[index];
 }

@@ -71,6 +71,9 @@ void setup() {
     // Init serial (UART1 + UART2)
     setupSerial();
     Serial.println("Serial: READY");
+
+    // Init serial command handler
+    setupSerialCommand();
 }
 
 // =====================================================================
@@ -78,6 +81,9 @@ void setup() {
 // =====================================================================
 
 void loop() {
+    // Serial command handler
+    serialCommandTick();
+
     // ESP-NOW receiver
     // 1. Cetak statistik periodik
     espNowControlTick();

@@ -32,7 +32,7 @@ constexpr size_t ENCODER_COUNT = 2;
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupEncoders();
-long getEncoderCount(uint8_t encoderIndex);
-void resetEncoderCount(uint8_t encoderIndex);
+long getEncoderCount(char encoderIndex);
+void resetEncoderCount(char encoderIndex);
 
 #endif // ENCODER_H

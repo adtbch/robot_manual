@@ -16,8 +16,8 @@
 //  STRUCT SERVO CONFIG
 // =====================================================================
 struct ServoConfig {
+    char id;            // karakter unik: 'd'=depan, 't'=tengah, 'b'=belakang, dst
     uint8_t pin;
-    uint8_t ledc_channel;
 };
 
 // =====================================================================
@@ -44,6 +44,6 @@ constexpr int SERVO_DUTY_MAX   = 2400;   // us (180 derajat)
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupServos();
-void setServoAngle(uint8_t servoIndex, int angle);
+void setServoAngle(char servoId, int angle);
 
 #endif // SERVO_H

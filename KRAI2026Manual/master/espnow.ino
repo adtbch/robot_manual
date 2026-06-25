@@ -235,13 +235,15 @@ void printStatsIfDue() {
 //  5. CALLBACK (use all helpers above)
 // =====================================================================
 
-void onEspNowReceive(const uint8_t *macAddr, const uint8_t *data, int dataLen) {
+void onEspNowReceive(const esp_now_recv_info *info, const uint8_t *data, int dataLen) {
     gEspNow.stats.any++;
 
-    if (macAddr == nullptr || data == nullptr) {
+    if (info == nullptr || data == nullptr) {
         gEspNow.stats.rejectedLength++;
         return;
     }
+
+    const uint8_t *macAddr = info->src_addr;
 
     if (!isAllowedSender(macAddr)) {
         gEspNow.stats.rejectedMac++;

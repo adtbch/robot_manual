@@ -1,10 +1,9 @@
 /*
  * =====================================================================
  * FILE    : motor.ino
- * PERAN   : Setup & control motor via H-bridge (L298N/drv8833).
- *           2 motor: 'x'=axis X, 'y'=axis Y.
+ * PERAN   : Setup & control 4 motor mecanum drive.
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave1 Motion)
  * =====================================================================
  */
 
@@ -16,18 +15,12 @@
 
 namespace {
 
-    MotorConfig motors[MOTOR_COUNT] = {
-        {'x', MOTOR1_PIN_DIR, MOTOR1_PIN_PWM},   // axis X
-        {'y', MOTOR2_PIN_DIR, MOTOR2_PIN_PWM},   // axis Y
-    };
-
-    // Cari index berdasarkan id. Return -1 jika tidak ditemukan.
-    int findMotorIndex(char id) {
-        for (size_t i = 0; i < MOTOR_COUNT; i++) {
-            if (motors[i].id == id) return (int)i;
-        }
-        return -1;
-    }
+MotorConfig motors[MOTOR_COUNT] = {
+    {MOTOR_FR_DIR, MOTOR_FR_PWM},   // 0: Front Right
+    {MOTOR_FL_DIR, MOTOR_FL_PWM},   // 1: Front Left
+    {MOTOR_BR_DIR, MOTOR_BR_PWM},   // 2: Back Right
+    {MOTOR_BL_DIR, MOTOR_BL_PWM},   // 3: Back Left
+};
 
 } // anonymous namespace
 
@@ -49,26 +42,27 @@ void SetupMotors() {
 //  CONTROL
 // =====================================================================
 
-void pwmMotor(char motorId, int pwmValue) {
-    int idx = findMotorIndex(motorId);
-    if (idx < 0) return;
+void pwmMotor(int idMotor, int pwmValue) {
+    if (idMotor < 0 || (size_t)idMotor >= MOTOR_COUNT) {
+        return;
+    }
 
     pwmValue = constrain(pwmValue, PWM_MIN, PWM_MAX);
 
     if (pwmValue > 0) {
-        ledcWrite(motors[idx].pin_pwm, pwmValue);
-        digitalWrite(motors[idx].pin_dir, LOW);
+        digitalWrite(motors[idMotor].pin_dir, LOW);
+        ledcWrite(motors[idMotor].pin_pwm, pwmValue);
     } else if (pwmValue < 0) {
-        ledcWrite(motors[idx].pin_pwm, PWM_MAX + pwmValue);
-        digitalWrite(motors[idx].pin_dir, HIGH);
+        digitalWrite(motors[idMotor].pin_dir, HIGH);
+        ledcWrite(motors[idMotor].pin_pwm, PWM_MAX + pwmValue);
     } else {
-        ledcWrite(motors[idx].pin_pwm, 0);
-        digitalWrite(motors[idx].pin_dir, LOW);
+        ledcWrite(motors[idMotor].pin_pwm, 0);
+        digitalWrite(motors[idMotor].pin_dir, LOW);
     }
 }
 
 void motorStopAll() {
     for (size_t i = 0; i < MOTOR_COUNT; i++) {
-        pwmMotor(motors[i].id, 0);
+        pwmMotor(i, 0);
     }
 }

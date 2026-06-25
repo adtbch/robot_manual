@@ -2,7 +2,7 @@
  * =====================================================================
  * FILE    : servo.ino
  * PERAN   : Control servo via LEDC PWM.
- *           3 servo: Servo1, Servo2, Servo3.
+ *           3 servo: 'd'=depan, 't'=tengah, 'b'=belakang.
  *
  * LIBRARY : Arduino ESP32 Core (LEDC)
  *
@@ -19,10 +19,18 @@
 namespace {
 
     ServoConfig servos[SERVO_COUNT] = {
-        {SERVO_1_PIN, 2},   // ch 0-1 dipakai motor
-        {SERVO_2_PIN, 3},
-        {SERVO_3_PIN, 4},
+        {'d', SERVO_1_PIN},   // depan
+        {'t', SERVO_2_PIN},   // tengah
+        {'b', SERVO_3_PIN},   // belakang
     };
+
+    // Cari index berdasarkan id. Return -1 jika tidak ditemukan.
+    int findServoIndex(char id) {
+        for (size_t i = 0; i < SERVO_COUNT; i++) {
+            if (servos[i].id == id) return (int)i;
+        }
+        return -1;
+    }
 
 } // anonymous namespace
 
@@ -32,8 +40,7 @@ namespace {
 
 void setupServos() {
     for (size_t i = 0; i < SERVO_COUNT; i++) {
-        ledcSetup(servos[i].ledc_channel, SERVO_FREQUENCY, SERVO_RESOLUTION);
-        ledcAttachPin(servos[i].pin, servos[i].ledc_channel);
+        ledcAttach(servos[i].pin, SERVO_FREQUENCY, SERVO_RESOLUTION);
     }
 }
 
@@ -41,10 +48,9 @@ void setupServos() {
 //  CONTROL — set sudut servo (0-180 derajat)
 // =====================================================================
 
-void setServoAngle(uint8_t servoIndex, int angle) {
-    if (servoIndex >= SERVO_COUNT) {
-        return;
-    }
+void setServoAngle(char servoId, int angle) {
+    int idx = findServoIndex(servoId);
+    if (idx < 0) return;
 
     angle = constrain(angle, 0, 180);
 
@@ -55,5 +61,5 @@ void setServoAngle(uint8_t servoIndex, int angle) {
     // Rumus: (pulseWidth / period_20000us) × max_duty
     long duty = (pulseWidth * ((1L << SERVO_RESOLUTION) - 1)) / 20000;
 
-    ledcWrite(servos[servoIndex].ledc_channel, duty);
+    ledcWrite(servos[idx].pin, duty);
 }

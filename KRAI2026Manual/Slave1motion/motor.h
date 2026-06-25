@@ -2,8 +2,9 @@
  * =====================================================================
  * FILE    : motor.h
  * PERAN   : Konfigurasi modul motor (pin, PWM, struct).
+ *           4 motor mecanum drive.
  *
- * BOARD   : ESP32-S3 (Master)
+ * BOARD   : ESP32-S3 (Slave1 Motion)
  * =====================================================================
  */
 
@@ -13,43 +14,41 @@
 #include "config.h"
 
 // =====================================================================
-//  STRUCT MOTOR CONFIG
-// =====================================================================
-struct MotorConfig {
-    char id;            // karakter unik: 'x'=axis X, 'y'=axis Y, dst
-    uint8_t pin_dir;    // direction pin (OUTPUT)
-    uint8_t pin_pwm;    // speed pin (LEDC PWM)
-};
-
-// =====================================================================
 //  PIN MOTOR — berdasarkan schematic KRAI 2026
 // =====================================================================
-// Motor1 (axis X / arm)
-constexpr uint8_t MOTOR1_PIN_DIR  = 1;   // direction pin
-constexpr uint8_t MOTOR1_PIN_PWM  = 2;   // speed pin (LEDC PWM)
 
-// Motor2 (axis Y / arm)
-constexpr uint8_t MOTOR2_PIN_DIR  = 42;   // direction pin
-constexpr uint8_t MOTOR2_PIN_PWM  = 41;   // speed pin (LEDC PWM)
+// Motor Depan Kanan (Front Right)
+constexpr uint8_t MOTOR_FR_DIR = 6;
+constexpr uint8_t MOTOR_FR_PWM = 7;
+
+// Motor Depan Kiri (Front Left)
+constexpr uint8_t MOTOR_FL_DIR = 3;
+constexpr uint8_t MOTOR_FL_PWM = 8;
+
+// Motor Belakang Kanan (Back Right)
+constexpr uint8_t MOTOR_BR_DIR = 15;
+constexpr uint8_t MOTOR_BR_PWM = 16;
+
+// Motor Belakang Kiri (Back Left)
+constexpr uint8_t MOTOR_BL_DIR = 18;
+constexpr uint8_t MOTOR_BL_PWM = 17;
 
 // =====================================================================
 //  JUMLAH MOTOR
 // =====================================================================
-constexpr size_t MOTOR_COUNT = 2;
+constexpr size_t MOTOR_COUNT = 4;
 
 // =====================================================================
-//  PWM CONFIGURATION
+//  RPM LIMITS
 // =====================================================================
-constexpr int PWM_MAX        = 1023;
-constexpr int PWM_MIN        = -1023;
-constexpr int PWM_FREQUENCY  = 20000;   // Hz
-constexpr int PWM_RESOLUTION = 10;      // bit (2^10 = 1024)
+constexpr float RPM_MIN = -500.0f;
+constexpr float RPM_MAX = 500.0f;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void SetupMotors();
-void pwmMotor(char motorId, int pwmValue);
+void pwmMotor(int idMotor, int pwmValue);
 void motorStopAll();
 
 #endif // MOTOR_H

@@ -36,7 +36,7 @@ void setupProximity() {
 //  READ
 // =====================================================================
 
-bool readProximity(uint8_t index) {
+bool readProximity(char index) {
     if (index >= PROXIMITY_COUNT) {
         return false;
     }
