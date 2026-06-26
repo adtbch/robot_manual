@@ -26,10 +26,10 @@
  * Callback pengiriman ESP-NOW.
  * Mencatat error ke Serial jika paket gagal terkirim.
  *
- * @param mac    MAC address tujuan
- * @param status ESP_NOW_SEND_SUCCESS atau ESP_NOW_SEND_FAIL
+ * @param mac_addr MAC address tujuan
+ * @param status   ESP_NOW_SEND_SUCCESS atau ESP_NOW_SEND_FAIL
  */
-static void saat_espnow_terkirim(const esp_now_send_info_t *info, esp_now_send_status_t status) {
+static void saat_espnow_terkirim(const uint8_t *mac_addr, esp_now_send_status_t status) {
     if (status != ESP_NOW_SEND_SUCCESS) {
         // Serial.println("[ESP-NOW] Send FAILED");
     }
@@ -51,6 +51,7 @@ static void saat_espnow_terkirim(const esp_now_send_info_t *info, esp_now_send_s
 bool espnow_init() {
     // WiFi mode STA untuk ESP-NOW
     WiFi.mode(WIFI_STA);
+    Serial.println("Mac Address: " + WiFi.macAddress());
     WiFi.disconnect(false, false);
 
     // Set channel agar cocok dengan receiver
