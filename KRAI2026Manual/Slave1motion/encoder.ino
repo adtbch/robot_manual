@@ -74,8 +74,12 @@ static void setupExtEncoders() {
     static const uint8_t extPinA[EXT_ENCODER_COUNT] = {EXT_ENC_FR_A, EXT_ENC_FL_A, EXT_ENC_BR_A, EXT_ENC_BL_A};
     static const uint8_t extPinB[EXT_ENCODER_COUNT] = {EXT_ENC_FR_B, EXT_ENC_FL_B, EXT_ENC_BR_B, EXT_ENC_BL_B};
 
+    ESP32Encoder::useInternalWeakPullResistors = puType::up;
+
     for (int i = 0; i < EXT_ENCODER_COUNT; i++) {
         extEncoders[i].attachHalfQuad(extPinA[i], extPinB[i]);
+        // Aktifkan hardware glitch filter (maksimal 1023) untuk mencegah false count saat getar
+        extEncoders[i].setFilter(1023); 
         extEncoders[i].clearCount();
     }
 }

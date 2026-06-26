@@ -26,12 +26,12 @@ constexpr uint8_t MOTOR_FL_DIR = 3;
 constexpr uint8_t MOTOR_FL_PWM = 8;
 
 // Motor Belakang Kanan (Back Right)
-constexpr uint8_t MOTOR_BR_DIR = 15;
-constexpr uint8_t MOTOR_BR_PWM = 16;
+constexpr uint8_t MOTOR_BR_DIR = 16;
+constexpr uint8_t MOTOR_BR_PWM = 15;
 
 // Motor Belakang Kiri (Back Left)
-constexpr uint8_t MOTOR_BL_DIR = 18;
-constexpr uint8_t MOTOR_BL_PWM = 17;
+constexpr uint8_t MOTOR_BL_DIR = 17;
+constexpr uint8_t MOTOR_BL_PWM = 18;
 
 // =====================================================================
 //  JUMLAH MOTOR

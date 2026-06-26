@@ -1,264 +1,638 @@
-/*
- * =====================================================================
- * FILE    : autoTuner.ino
- * PERAN   : Auto-Tuner PID Motor (Step Response + Scoring)
- *           Metode: Multi-pass (COARSE -> FINE)
- *           Tuning: Kf -> Kp -> Ki (Kd diabaikan/0)
- * =====================================================================
- */
+// ============================================================
+// AUTO-TUNER for PID (3-Phase: Deadband -> Kf -> PI)
+// Adapted for Slave1motion with exact physical modelling
+// ============================================================
 
 #include "autoTuner.h"
-#include "motor.h"
-#include "encoder.h"
-#include "pid.h"
-#include "oled.h"
+#include <Preferences.h>
 
-namespace {
+// ============================================================
+// Internal constants
+// ============================================================
 
-enum class TuneState {
-    IDLE,
-    INIT_MOTOR,
-    FIND_KF_START,
-    FIND_KF_WAIT,
-    EVAL_START,
-    EVAL_RUN,
-    COOLDOWN,
+namespace AutoTunerNS {
+    constexpr uint32_t kPidTickMs = 40;
+    constexpr uint32_t kQuickLogThresholdMs = 200;
+    constexpr float kTargetRpm = AUTOTUNE_TARGET_RPM;
+    constexpr float kSteadyStateStartFraction = 0.60f;
+    constexpr float kBurstThreshold = 1.30f;
+    constexpr float kBestScoreInitial = 999999.0f;
+    constexpr float kBestScoreSavedCutoff = 999998.0f;
+    constexpr float kSteadyStateMinSamples = 10.0f;
+
+    // Measurement phases
+    constexpr uint32_t DEADBAND_STEP_MS = 20;
+    constexpr float KF_PWM_FRACTION = 0.5f;
+    constexpr uint32_t KF_RUN_MS = 2000;
+    constexpr float KF_MIN_RPM = 10.0f;
+
+    constexpr float HIGH_OVERSHOOT_PCT = 10.0f;
+    constexpr float MEDIUM_OVERSHOOT_PCT = 5.0f;
+    constexpr float LOW_OVERSHOOT_PCT = 3.0f;
+    constexpr uint32_t SLOW_RISE_MS = 3000UL;
+    constexpr uint32_t MEDIUM_RISE_MS = 1500UL;
+    constexpr float AVG_ERR_EXCELLENT = 1.5f;
+    constexpr float AVG_ERR_GOOD = 3.0f;
+    constexpr float EXCELLENT_SCORE = 20.0f;
+    constexpr float GOOD_SCORE = 35.0f;
+
+    constexpr float W_ERROR = 10.0f;
+    constexpr float W_OVERSHOOT = 5.0f;
+    constexpr float W_RISE_TIME = 0.05f;
+    constexpr float W_STABILITY = 5.0f;
+    constexpr float W_BURST = 0.6f;
+
+    constexpr float KP_COARSE = 5.0f, KP_FINE = 1.0f, KP_ULTRA = 0.3f;
+    constexpr float KI_COARSE = 1.2f, KI_FINE = 0.8f, KI_ULTRA = 0.4f;
+    constexpr int STAGE_COARSE_CYCLES = 6;
+    constexpr int STAGE_FINE_CYCLES = 5;
+    constexpr int STAGNATION_LIMIT = 3;
+}
+
+enum class Precision : uint8_t { COARSE = 0, FINE, ULTRA_FINE };
+
+struct CycleMetrics {
+    float total_err;
+    int samples;
+    float peak_rpm;
+    bool rise_10_done, rise_90_done;
+    uint32_t rise_10_t, rise_time_ms;
+    bool burst_detected;
+    float burst_rpm;
+    uint32_t burst_t_ms;
+    float ss_mean, ss_M2;
+    int ss_samples;
+
+    void reset() {
+        total_err = 0.0f; samples = 0; peak_rpm = 0.0f;
+        rise_10_done = false; rise_90_done = false;
+        rise_10_t = 0; rise_time_ms = 0;
+        burst_detected = false; burst_rpm = 0.0f; burst_t_ms = 0;
+        ss_mean = 0.0f; ss_M2 = 0.0f; ss_samples = 0;
+    }
+
+    float avg_err() const { return (samples > 0) ? total_err / samples : 0.0f; }
+    float overshoot_pct() const {
+        float over = peak_rpm - AutoTunerNS::kTargetRpm;
+        return (over > 0.0f) ? (over / AutoTunerNS::kTargetRpm * 100.0f) : 0.0f;
+    }
+    float ss_variance() const { return (ss_samples > 1) ? ss_M2 / ss_samples : 0.0f; }
+    float ss_error() const { return fabsf(ss_mean - AutoTunerNS::kTargetRpm); }
+};
+
+enum class ATState : uint8_t {
+    IDLE = 0,
+    WAIT_RELEASE,
+    MOTOR_INIT,
+    DEADBAND_START,
+    DEADBAND_WAIT,
+    KF_START,
+    KF_WAIT,
+    CYCLE_START,
+    CYCLE_RUN,
+    CYCLE_FINISH,
+    CYCLE_COOLDOWN,
+    MOTOR_SHOW,
     DONE,
-    ERROR_WAIT
 };
 
-enum class PassLevel {
-    COARSE_KP,
-    FINE_KP,
-    COARSE_KI,
-    FINE_KI,
-    FINISHED
-};
+static ATState state = ATState::IDLE;
+static int tMotorIdx = 0;
+static int targetMotor = -1;
+static bool singleMode = false;
+static bool aborted = false;
+static bool oledDrawn = false;
 
-TuneState state = TuneState::IDLE;
-PassLevel currentPass = PassLevel::COARSE_KP;
+static float curKp, curKi, baseKf, baseDeadband;
+static float bestKp, bestKi;
+static float bestScore, currentScore;
 
-int tMotorIdx = -1;
+static uint32_t stateStartMs = 0;
+static uint32_t lastPidTickMs = 0;
+static uint32_t lastOledMs = 0;
+static int cycleCount = 0;
 
-// Konstanta uji
-constexpr float TUNE_TARGET_RPM = 200.0f;
-constexpr uint32_t TUNE_RUN_MS = 1500;
-constexpr uint32_t TUNE_COOLDOWN_MS = 500;
+static int deadbandPwm = 0;
+static uint32_t lastDeadbandStepMs = 0;
 
-// Parameter pencarian
-float testVal = 0.0f;
-float testMin = 0.0f;
-float testMax = 0.0f;
-float testStep = 0.0f;
+static CycleMetrics metrics;
+static Precision precision = Precision::COARSE;
+static float kpStep, kiStep;
+static int stageCount = 0;
+static int noImprove = 0;
 
-// Hasil terbaik
-float bestKp = 0.0f, bestKi = 0.0f, baseKf = 0.0f;
-float bestScore = 999999.0f;
-float currentScore = 0.0f;
+// ============================================================
+// Precision stage management
+// ============================================================
 
-// Variabel Loop
-uint32_t stateStartMs = 0;
-bool isSettled = false;
-uint32_t settleTimeMs = 0;
+static void precisionInit() {
+    precision = Precision::COARSE;
+    kpStep = AutoTunerNS::KP_COARSE;
+    kiStep = AutoTunerNS::KI_COARSE;
+    stageCount = 0;
+    noImprove = 0;
+}
 
-// Fungsi helper setup range
-void setupPass(PassLevel level) {
-    currentPass = level;
-    bestScore = 999999.0f; // Reset skor tiap pass
-    
-    if (level == PassLevel::COARSE_KP) {
-        testMin = 0.1f; testMax = 3.0f; testStep = 0.3f; testVal = testMin;
-    } else if (level == PassLevel::FINE_KP) {
-        testMin = max(0.01f, bestKp - 0.3f); testMax = bestKp + 0.3f; testStep = 0.05f; testVal = testMin;
-    } else if (level == PassLevel::COARSE_KI) {
-        testMin = 0.01f; testMax = 0.5f; testStep = 0.05f; testVal = testMin;
-    } else if (level == PassLevel::FINE_KI) {
-        testMin = max(0.001f, bestKi - 0.05f); testMax = bestKi + 0.05f; testStep = 0.01f; testVal = testMin;
+static void precisionAdvance() {
+    curKp = bestKp;
+    curKi = bestKi;
+    if (precision == Precision::COARSE) {
+        precision = Precision::FINE;
+        kpStep = AutoTunerNS::KP_FINE;
+        kiStep = AutoTunerNS::KI_FINE;
+    } else if (precision == Precision::FINE) {
+        precision = Precision::ULTRA_FINE;
+        kpStep = AutoTunerNS::KP_ULTRA;
+        kiStep = AutoTunerNS::KI_ULTRA;
+    }
+    stageCount = 0;
+    noImprove = 0;
+}
+
+static bool precisionShouldAdvance() {
+    stageCount++;
+    if (precision == Precision::ULTRA_FINE) return false;
+    if (currentScore < AutoTunerNS::EXCELLENT_SCORE) return true;
+    if (precision == Precision::COARSE && (stageCount >= AutoTunerNS::STAGE_COARSE_CYCLES || noImprove >= AutoTunerNS::STAGNATION_LIMIT)) return true;
+    if (precision == Precision::FINE && (stageCount >= AutoTunerNS::STAGE_FINE_CYCLES || noImprove >= AutoTunerNS::STAGNATION_LIMIT)) return true;
+    return false;
+}
+
+static const char* precisionName() {
+    if (precision == Precision::COARSE) return "COARSE";
+    if (precision == Precision::FINE) return "FINE";
+    return "ULTRA";
+}
+
+// ============================================================
+// Scoring function
+// ============================================================
+
+static float calculateScore() {
+    float avgErr = metrics.avg_err();
+    float over = metrics.overshoot_pct();
+    uint32_t rise = metrics.rise_time_ms;
+    float score = 0.0f;
+
+    score += avgErr * avgErr * AutoTunerNS::W_ERROR;
+
+    if (metrics.ss_samples >= (int)AutoTunerNS::kSteadyStateMinSamples) {
+        float ssErr = metrics.ss_error();
+        score += ssErr * ssErr * 18.0f;
+    }
+    if (metrics.ss_samples >= (int)AutoTunerNS::kSteadyStateMinSamples) {
+        float var = metrics.ss_variance();
+        score += var * 4.0f;
+        if (var < 1.0f) score -= 10.0f;
+    }
+
+    if (over > AutoTunerNS::HIGH_OVERSHOOT_PCT)
+        score += over * over * AutoTunerNS::W_OVERSHOOT * 2.0f;
+    else if (over > AutoTunerNS::MEDIUM_OVERSHOOT_PCT)
+        score += over * over * AutoTunerNS::W_OVERSHOOT;
+    else
+        score += over * AutoTunerNS::W_OVERSHOOT * 0.5f;
+
+    if (rise > AutoTunerNS::SLOW_RISE_MS)
+        score += (float)(rise - AutoTunerNS::SLOW_RISE_MS) * AutoTunerNS::W_RISE_TIME * 1.5f;
+    else if (rise > AutoTunerNS::MEDIUM_RISE_MS)
+        score += (float)(rise - AutoTunerNS::MEDIUM_RISE_MS) * AutoTunerNS::W_RISE_TIME;
+
+    if (metrics.samples > 50) {
+        if (avgErr < AutoTunerNS::AVG_ERR_EXCELLENT) score -= 8.0f * AutoTunerNS::W_STABILITY;
+        else if (avgErr < AutoTunerNS::AVG_ERR_GOOD) score -= 4.0f * AutoTunerNS::W_STABILITY;
+    }
+
+    if (rise < AutoTunerNS::MEDIUM_RISE_MS && over < AutoTunerNS::MEDIUM_OVERSHOOT_PCT && avgErr < 2.5f)
+        score -= 15.0f;
+    else if (rise < AutoTunerNS::SLOW_RISE_MS && over < AutoTunerNS::HIGH_OVERSHOOT_PCT && avgErr < 4.0f)
+        score -= 8.0f;
+
+    if (curKp < KP_MIN || curKp > KP_MAX) score += 20.0f;
+    if (curKi < KI_MIN || curKi > KI_MAX) score += 15.0f;
+
+    if (metrics.burst_detected) {
+        float burstOver = ((metrics.burst_rpm - AutoTunerNS::kTargetRpm) / AutoTunerNS::kTargetRpm) * 100.0f;
+        if (burstOver > 30.0f) score += burstOver * AutoTunerNS::W_BURST;
+    }
+
+    return fmaxf(0.0f, score);
+}
+
+// ============================================================
+// Parameter adjustment (Only Kp and Ki, Kf is fixed open-loop)
+// ============================================================
+
+static void adjustCoarse() {
+    float over = metrics.overshoot_pct();
+    float err = metrics.avg_err();
+    uint32_t rt = metrics.rise_time_ms;
+
+    float stepScale = 1.0f;
+    if (currentScore < AutoTunerNS::EXCELLENT_SCORE) stepScale = 0.2f;
+    else if (currentScore < AutoTunerNS::GOOD_SCORE) stepScale = 0.5f;
+
+    if (over > AutoTunerNS::HIGH_OVERSHOOT_PCT) {
+        curKp *= (1.0f - 0.25f * stepScale);
+        curKi *= (1.0f - 0.10f * stepScale);
+    } else if (rt > AutoTunerNS::SLOW_RISE_MS) {
+        curKp *= (1.0f + 0.40f * stepScale);
+        curKi *= (1.0f + 0.20f * stepScale);
+    } else if (err > 5.0f) {
+        curKi *= (1.0f + 0.50f * stepScale);
+    } else if (over > AutoTunerNS::MEDIUM_OVERSHOOT_PCT && rt < AutoTunerNS::MEDIUM_RISE_MS) {
+        curKp *= (1.0f - 0.05f * stepScale);
+        curKi *= (1.0f - 0.05f * stepScale);
+    } else if (metrics.burst_detected) {
+        curKp *= (1.0f - 0.30f * stepScale);
+        curKi *= (1.0f - 0.20f * stepScale);
+    } else {
+        if (noImprove == 0) curKi += kiStep * 0.5f * stepScale;
+        else curKi *= (1.0f - 0.10f * stepScale);
     }
 }
 
-// Fungsi Scoring
-void updateScore(float rpm, uint32_t elapsed) {
-    float err = TUNE_TARGET_RPM - rpm;
-    float absErr = fabsf(err);
-    
-    // IAE (Integral Absolute Error)
-    currentScore += absErr * 0.04f;
+static void adjustFine() {
+    float over = metrics.overshoot_pct();
+    float err = metrics.avg_err();
+    uint32_t rt = metrics.rise_time_ms;
 
-    // Overshoot penalty
-    if (err < -5.0f) {
-        currentScore += fabsf(err) * 3.0f; // Penalti berat jika melampaui target
-    }
+    float stepScale = 1.0f;
+    if (currentScore < AutoTunerNS::EXCELLENT_SCORE) stepScale = 0.2f;
+    else if (currentScore < AutoTunerNS::GOOD_SCORE) stepScale = 0.5f;
 
-    // Settling time: dianggap stabil jika masuk range +- 5% (10 RPM)
-    if (!isSettled && absErr <= 10.0f && elapsed > 200) {
-        isSettled = true;
-        settleTimeMs = elapsed;
+    if (over > AutoTunerNS::MEDIUM_OVERSHOOT_PCT) {
+        curKp -= kpStep * stepScale;
+    } else if (over < AutoTunerNS::LOW_OVERSHOOT_PCT && err < 3.0f && rt < AutoTunerNS::MEDIUM_RISE_MS) {
+        curKi += kiStep * 0.8f * stepScale;
+    } else if (err > 3.0f) {
+        curKi += kiStep * 1.2f * stepScale;
+    } else if (rt > AutoTunerNS::MEDIUM_RISE_MS) {
+        curKp += kpStep * 0.8f * stepScale;
     }
 }
 
-// Draw to OLED (Progress)
-void drawProgress(const char* passName, float val, float rpm, int prog, int total) {
-    char buf1[30];
-    char buf2[30];
-    snprintf(buf1, sizeof(buf1), "%s: %.2f", passName, val);
-    snprintf(buf2, sizeof(buf2), "RPM:%d [%d/%d]", (int)rpm, prog, total);
-    oledShowStatus(buf1, buf2);
+static void adjustUltraFine() {
+    float over = metrics.overshoot_pct();
+    float err = metrics.avg_err();
+    uint32_t rt = metrics.rise_time_ms;
+
+    float stepScale = 1.0f;
+    if (currentScore < AutoTunerNS::EXCELLENT_SCORE) stepScale = 0.2f;
+    else if (currentScore < AutoTunerNS::GOOD_SCORE) stepScale = 0.5f;
+
+    if (over > 5.0f) {
+        curKp -= kpStep * 0.6f * stepScale;
+    } else if (err > 2.0f) {
+        curKi += kiStep * 0.8f * stepScale;
+    } else if (rt > AutoTunerNS::MEDIUM_RISE_MS + 500) {
+        curKp += kpStep * 0.5f * stepScale;
+    } else {
+        switch (cycleCount % 3) {
+            case 0: curKp += kpStep * 0.15f * stepScale; break;
+            case 1: curKp -= kpStep * 0.15f * stepScale; break;
+            case 2: curKi += kiStep * 0.2f * stepScale; break;
+        }
+    }
 }
 
-} // anonymous namespace
+static void adjustParameters() {
+    if (precisionShouldAdvance()) precisionAdvance();
+
+    switch (precision) {
+        case Precision::COARSE:     adjustCoarse();   break;
+        case Precision::FINE:       adjustFine();     break;
+        case Precision::ULTRA_FINE: adjustUltraFine(); break;
+    }
+
+    curKp = constrain(curKp, KP_MIN, KP_MAX);
+    curKi = constrain(curKi, KI_MIN, KI_MAX);
+}
+
+// ============================================================
+// Public API
+// ============================================================
 
 void startAutoTune(int motorIdx) {
-    if (motorIdx < 0 || motorIdx >= 4) return;
-    tMotorIdx = motorIdx;
-    state = TuneState::INIT_MOTOR;
-    Serial.printf("\n[AUTOTUNE] Motor %d - Start\n", motorIdx);
+    if (motorIdx < 0 || motorIdx >= (int)MOTOR_COUNT) return;
+    targetMotor = motorIdx;
+    singleMode = true;
+    state = ATState::WAIT_RELEASE;
+    Serial.printf("\n[AUTOTUNE] Start Motor %d\n", motorIdx);
 }
 
-bool isAutoTunerRunning() { return state != TuneState::IDLE; }
+void startAutoTuneAll() {
+    targetMotor = 0;
+    singleMode = false;
+    state = ATState::WAIT_RELEASE;
+    Serial.println("\n[AUTOTUNE] Start All Motors");
+}
 
-void autoTunerTick() {
-    if (state == TuneState::IDLE) return;
+void autoTunerAbort() {
+    aborted = true;
+    state = ATState::DONE;
+}
+
+bool isAutoTunerRunning() {
+    return state != ATState::IDLE;
+}
+
+// ============================================================
+// State machine
+// ============================================================
+
+void autoTunerTick(bool bootPressed) {
+    if (state == ATState::IDLE) return;
     uint32_t now = millis();
 
     switch (state) {
-        case TuneState::INIT_MOTOR:
+
+    case ATState::WAIT_RELEASE:
+        if (!bootPressed) {
+            aborted = false;
+            oledDrawn = false;
             motorStopAll();
-            pidResetOne(tMotorIdx);
-            stateStartMs = now;
-            state = TuneState::FIND_KF_START;
-            break;
+            tMotorIdx = targetMotor;
+            state = ATState::MOTOR_INIT;
+        }
+        break;
 
-        case TuneState::FIND_KF_START:
-            Serial.println("[AUTOTUNE] Step 1: Cari Kf (Open Loop)");
-            drawProgress("FIND_KF", 0, 0, 0, 1);
-            pwmMotor(tMotorIdx, PWM_MAX / 2); // Gas 50%
-            stateStartMs = now;
-            state = TuneState::FIND_KF_WAIT;
-            break;
+    case ATState::MOTOR_INIT: {
+        if (bootPressed) { motorStopAll(); aborted = true; state = ATState::DONE; break; }
 
-        case TuneState::FIND_KF_WAIT:
-            if (now - stateStartMs > 1000) {
-                float maxRpm = getEncoderVelocityRpm(tMotorIdx);
-                pwmMotor(tMotorIdx, 0);
-                
-                if (maxRpm < 10.0f) {
-                    Serial.println("[AUTOTUNE] ERROR: RPM terlalu kecil (Encoder slip?)");
-                    extern void oledShowStatus(const char*, const char*);
-                    oledShowStatus("ERROR TUNE", "RPM < 10 !!");
-                    stateStartMs = now;
-                    state = TuneState::ERROR_WAIT;
-                    return;
-                }
-                baseKf = (PWM_MAX / 2.0f) / maxRpm;
-                Serial.printf("[AUTOTUNE] Kf base = %.3f\n", baseKf);
-                
-                setupPass(PassLevel::COARSE_KP);
-                stateStartMs = now;
-                state = TuneState::COOLDOWN;
-            }
-            break;
+        float kpid, kid, kfd, deadp;
+        pidLoadFromNVS(tMotorIdx, kpid, kid, kfd, deadp);
 
-        case TuneState::ERROR_WAIT:
-            // Tahan layar error selama 3 detik
-            if (now - stateStartMs > 3000) {
-                state = TuneState::IDLE;
-            }
-            break;
-
-        case TuneState::COOLDOWN:
-            if (now - stateStartMs > TUNE_COOLDOWN_MS) {
-                if (currentPass == PassLevel::FINISHED) state = TuneState::DONE;
-                else state = TuneState::EVAL_START;
-            }
-            break;
-
-        case TuneState::EVAL_START: {
-            currentScore = 0.0f;
-            isSettled = false;
-            settleTimeMs = TUNE_RUN_MS; // default max
-            
-            float kP = (currentPass == PassLevel::COARSE_KP || currentPass == PassLevel::FINE_KP) ? testVal : bestKp;
-            float kI = (currentPass == PassLevel::COARSE_KI || currentPass == PassLevel::FINE_KI) ? testVal : bestKi;
-            
-            pidSetGains(tMotorIdx, kP, kI, 0.0f, baseKf);
-            pidResetOne(tMotorIdx);
-            
-            Serial.printf("  Test Kp=%.2f Ki=%.3f ... ", kP, kI);
-            
-            stateStartMs = now;
-            state = TuneState::EVAL_RUN;
-            break;
+        bool isFirstTime = (fabsf(kpid - 0.1f) < 0.0001f);
+        if (isFirstTime) {
+            curKp = 1.0f;
+            curKi = 0.5f;
+            Serial.printf("AutoTuner M%d: First-time.\n", tMotorIdx);
+        } else {
+            curKp = kpid;
+            curKi = kid;
+            Serial.printf("AutoTuner M%d: Loaded Kp=%.2f Ki=%.3f\n", tMotorIdx, curKp, curKi);
         }
 
-        case TuneState::EVAL_RUN:
-            {
-                uint32_t elapsed = now - stateStartMs;
-                float rpm = getEncoderVelocityRpm(tMotorIdx);
-                
-                // Bypass Ramping di pid.ino (Tembak Step murni)
-                float dt = 0.04f; 
-                extern PIDState pidStates[];
-                int pOut = pidCompute(pidStates[tMotorIdx], TUNE_TARGET_RPM, rpm, dt);
-                pwmMotor(tMotorIdx, pOut);
-                
-                updateScore(rpm, elapsed);
-                
-                // Update OLED Progress
-                int prog = ((testVal - testMin) / testStep) + 1;
-                int total = ((testMax - testMin) / testStep) + 1;
-                const char* passName = 
-                    (currentPass == PassLevel::COARSE_KP) ? "COARSE Kp" :
-                    (currentPass == PassLevel::FINE_KP) ? "FINE Kp" :
-                    (currentPass == PassLevel::COARSE_KI) ? "COARSE Ki" : "FINE Ki";
-                    
-                drawProgress(passName, testVal, rpm, prog, total);
-            }
+        bestKp = curKp;
+        bestKi = curKi;
+        bestScore = AutoTunerNS::kBestScoreInitial;
+        cycleCount = 0;
+        baseKf = 0.0f;
+        baseDeadband = 0.0f;
 
-            if (now - stateStartMs > TUNE_RUN_MS) {
-                pwmMotor(tMotorIdx, 0); // Stop
+        precisionInit();
+        pidResetOne(tMotorIdx);
+        
+        char buf1[20]; snprintf(buf1, sizeof(buf1), "M%d DEADBAND", tMotorIdx);
+        oledShowStatus(buf1, "Finding Friction...");
+        Serial.printf("[AUTOTUNE] Step 1: Finding Deadband (Friction) M%d\n", tMotorIdx);
+        
+        deadbandPwm = 0;
+        lastDeadbandStepMs = now;
+        stateStartMs = now;
+        state = ATState::DEADBAND_START;
+        break;
+    }
+
+    // ---------------------------------------------------------
+    // Phase 1: DEADBAND (Friction Offset)
+    // ---------------------------------------------------------
+    case ATState::DEADBAND_START:
+        pwmMotor(tMotorIdx, 0);
+        state = ATState::DEADBAND_WAIT;
+        break;
+
+    case ATState::DEADBAND_WAIT: {
+        if (bootPressed) { motorStopAll(); aborted = true; state = ATState::DONE; break; }
+
+        if (now - lastDeadbandStepMs >= AutoTunerNS::DEADBAND_STEP_MS) {
+            lastDeadbandStepMs = now;
+            deadbandPwm += 1;
+            pwmMotor(tMotorIdx, deadbandPwm);
+
+            float rpm = fabsf(getEncoderVelocityRpm(tMotorIdx));
+            
+            // If motor starts spinning
+            if (rpm >= 2.0f) {
+                baseDeadband = (float)deadbandPwm;
+                pwmMotor(tMotorIdx, 0);
+                Serial.printf("[AUTOTUNE] Deadband found: PWM %d (RPM=%.1f)\n", deadbandPwm, rpm);
                 
-                // Tambah penalti untuk settling time yang lama
-                currentScore += (settleTimeMs / 100.0f) * 2.0f;
+                char buf1[20], buf2[20];
+                snprintf(buf1, sizeof(buf1), "M%d KF OPEN", tMotorIdx);
+                snprintf(buf2, sizeof(buf2), "DB: %.0f", baseDeadband);
+                oledShowStatus(buf1, buf2);
                 
-                Serial.printf("Score: %.1f (Settle: %d ms)\n", currentScore, settleTimeMs);
-                
-                if (currentScore < bestScore) {
-                    bestScore = currentScore;
-                    if (currentPass == PassLevel::COARSE_KP || currentPass == PassLevel::FINE_KP) bestKp = testVal;
-                    if (currentPass == PassLevel::COARSE_KI || currentPass == PassLevel::FINE_KI) bestKi = testVal;
-                }
-                
-                testVal += testStep;
-                
-                // Lanjut next test atau pindah Pass
-                if (testVal > testMax + 0.001f) {
-                    Serial.printf(">> Best Pass: Kp=%.2f Ki=%.2f\n", bestKp, bestKi);
-                    if (currentPass == PassLevel::COARSE_KP) setupPass(PassLevel::FINE_KP);
-                    else if (currentPass == PassLevel::FINE_KP) setupPass(PassLevel::COARSE_KI);
-                    else if (currentPass == PassLevel::COARSE_KI) setupPass(PassLevel::FINE_KI);
-                    else setupPass(PassLevel::FINISHED);
-                }
-                
+                delay(500); // let motor stop
+                stateStartMs = millis();
+                state = ATState::KF_START;
+            } else if (deadbandPwm > 300) {
+                // Failsafe
+                baseDeadband = 0.0f;
+                pwmMotor(tMotorIdx, 0);
+                Serial.println("[AUTOTUNE] ERROR: Deadband not found up to PWM 300!");
+                delay(500);
+                stateStartMs = millis();
+                state = ATState::KF_START;
+            }
+        }
+        break;
+    }
+
+    // ---------------------------------------------------------
+    // Phase 2: KF (Open-loop linear slope)
+    // ---------------------------------------------------------
+    case ATState::KF_START: {
+        if (bootPressed) { motorStopAll(); aborted = true; state = ATState::DONE; break; }
+
+        int pwmHalf = (int)(PWM_MAX * AutoTunerNS::KF_PWM_FRACTION);
+        pwmMotor(tMotorIdx, pwmHalf);
+        stateStartMs = now;
+        state = ATState::KF_WAIT;
+        break;
+    }
+
+    case ATState::KF_WAIT: {
+        if (bootPressed) { motorStopAll(); aborted = true; state = ATState::DONE; break; }
+
+        if (now - stateStartMs > AutoTunerNS::KF_RUN_MS) {
+            float rawRpm = getEncoderVelocityRpm(tMotorIdx);
+            float absRpm = fabsf(rawRpm);
+            pwmMotor(tMotorIdx, 0);
+
+            if (absRpm < AutoTunerNS::KF_MIN_RPM) {
+                Serial.println("[AUTOTUNE] ERROR: RPM < 10 — encoder slip?");
+                oledShowStatus("ERROR TUNE", "Encoder slip?");
                 stateStartMs = now;
-                state = TuneState::COOLDOWN;
+                state = ATState::DONE;
+                break;
             }
-            break;
 
-        case TuneState::DONE:
-            Serial.println("\n[AUTOTUNE] FINAL RESULT:");
-            Serial.printf("Motor %d -> Kp: %.2f | Ki: %.3f | Kd: 0.00 | Kf: %.3f\n", 
-                           tMotorIdx, bestKp, bestKi, baseKf);
-                           
-            // Save & Terapkan
-            pidSaveToNVS(tMotorIdx, bestKp, bestKi, 0.0f, baseKf);
-            pidSetGains(tMotorIdx, bestKp, bestKi, 0.0f, baseKf);
+            int pwmHalf = (int)(PWM_MAX * AutoTunerNS::KF_PWM_FRACTION);
+            // Kf = (PWM - Deadband) / RPM
+            baseKf = ((float)pwmHalf - baseDeadband) / absRpm;
+            baseKf = fmaxf(0.0f, baseKf); // Safety
             
-            char buf[30];
-            snprintf(buf, sizeof(buf), "M%d TUNED!", tMotorIdx);
-            oledShowStatus("DONE!", buf);
-            
-            state = TuneState::IDLE;
-            break;
+            Serial.printf("[AUTOTUNE] Kf = %.4f (from %d PWM, %.0f DB, %.0f RPM)\n", 
+                          baseKf, pwmHalf, baseDeadband, absRpm);
+
+            delay(1000); // let motor stop completely
+            stateStartMs = millis();
+            state = ATState::CYCLE_START;
+        }
+        break;
+    }
+
+    // ---------------------------------------------------------
+    // Phase 3: PID TUNING (Kp, Ki)
+    // ---------------------------------------------------------
+    case ATState::CYCLE_START:
+        if (bootPressed) { motorStopAll(); aborted = true; state = ATState::DONE; break; }
+
+        pidSetGains(tMotorIdx, curKp, curKi, baseKf, baseDeadband);
+        pidResetOne(tMotorIdx);
+        metrics.reset();
+        stateStartMs = now;
+        lastPidTickMs = now;
+        state = ATState::CYCLE_RUN;
+        break;
+
+    case ATState::CYCLE_RUN: {
+        if (bootPressed) { motorStopAll(); aborted = true; state = ATState::DONE; break; }
+
+        uint32_t elapsed = now - stateStartMs;
+
+        if (now - lastPidTickMs >= AutoTunerNS::kPidTickMs) {
+            lastPidTickMs = now;
+            convertEncoderToRPM();
+
+            float rpm = getEncoderVelocityRpm(tMotorIdx);
+            int pwm = pidCompute(tMotorIdx, AutoTunerNS::kTargetRpm, AutoTunerNS::kPidTickMs / 1000.0f);
+            pwmMotor(tMotorIdx, pwm);
+
+            // Metrics
+            if (rpm > metrics.peak_rpm) metrics.peak_rpm = rpm;
+            metrics.total_err += fabsf(rpm - AutoTunerNS::kTargetRpm);
+            metrics.samples++;
+
+            if (!metrics.rise_10_done && rpm >= AutoTunerNS::kTargetRpm * 0.10f) {
+                metrics.rise_10_t = now;
+                metrics.rise_10_done = true;
+            }
+            if (metrics.rise_10_done && !metrics.rise_90_done && rpm >= AutoTunerNS::kTargetRpm * 0.90f) {
+                metrics.rise_time_ms = now - metrics.rise_10_t;
+                metrics.rise_90_done = true;
+            }
+
+            if (!metrics.burst_detected && elapsed < 500 && rpm > AutoTunerNS::kTargetRpm * AutoTunerNS::kBurstThreshold) {
+                metrics.burst_detected = true;
+                metrics.burst_rpm = rpm;
+                metrics.burst_t_ms = elapsed;
+            }
+
+            if (elapsed >= (uint32_t)(AUTOTUNE_RUN_MS * AutoTunerNS::kSteadyStateStartFraction)) {
+                metrics.ss_samples++;
+                float delta = rpm - metrics.ss_mean;
+                metrics.ss_mean += delta / metrics.ss_samples;
+                float delta2 = rpm - metrics.ss_mean;
+                metrics.ss_M2 += delta * delta2;
+            }
+
+            if (now - lastOledMs >= AutoTunerNS::kQuickLogThresholdMs) {
+                lastOledMs = now;
+                char buf1[20], buf2[20];
+                snprintf(buf1, sizeof(buf1), "M%d %s %d%%", tMotorIdx, precisionName(), (int)(elapsed * 100 / AUTOTUNE_RUN_MS));
+                snprintf(buf2, sizeof(buf2), "T:%.0f C:%.0f", AutoTunerNS::kTargetRpm, rpm);
+                oledShowStatus(buf1, buf2);
+            }
+        }
+
+        if (elapsed >= AUTOTUNE_RUN_MS) {
+            motorStopAll();
+            pidResetOne(tMotorIdx);
+            state = ATState::CYCLE_FINISH;
+        }
+        break;
+    }
+
+    case ATState::CYCLE_FINISH: {
+        float score = calculateScore();
+        currentScore = score;
+
+        if (score < bestScore) {
+            bestScore = score;
+            bestKp = curKp;
+            bestKi = curKi;
+            noImprove = 0;
+            Serial.printf("  + Score: %.1f (new best) Kp=%.2f Ki=%.3f\n", score, curKp, curKi);
+        } else {
+            noImprove++;
+            curKp = bestKp;
+            curKi = bestKi;
+            Serial.printf("  - Score: %.1f -> rollback Kp=%.2f Ki=%.3f\n", score, bestKp, bestKi);
+        }
+
+        adjustParameters();
+        cycleCount++;
+
+        if (cycleCount >= AUTOTUNE_MAX_CYCLES) {
+            pidSetGains(tMotorIdx, bestKp, bestKi, baseKf, baseDeadband);
+            pidSaveToNVS(tMotorIdx, bestKp, bestKi, baseKf, baseDeadband);
+
+            char buf1[20], buf2[20];
+            snprintf(buf1, sizeof(buf1), "M%d DONE", tMotorIdx);
+            snprintf(buf2, sizeof(buf2), "Kp:%.1f Ki:%.2f", bestKp, bestKi);
+            oledShowStatus(buf1, buf2);
+            Serial.printf("Motor %d DONE - Kp: %.2f, Ki: %.3f, Kf: %.4f, DB: %.0f\n", 
+                          tMotorIdx, bestKp, bestKi, baseKf, baseDeadband);
+
+            stateStartMs = now;
+            state = ATState::MOTOR_SHOW;
+        } else {
+            stateStartMs = now;
+            state = ATState::CYCLE_COOLDOWN;
+        }
+        break;
+    }
+
+    case ATState::CYCLE_COOLDOWN:
+        if (bootPressed) { motorStopAll(); aborted = true; state = ATState::DONE; break; }
+        if (now - stateStartMs >= AUTOTUNE_COOLDOWN_MS)
+            state = ATState::CYCLE_START;
+        break;
+
+    case ATState::MOTOR_SHOW:
+        if (bootPressed || (now - stateStartMs >= AUTOTUNE_SHOW_MS)) {
+            if (singleMode) {
+                state = ATState::DONE;
+            } else {
+                tMotorIdx++;
+                if (tMotorIdx >= (int)MOTOR_COUNT) {
+                    state = ATState::DONE;
+                } else {
+                    state = ATState::MOTOR_INIT;
+                }
+            }
+        }
+        break;
+
+    case ATState::DONE:
+        motorStopAll();
+        if (!oledDrawn) {
+            if (aborted) {
+                oledShowStatus("ABORTED", "Cancelled");
+                Serial.println("AUTOTUNE: Aborted");
+            } else {
+                oledShowStatus("ALL DONE", "Check Serial");
+                Serial.println("=== AUTOTUNE COMPLETE ===");
+                pidReloadFromNVS();
+            }
+            oledDrawn = true;
+        }
+        singleMode = false;
+        targetMotor = -1;
+        state = ATState::IDLE;
+        break;
     }
 }

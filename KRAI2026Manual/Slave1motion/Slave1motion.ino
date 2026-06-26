@@ -18,6 +18,8 @@
 #include "button.h"
 #include "ota.h"
 #include "autoTuner.h"
+#include <WebServer.h>
+#include "webconfig.h"
 #include <Wire.h>
 
 // =====================================================================
@@ -39,16 +41,17 @@ void setup() {
     // Init WiFi + OTA
     setupOTA();
 
+    // Init Web Server (runs on core 0)
+    setupWebServer();
+
     // Init I2C
     Wire.begin(I2C_SDA, I2C_SCL);
-    Wire.setTimeOut(100);
+    Wire.setTimeOut(100);  // Timeout 100ms agar I2C tidak hang jika bus error
     Wire.setClock(400000);
 
     // Init OLED
     if (!setupOLED()) {
         Serial.println("OLED: not ready");
-    } else {
-        Serial.println("OLED: READY");
     }
 
     // Init motors
@@ -82,7 +85,7 @@ void setup() {
 void loop() {
     // Handle OTA update (WiFi)
     handleOTA();
-
+    
     // Baca perintah USB Serial (Tuning PID)
     parseSerialCommand();
 
@@ -92,11 +95,11 @@ void loop() {
     // Tombol tahan 3 detik -> trigger auto-tune
     if (isButtonLongPressed() && !isAutoTunerRunning()) {
         Serial.println("\n[AUTOTUNE] Button Long Press -> Starting!");
-        startAutoTune(0); // Mulai tuning motor 0
+        startAutoTuneAll();
     }
 
     // Jalankan Auto-Tuner (kalau sedang aktif)
-    autoTunerTick();
+    autoTunerTick(isButtonLongHolding());
 
     // Relay WSN-31 → Master
     serialRelayTick();

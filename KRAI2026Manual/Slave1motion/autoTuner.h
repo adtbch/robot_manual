@@ -1,8 +1,7 @@
 /*
  * =====================================================================
  * FILE    : autoTuner.h
- * PERAN   : Auto-Tuner PID (Step Response + Scoring).
- *           Mencari Kf, lalu Kp, lalu Ki terbaik secara otomatis.
+ * PERAN   : Auto-Tuner PID (3-Phase: Deadband -> Kf -> PI).
  *
  * BOARD   : ESP32-S3 (Slave1 Motion)
  * =====================================================================
@@ -13,11 +12,10 @@
 
 #include "config.h"
 
-// =====================================================================
-//  SHARED FUNCTION DECLARATIONS
-// =====================================================================
 void startAutoTune(int motorIdx);
-void autoTunerTick();
+void startAutoTuneAll();
+void autoTunerAbort();
 bool isAutoTunerRunning();
+void autoTunerTick(bool bootPressed);
 
 #endif // AUTOTUNER_H

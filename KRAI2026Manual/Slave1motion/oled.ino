@@ -138,12 +138,27 @@ void drawDebugMode() {
 // =====================================================================
 
 bool setupOLED() {
-    if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
-        Serial.println("OLED: not found at 0x3C");
-        if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3D)) {
-            Serial.println("OLED: not found at 0x3D either");
-            return false;
+    // Probe I2C dulu tanpa spam NACK error
+    uint8_t foundAddr = 0;
+    Wire.beginTransmission(OLED_I2C_ADDR);
+    if (Wire.endTransmission() == 0) {
+        foundAddr = OLED_I2C_ADDR;
+    } else {
+        Wire.beginTransmission(0x3D);
+        if (Wire.endTransmission() == 0) {
+            foundAddr = 0x3D;
         }
+    }
+
+    if (foundAddr == 0) {
+        Serial.println("OLED: not found on I2C (0x3C & 0x3D)");
+        return false;
+    }
+
+    Serial.printf("OLED: found at 0x%02X\n", foundAddr);
+    if (!display.begin(SSD1306_SWITCHCAPVCC, foundAddr)) {
+        Serial.println("OLED: begin() failed");
+        return false;
     }
 
     display.clearDisplay();
@@ -171,10 +186,10 @@ void updateOLED() {
         display.println("AUTOTUNE");
         display.setTextSize(1);
         display.setCursor(0, 30);
-        display.println("Lepas tombol");
-        display.println("untuk memulai...");
+        display.println("Tahan 3 detik...");
+        display.println("Lepas utk mulai");
         display.display();
-        return; // Jangan gambar mode biasa
+        return;
     }
 
     // Jika autotuner sedang jalan, biarkan autotuner yang menggambar layar
