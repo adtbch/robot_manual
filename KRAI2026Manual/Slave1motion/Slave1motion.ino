@@ -83,8 +83,8 @@ void loop() {
     // Handle OTA update (WiFi)
     handleOTA();
 
-    // Baca perintah USB Serial (Tuning PID)
-    parseSerialCommand();
+    // Baca perintah USB Serial + UART master (rpm, tune, stop, ...)
+    serialCommandTick();
 
     // Update state button (debounce & durasi)
     updateButton();
