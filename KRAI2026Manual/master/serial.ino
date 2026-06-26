@@ -20,6 +20,7 @@
  *   encreset            - Reset semua encoder
  *   limit               - Baca semua limit switch
  *   prox                - Baca proximity sensor
+ *   gripper reset       - Reset auto gripper ke IDLE
  *   status              - Tampilkan semua status
  *   stop                - Stop semua motor + servo tengah
  *   help                - Tampilkan daftar command
@@ -74,12 +75,15 @@ void printHelp(Print& out) {
     out.println("--- Daftar Command ---");
     out.println("  motor <id> <pwm>  (contoh: motor x 500)");
     out.println("  motorstop        stop semua motor");
+    out.println("  motortarget <x|y> <enc>  set encoder target (alias: motorpid)");
+    out.println("  motortargetstop <x|y>    stop positioning (alias: motorpidstop)");
     out.println("  servo <id> <angle> (contoh: servo d 90)");
     out.println("  relay <on|off|t>  on/off/toggle");
     out.println("  enc               baca encoder");
     out.println("  encreset          reset encoder");
     out.println("  limit             baca limit switch");
     out.println("  prox              baca proximity");
+    out.println("  gripper <reset|homing>  reset atau homing gripper");
     out.println("  status            semua status");
     out.println("  stop              stop semua");
     out.println("  help              tampilkan ini");
@@ -110,6 +114,44 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
     else if (strcmp(token, "motorstop") == 0) {
         motorStopAll();
         out.println("Semua motor STOP");
+    }
+
+    // ── MOTORTARGET <id> <target> ───────────────────────────────
+    else if (strcmp(token, "motortarget") == 0 || strcmp(token, "motorpid") == 0) {
+        char* id = strtok(nullptr, " ");
+        char* val = strtok(nullptr, " ");
+        if (id != nullptr && val != nullptr) {
+            long target = atol(val);
+            if (id[0] == 'x') {
+                motorXSetTarget(target);
+                out.printf("Motor X target: %ld\n", target);
+            } else if (id[0] == 'y') {
+                motorYSetTarget(target);
+                out.printf("Motor Y target: %ld\n", target);
+            } else {
+                out.println("Usage: motortarget <x|y> <target>");
+            }
+        } else {
+            out.println("Usage: motortarget <x|y> <target>  (contoh: motortarget y 500)");
+        }
+    }
+
+    // ── MOTORTARGETSTOP <id> ────────────────────────────────────
+    else if (strcmp(token, "motortargetstop") == 0 || strcmp(token, "motorpidstop") == 0) {
+        char* id = strtok(nullptr, " ");
+        if (id != nullptr) {
+            if (id[0] == 'x') {
+                motorXStop();
+                out.println("Motor X STOP");
+            } else if (id[0] == 'y') {
+                motorYStop();
+                out.println("Motor Y STOP");
+            } else {
+                out.println("Usage: motortargetstop <x|y>");
+            }
+        } else {
+            out.println("Usage: motortargetstop <x|y>");
+        }
     }
 
     // ── SERVO <id> <angle> ─────────────────────────────────────
@@ -176,18 +218,31 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
                    readProximity() ? "DETECTED" : "clear");
     }
 
+    // ── GRIPPER ─────────────────────────────────────────────────
+    else if (strcmp(token, "gripper") == 0) {
+        char* sub = strtok(nullptr, " ");
+        if (sub != nullptr && strcmp(sub, "reset") == 0) {
+            gripperReset();
+            out.println("Gripper: RESET ke IDLE");
+        } else if (sub != nullptr && strcmp(sub, "homing") == 0) {
+            setServoHoming();
+            out.println("Gripper: HOMING (buka + lengan awal)");
+        } else {
+            out.println("Usage: gripper <reset|homing>");
+        }
+    }
+
     // ── STATUS ──────────────────────────────────────────────────
     else if (strcmp(token, "status") == 0) {
         out.println("=== STATUS ===");
         out.printf("  Relay   : %s\n", relayState() ? "ON" : "OFF");
         out.printf("  Prox    : %s\n", readProximity() ? "DETECTED" : "clear");
-        for (size_t i = 0; i < ENCODER_COUNT; i++) {
-            out.printf("  Enc%zu    : %ld\n", i + 1, getEncoderCount(i));
-        }
-        for (size_t i = 0; i < LIMIT_COUNT; i++) {
-            out.printf("  Lim%zu    : %s\n", i + 1,
-                       readLimitSwitch(i) ? "TRIGGERED" : "clear");
-        }
+        out.printf("  EncX    : %ld\n", getEncoderCount('x'));
+        out.printf("  EncY    : %ld\n", getEncoderCount('y'));
+        out.printf("  LimX1   : %s\n", readLimitSwitch(LIMIT_SWITCH_X1) ? "TRIGGERED" : "clear");
+        out.printf("  LimX2   : %s\n", readLimitSwitch(LIMIT_SWITCH_X2) ? "TRIGGERED" : "clear");
+        out.printf("  LimX3   : %s\n", readLimitSwitch(LIMIT_SWITCH_X3) ? "TRIGGERED" : "clear");
+        out.printf("  LimX4   : %s\n", readLimitSwitch(LIMIT_SWITCH_X4) ? "TRIGGERED" : "clear");
         out.println("==============");
     }
 

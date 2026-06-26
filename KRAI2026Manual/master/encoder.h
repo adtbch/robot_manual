@@ -15,11 +15,11 @@
 // =====================================================================
 //  PIN ENCODER — berdasarkan schematic KRAI 2026
 // =====================================================================
-// Encoder1 (axis X / motor1)
+// Encoder 'x' (axis X / motor1)
 constexpr uint8_t ENCODER1_PIN_A = 40;
 constexpr uint8_t ENCODER1_PIN_B = 39;
 
-// Encoder2 (axis Y / motor2)
+// Encoder 'y' (axis Y / motor2)
 constexpr uint8_t ENCODER2_PIN_A = 38;
 constexpr uint8_t ENCODER2_PIN_B = 37;
 

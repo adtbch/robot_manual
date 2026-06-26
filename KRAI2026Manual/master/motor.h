@@ -45,11 +45,37 @@ constexpr int PWM_MIN        = -1023;
 constexpr int PWM_FREQUENCY  = 20000;   // Hz
 constexpr int PWM_RESOLUTION = 10;      // bit (2^10 = 1024)
 
+// Encoder travel limits — sesuaikan setelah kalibrasi hardware
+constexpr long MOTOR_X_ENC_MIN = -2500;
+constexpr long MOTOR_X_ENC_MAX =  2500;
+constexpr long MOTOR_Y_ENC_MIN = -2500;
+constexpr long MOTOR_Y_ENC_MAX =  2500;
+
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void SetupMotors();
 void pwmMotor(char motorId, int pwmValue);
 void motorStopAll();
+
+// =====================================================================
+//  MOTOR X — encoder positioning
+// =====================================================================
+void motorXSetTarget(long targetEncoder);
+void motorXAdjustTarget(long deltaPulse);
+long motorXGetTarget();
+void motorXStop();
+bool motorXIsActive();
+void motorXPositionTick();
+
+// =====================================================================
+//  MOTOR Y — encoder positioning + hold anti-gravitasi di target
+// =====================================================================
+void motorYSetTarget(long targetEncoder);
+void motorYAdjustTarget(long deltaPulse);
+long motorYGetTarget();
+void motorYStop();
+bool motorYIsActive();
+void motorYPositionTick();
 
 #endif // MOTOR_H
