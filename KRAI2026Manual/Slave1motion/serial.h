@@ -38,5 +38,6 @@ constexpr uint32_t SERIAL_WSN_BAUD = 9600;
 // =====================================================================
 void setupSerial();
 void serialRelayTick();
+void parseSerialCommand();  // Parser USB Serial untuk tuning PID
 
 #endif // SERIAL_H

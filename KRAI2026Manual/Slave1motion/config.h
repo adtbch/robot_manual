@@ -29,21 +29,14 @@ static constexpr float KI_MIN = 0.0f;
 static constexpr float KI_MAX = 100.0f;
 static constexpr float KD_MIN = 0.0f;
 static constexpr float KD_MAX = 10.0f;
+static constexpr float KF_MIN = 0.0f;
+static constexpr float KF_MAX = 10.0f;
 
 // =====================================================================
 //  BOOT BUTTON
 // =====================================================================
 constexpr uint8_t BOOT_BUTTON_PIN = 0;
-
-// =====================================================================
-//  ROBOT PARAMETERS
-// =====================================================================
-constexpr float WHEEL_RADIUS_M = 0.0635f;     // meter
-constexpr int ENCODER_PPR = 270;              // pulses per revolution
-
-// Robot geometry (wheelbase)
-constexpr float ROBOT_LX = 0.1325f;           // setengah lebar (m)
-constexpr float ROBOT_LY = 0.0925f;           // setengah panjang (m)
+           // setengah panjang (m)
 
 // =====================================================================
 //  PWM CONFIGURATION
@@ -118,6 +111,7 @@ struct PIDState {
     float kp = 0.0f;
     float ki = 0.0f;
     float kd = 0.0f;
+    float kf = 0.0f;  // Feed-forward gain
     float integral = 0.0f;
     float lastError = 0.0f;
     float lastTime = 0.0f;

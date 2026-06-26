@@ -16,7 +16,6 @@
 
 namespace {
 
-PIDState pidStates[MOTOR_COUNT];
 float rpmTarget[MOTOR_COUNT] = {};
 
 constexpr const char* YAW_PID_NVS_NS = "yaw_pid";
@@ -26,40 +25,37 @@ constexpr float YAW_PID_DEFAULT_KD = 0.1f;
 
 } // anonymous namespace
 
+PIDState pidStates[MOTOR_COUNT];
 PIDState pidKinematicYaw;
 
 // =====================================================================
 //  NVS LOAD/SAVE — MOTOR PID
 // =====================================================================
 
-void pidLoadFromNVS(int motorIdx, float &kp, float &ki, float &kd) {
+void pidLoadFromNVS(int motorIdx, float &kp, float &ki, float &kd, float &kf) {
     if (motorIdx < 0 || (size_t)motorIdx >= MOTOR_COUNT) {
-        kp = 0.1f; ki = 0.0f; kd = 0.0f;
+        kp = 0.1f; ki = 0.0f; kd = 0.0f; kf = 0.0f;
         return;
     }
     Preferences prefs;
     prefs.begin(PID_NVS_NAMESPACE, true);
-    char keyKp[16], keyKi[16], keyKd[16];
-    snprintf(keyKp, sizeof(keyKp), "kp_%d", motorIdx);
-    snprintf(keyKi, sizeof(keyKi), "ki_%d", motorIdx);
-    snprintf(keyKd, sizeof(keyKd), "kd_%d", motorIdx);
-    kp = prefs.getFloat(keyKp, 0.1f);
-    ki = prefs.getFloat(keyKi, 0.0f);
-    kd = prefs.getFloat(keyKd, 0.0f);
+    char key[16];
+    snprintf(key, sizeof(key), "kp_%d", motorIdx); kp = prefs.getFloat(key, 0.1f);
+    snprintf(key, sizeof(key), "ki_%d", motorIdx); ki = prefs.getFloat(key, 0.0f);
+    snprintf(key, sizeof(key), "kd_%d", motorIdx); kd = prefs.getFloat(key, 0.0f);
+    snprintf(key, sizeof(key), "kf_%d", motorIdx); kf = prefs.getFloat(key, 0.0f);
     prefs.end();
 }
 
-void pidSaveToNVS(int motorIdx, float kp, float ki, float kd) {
+void pidSaveToNVS(int motorIdx, float kp, float ki, float kd, float kf) {
     if (motorIdx < 0 || (size_t)motorIdx >= MOTOR_COUNT) return;
     Preferences prefs;
     prefs.begin(PID_NVS_NAMESPACE, false);
-    char keyKp[16], keyKi[16], keyKd[16];
-    snprintf(keyKp, sizeof(keyKp), "kp_%d", motorIdx);
-    snprintf(keyKi, sizeof(keyKi), "ki_%d", motorIdx);
-    snprintf(keyKd, sizeof(keyKd), "kd_%d", motorIdx);
-    prefs.putFloat(keyKp, kp);
-    prefs.putFloat(keyKi, ki);
-    prefs.putFloat(keyKd, kd);
+    char key[16];
+    snprintf(key, sizeof(key), "kp_%d", motorIdx); prefs.putFloat(key, kp);
+    snprintf(key, sizeof(key), "ki_%d", motorIdx); prefs.putFloat(key, ki);
+    snprintf(key, sizeof(key), "kd_%d", motorIdx); prefs.putFloat(key, kd);
+    snprintf(key, sizeof(key), "kf_%d", motorIdx); prefs.putFloat(key, kf);
     prefs.end();
 }
 
@@ -102,7 +98,7 @@ void showYawPid() {
 
 void pidControllerInit() {
     for (size_t i = 0; i < MOTOR_COUNT; i++) {
-        pidLoadFromNVS(i, pidStates[i].kp, pidStates[i].ki, pidStates[i].kd);
+        pidLoadFromNVS(i, pidStates[i].kp, pidStates[i].ki, pidStates[i].kd, pidStates[i].kf);
         pidStates[i].reset();
     }
 }
@@ -111,11 +107,12 @@ void pidControllerInit() {
 //  PID GAINS
 // =====================================================================
 
-void pidSetGains(int motorIdx, float kp, float ki, float kd) {
+void pidSetGains(int motorIdx, float kp, float ki, float kd, float kf) {
     if (motorIdx < 0 || (size_t)motorIdx >= MOTOR_COUNT) return;
     pidStates[motorIdx].kp = constrain(kp, KP_MIN, KP_MAX);
     pidStates[motorIdx].ki = constrain(ki, KI_MIN, KI_MAX);
     pidStates[motorIdx].kd = constrain(kd, KD_MIN, KD_MAX);
+    pidStates[motorIdx].kf = constrain(kf, KF_MIN, KF_MAX);
 }
 
 void pidResetOne(int motorIdx) {
@@ -125,7 +122,7 @@ void pidResetOne(int motorIdx) {
 
 void pidReloadFromNVS() {
     for (size_t i = 0; i < MOTOR_COUNT; i++) {
-        pidLoadFromNVS(i, pidStates[i].kp, pidStates[i].ki, pidStates[i].kd);
+        pidLoadFromNVS(i, pidStates[i].kp, pidStates[i].ki, pidStates[i].kd, pidStates[i].kf);
         pidResetOne(i);
     }
 }
@@ -158,7 +155,10 @@ int pidCompute(PIDState &pid, float target, float current, float dt) {
         dOut = -pid.kd * (current - pid.lastError) / dt;
     }
 
-    float output = pOut + iOut + dOut;
+    // Feed-Forward
+    float ffOut = pid.kf * target;
+
+    float output = pOut + iOut + dOut + ffOut;
     int pwmOutput = (int)constrain(output, (float)PWM_MIN, (float)PWM_MAX);
 
     pid.lastError = current;
@@ -272,18 +272,4 @@ void rpmMotor(int rpm1, int rpm2, int rpm3, int rpm4) {
     pwmMotor(1, pFl);
     pwmMotor(2, pBr);
     pwmMotor(3, pBl);
-}
-
-void rpmMotorControl(int targetRPM0, int targetRPM1, int targetRPM2, int targetRPM3) {
-    static uint32_t lastTickMs = 0;
-    uint32_t nowMs = millis();
-    float dt = (lastTickMs > 0) ? (nowMs - lastTickMs) / 1000.0f : 0.04f;
-    lastTickMs = nowMs;
-    dt = constrain(dt, 0.01f, 0.1f);
-
-    int targets[4] = {targetRPM0, targetRPM1, targetRPM2, targetRPM3};
-    for (size_t i = 0; i < MOTOR_COUNT; i++) {
-        int pwmOut = pidCompute((int)i, (float)targets[i], dt);
-        pwmMotor((int)i, pwmOut);
-    }
 }

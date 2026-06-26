@@ -22,6 +22,9 @@ constexpr float PPR_RPM_FACTOR = 60000.0f / ENCODER_PPR;
 // External (PCNT)
 ESP32Encoder extEncoders[EXT_ENCODER_COUNT];
 
+// Odometry state (X-config omni wheels)
+int64_t prevExtCount[EXT_ENCODER_COUNT] = {0};
+
 inline int64_t readIntEncCount(int idx) {
     int64_t val;
     portENTER_CRITICAL(&intEncMux);
@@ -31,6 +34,11 @@ inline int64_t readIntEncCount(int idx) {
 }
 
 } // anonymous namespace
+
+// Odometry state — extern di encoder.h
+float odomX = 0.0f;        // meter
+float odomY = 0.0f;        // meter
+float odomTheta = 0.0f;    // derajat
 
 // =====================================================================
 //  INTERNAL (ISR)
@@ -119,9 +127,9 @@ float getEncoderVelocityRpm(int idx) {
     return motorVelocityRpm[idx];
 }
 
-float getEncoderVelocityRadS(int idx) {
-    return getEncoderVelocityRpm(idx) * RPM_TO_RAD_PER_SEC;
-}
+// =====================================================================
+//  EXTERNAL (PCNT) — ODOMETRY
+// =====================================================================
 
 int64_t getExtEncoderCount(int idx) {
     if (idx < 0 || idx >= EXT_ENCODER_COUNT) return 0;
@@ -133,29 +141,57 @@ void resetExtEncoderCount(int idx) {
     extEncoders[idx].clearCount();
 }
 
-float getEncoderYawRateRads() {
-    float vFR = getEncoderVelocityRadS(0) * WHEEL_RADIUS_M;
-    float vFL = getEncoderVelocityRadS(1) * WHEEL_RADIUS_M;
-    float vBR = getEncoderVelocityRadS(2) * WHEEL_RADIUS_M;
-    float vBL = getEncoderVelocityRadS(3) * WHEEL_RADIUS_M;
+// X-config omni wheels:
+//   FR axis 45°, FL axis 135°, BR axis -45°, BL axis -135°
+//   vx = (vFR - vFL + vBR - vBL) * cos45
+//   vy = (vFR + vFL - vBR - vBL) * sin45
+//   ω  = (-vFR - vFL + vBR + vBL) / (4 * L)
+//   cos45 = sin45 ≈ 0.7071
 
-    float halfWheelbase = ROBOT_LX + ROBOT_LY;
-    if (fabsf(halfWheelbase) < 0.001f) return 0.0f;
+void updateOdometry() {
+    static uint32_t lastMs = 0;
+    uint32_t nowMs = millis();
+    float dt = (lastMs == 0) ? 0.0f : (nowMs - lastMs) * 0.001f;
+    lastMs = nowMs;
+    if (dt <= 0.0f || dt > 0.5f) return;  // skip first call & large gaps
 
-    return (-vFL + vFR + vBL - vBR) / (2.0f * halfWheelbase);
-}
+    constexpr float COS45 = 0.70710678f;
+    constexpr float WHEEL_CIRC_M = 2.0f * PI * WHEEL_RADIUS_M;
+    constexpr float TICKS_TO_M = WHEEL_CIRC_M / (float)EXT_ENCODER_PPR;
 
-float getEncoderConfidence() {
-    int64_t maxTick = 0;
-    for (int i = 0; i < INT_ENCODER_COUNT; i++) {
-        float rpm = fabsf(motorVelocityRpm[i]);
-        int64_t t = (int64_t)(rpm / 60.0f * ENCODER_PPR * RPM_INTERVAL_MS / 1000.0f);
-        if (t > maxTick) maxTick = t;
+    float v[4];  // linear velocity per wheel (m/s)
+    for (int i = 0; i < EXT_ENCODER_COUNT; i++) {
+        int64_t curr = getExtEncoderCount(i);
+        int64_t delta = curr - prevExtCount[i];
+        prevExtCount[i] = curr;
+        v[i] = (float)delta * TICKS_TO_M / dt;
     }
 
-    if (maxTick < 2)   return 0.0f;
-    if (maxTick < 5)   return 0.2f;
-    if (maxTick < 15)  return 0.5f;
-    if (maxTick < 40)  return 0.7f;
-    return 0.9f;
+    // Forward kinematics X-config
+    float vx = (v[0] - v[1] + v[2] - v[3]) * COS45;
+    float vy = (v[0] + v[1] - v[2] - v[3]) * COS45;
+
+    // Rotasi vx/vy berdasarkan heading saat ini
+    float thetaRad = odomTheta * (PI / 180.0f);
+    float cosT = cosf(thetaRad);
+    float sinT = sinf(thetaRad);
+    float vxWorld = vx * cosT - vy * sinT;
+    float vyWorld = vx * sinT + vy * cosT;
+
+    // Integrasi posisi
+    odomX += vxWorld * dt;
+    odomY += vyWorld * dt;
+}
+
+void resetOdometry() {
+    odomX = 0.0f;
+    odomY = 0.0f;
+    odomTheta = 0.0f;
+    for (int i = 0; i < EXT_ENCODER_COUNT; i++) {
+        prevExtCount[i] = getExtEncoderCount(i);
+    }
+}
+
+void setOdomTheta(float theta) {
+    odomTheta = theta;
 }
