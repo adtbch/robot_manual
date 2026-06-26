@@ -27,16 +27,24 @@ static constexpr float KP_MIN = 0.1f;
 static constexpr float KP_MAX = 500.0f;
 static constexpr float KI_MIN = 0.0f;
 static constexpr float KI_MAX = 100.0f;
-static constexpr float KD_MIN = 0.0f;
-static constexpr float KD_MAX = 10.0f;
 static constexpr float KF_MIN = 0.0f;
 static constexpr float KF_MAX = 10.0f;
+static constexpr float DEADBAND_MIN = 0.0f;
+static constexpr float DEADBAND_MAX = 200.0f;
+
+// =====================================================================
+//  AUTOTUNE CONFIGURATION
+// =====================================================================
+constexpr float AUTOTUNE_TARGET_RPM = 50.0f;     // target velocity saat tuning (RPM)
+constexpr uint32_t AUTOTUNE_RUN_MS = 10000;      // durasi test per siklus (ms)
+constexpr uint32_t AUTOTUNE_COOLDOWN_MS = 3000;  // cooldown antar siklus (ms)
+constexpr int AUTOTUNE_MAX_CYCLES = 12;           // jumlah siklus per motor
+constexpr uint32_t AUTOTUNE_SHOW_MS = 3000;       // tampil hasil per motor (ms)
 
 // =====================================================================
 //  BOOT BUTTON
 // =====================================================================
 constexpr uint8_t BOOT_BUTTON_PIN = 0;
-           // setengah panjang (m)
 
 // =====================================================================
 //  PWM CONFIGURATION
@@ -94,6 +102,7 @@ struct __attribute__((packed)) ControlPacket {
 struct MotorConfig {
     uint8_t pin_dir;
     uint8_t pin_pwm;
+    int8_t ledc_channel;  // LEDC channel for PWM
 };
 
 // =====================================================================
@@ -110,8 +119,9 @@ struct EncoderConfig {
 struct PIDState {
     float kp = 0.0f;
     float ki = 0.0f;
-    float kd = 0.0f;
-    float kf = 0.0f;  // Feed-forward gain
+    float kd = 0.0f;        // Derivative (used by Yaw PID)
+    float kf = 0.0f;        // Feed-forward slope (used by Motor PID)
+    float deadband = 0.0f;  // Friction offset PWM (used by Motor PID)
     float integral = 0.0f;
     float lastError = 0.0f;
     float lastTime = 0.0f;

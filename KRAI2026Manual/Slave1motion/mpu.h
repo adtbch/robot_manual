@@ -31,6 +31,7 @@ void updateYaw();
 float getYaw();
 void calibrateGyro();
 void calibrateGyroHot();
+void calibClearNVS();
 void setYawReference(float targetYaw);
 void snapYaw();
 

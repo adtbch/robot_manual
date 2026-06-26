@@ -18,6 +18,8 @@
 #include "button.h"
 #include "ota.h"
 #include "autoTuner.h"
+#include <WebServer.h>
+#include "webconfig.h"
 #include <Wire.h>
 
 // =====================================================================
@@ -28,43 +30,34 @@ void setup() {
     Serial.begin(115200);
     Serial.println("=== KRAI 2026 Slave1 Motion Board ===");
 
-    // Init serial relay
     setupSerial();
     Serial.println("Serial: READY");
 
-    // Init button
     setupButton();
     Serial.println("Button: READY");
 
-    // Init WiFi + OTA
     setupOTA();
 
-    // Init I2C
+    setupWebServer();
+
     Wire.begin(I2C_SDA, I2C_SCL);
     Wire.setTimeOut(100);
     Wire.setClock(400000);
 
-    // Init OLED
     if (!setupOLED()) {
         Serial.println("OLED: not ready");
-    } else {
-        Serial.println("OLED: READY");
     }
 
-    // Init motors
     SetupMotors();
     Serial.println("Motors: READY");
 
-    // Init PID
     pidControllerInit();
     initYawPid();
     Serial.println("PID: READY");
 
-    // Init encoders
     setupEncoders();
     Serial.println("Encoders: READY");
 
-    // Init MPU — BLOCK di setup sampai berhasil
     while (!setupMPU()) {
         Serial.println("MPU: FAILED, retrying...");
         oledShowStatus("MPU FAILED!", "Check wiring");
@@ -80,39 +73,28 @@ void setup() {
 // =====================================================================
 
 void loop() {
-    // Handle OTA update (WiFi)
     handleOTA();
 
-    // Baca perintah USB Serial + UART master (rpm, tune, stop, ...)
+    // USB Serial (tuning) + UART master (rpm dari motion_control)
     serialCommandTick();
 
-    // Update state button (debounce & durasi)
     updateButton();
 
-    // Tombol tahan 3 detik -> trigger auto-tune
     if (isButtonLongPressed() && !isAutoTunerRunning()) {
         Serial.println("\n[AUTOTUNE] Button Long Press -> Starting!");
-        startAutoTune(0); // Mulai tuning motor 0
+        startAutoTuneAll();
     }
 
-    // Jalankan Auto-Tuner (kalau sedang aktif)
-    autoTunerTick();
+    autoTunerTick(isButtonLongHolding());
 
-    // Relay WSN-31 → Master
     serialRelayTick();
 
-    // Convert encoder ke RPM (40ms interval)
     static Jeda jedaEncoder;
     if (jedaEncoder.check(RPM_INTERVAL_MS)) {
         convertEncoderToRPM();
     }
 
-    // Update yaw dari MPU
     updateYaw();
-
-    // Update odometry dari external encoder (setiap loop, sudah ada dt guard)
     updateOdometry();
-
-    // Update OLED display
     updateOLED();
 }

@@ -36,11 +36,11 @@ void skalaKecepatanPWM(int m1, int m2, int m3, int m4) {
 // =====================================================================
 
 void driveRobotCentric(int vx, int vy, int vtheta) {
-    int motor1 = vx + vy - vtheta;
-    int motor2 = vx - vy + vtheta;
-    int motor3 = vx - vy - vtheta;
-    int motor4 = vx + vy + vtheta;
-    skalaKecepatanPWM(motor1, motor2, motor3, motor4);
+    int motorFR = vx + vy - vtheta;
+    int motorFL = vx - vy + vtheta;
+    int motorBR = vx - vy - vtheta;
+    int motorBL = vx + vy + vtheta;
+    skalaKecepatanPWM(motorFR, motorFL, motorBR, motorBL);
 }
 
 // =====================================================================
@@ -70,7 +70,7 @@ void driveFieldCentricWithYawCorrection(int vx, int vy, int yawTarget) {
 
     float currentYaw = getYaw();
     int correctionYaw = pidComputeYaw(pidKinematicYaw, (float)yawTarget, currentYaw, dt);
-    driveFieldCentric(vx, vy, -correctionYaw);
+    driveFieldCentricRpm(vx, vy, -correctionYaw);
 }
 
 // =====================================================================
@@ -92,4 +92,19 @@ void driveRobotCentricRpm(int vx, int vy, int vtheta) {
     }
 
     rpmMotor(motorFR, motorFL, motorBR, motorBL);
+}
+
+// =====================================================================
+//  FIELD-CENTRIC RPM
+// =====================================================================
+
+void driveFieldCentricRpm(int vx, int vy, int vtheta) {
+    float yawRad = getYaw() * (PI / 180.0f);
+    float c = cosf(yawRad);
+    float s = sinf(yawRad);
+
+    int vxRot = roundf(vx * c - vy * s);
+    int vyRot = roundf(vx * s + vy * c);
+
+    driveRobotCentricRpm(vxRot, vyRot, vtheta);
 }
