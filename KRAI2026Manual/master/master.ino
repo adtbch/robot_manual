@@ -37,8 +37,6 @@
 void setup() {
     Serial.begin(115200);
     Serial.println("=== KRAI 2026 Master Board ===");
-    Serial.print("MAC Address: ");
-    Serial.println(WiFi.macAddress());
 
     // Init ESP-NOW receiver
     bool espNowReady = espNowControlInit();
@@ -84,12 +82,24 @@ void loop() {
     // Serial command handler
     serialCommandTick();
 
+    // Gripper non-blocking update
+    gripperZone1();
+
+    // Motor homing (limit switch)
+    motorHomingTick();
+
     // ESP-NOW receiver
     // 1. Cetak statistik periodik
     espNowControlTick();
-    // 2. Ambil paket terbaru & cetak
+    // 2. Ambil paket terbaru & proses
     ControlPacket gLastRxPacket = {};
     if (espNowControlReadPacket(gLastRxPacket)) {
-        espNowControlPrintPacket(gLastRxPacket);
+        // 3. Dispatch ke modul control
+        gripperControlTick(gLastRxPacket);
+        motionControlTick(gLastRxPacket);
     }
+
+    // Encoder positioning motor X/Y
+    motorXPositionTick();
+    motorYPositionTick();
 }

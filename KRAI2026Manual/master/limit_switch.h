@@ -15,10 +15,10 @@
 // =====================================================================
 //  PIN LIMIT SWITCH — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t LIMIT_SWITCH_1 = 6;
-constexpr uint8_t LIMIT_SWITCH_2 = 7;
-constexpr uint8_t LIMIT_SWITCH_3 = 15;
-constexpr uint8_t LIMIT_SWITCH_4 = 16;
+constexpr uint8_t LIMIT_SWITCH_X1 = 6;
+constexpr uint8_t LIMIT_SWITCH_X2 = 7;
+constexpr uint8_t LIMIT_SWITCH_X3 = 15;
+constexpr uint8_t LIMIT_SWITCH_X4 = 16;
 
 // =====================================================================
 //  JUMLAH LIMIT SWITCH
@@ -29,6 +29,6 @@ constexpr size_t LIMIT_COUNT = 4;
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupLimits();
-bool readLimitSwitch(char index);
+bool readLimitSwitch(uint8_t index);
 
 #endif // LIMIT_SWITCH_H

@@ -1,7 +1,8 @@
 /*
  * =====================================================================
  * FILE    : serial.ino
- * PERAN   : Inisialisasi UART1 + UART2, relay WSN-31 ke master.
+ * PERAN   : Inisialisasi UART1 + UART2, relay WSN-31 ke master,
+ *           unified command handler (USB Serial + UART master).
  *
  * BOARD   : ESP32-S3 (Slave1 Motion)
  * =====================================================================
@@ -13,22 +14,160 @@
 #include "mpu.h"
 #include "autoTuner.h"
 
+namespace {
+
+constexpr size_t SERIAL_CMD_BUF_SIZE = 96;
+
+char pcBuf[SERIAL_CMD_BUF_SIZE];
+uint8_t pcBufIdx = 0;
+
+char masterBuf[SERIAL_CMD_BUF_SIZE];
+uint8_t masterBufIdx = 0;
+
+void printHelp(Print& out) {
+    out.println("Commands:");
+    out.println("  tune <idx> <kp> <ki> <kf> <db>   — set motor PID");
+    out.println("  save                              — save motor PID to NVS");
+    out.println("  tuneyaw <kp> <ki> <kd>            — set yaw PID");
+    out.println("  saveyaw / loadyaw / showyaw       — yaw PID NVS");
+    out.println("  rpm <fr> <fl> <br> <bl>           — USB: raw PWM | Master: PID RPM");
+    out.println("  stop                              — stop all motors");
+    out.println("  autotune <motor|all>              — run auto-tuner");
+    out.println("  calibrate / calclear              — gyro calibration NVS");
+}
+
+void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
+    char* token = strtok(cmd, " ");
+    if (token == nullptr) return;
+
+    for (char* p = token; *p; ++p) *p = tolower(*p);
+
+    if (strcmp(token, "tune") == 0) {
+        char* idxStr = strtok(nullptr, " ");
+        char* kpStr = strtok(nullptr, " ");
+        char* kiStr = strtok(nullptr, " ");
+        char* kfStr = strtok(nullptr, " ");
+        char* dbStr = strtok(nullptr, " ");
+        if (idxStr != nullptr && kpStr != nullptr && kiStr != nullptr &&
+            kfStr != nullptr && dbStr != nullptr) {
+            const int idx = atoi(idxStr);
+            const float kp = atof(kpStr);
+            const float ki = atof(kiStr);
+            const float kf = atof(kfStr);
+            const float deadband = atof(dbStr);
+            pidSetGains(idx, kp, ki, kf, deadband);
+            out.printf("Motor %d PID updated: Kp=%.2f Ki=%.2f Kf=%.2f Db=%.2f\n",
+                       idx, kp, ki, kf, deadband);
+        } else {
+            out.println("Format: tune <motorIdx> <kp> <ki> <kf> <db>");
+        }
+    } else if (strcmp(token, "save") == 0) {
+        for (int i = 0; i < 4; i++) {
+            pidSaveToNVS(i, pidStates[i].kp, pidStates[i].ki,
+                         pidStates[i].kf, pidStates[i].deadband);
+        }
+        out.println("Semua konstanta PID tersimpan ke NVS.");
+    } else if (strcmp(token, "rpm") == 0) {
+        char* frStr = strtok(nullptr, " ");
+        char* flStr = strtok(nullptr, " ");
+        char* brStr = strtok(nullptr, " ");
+        char* blStr = strtok(nullptr, " ");
+        if (frStr != nullptr && flStr != nullptr && brStr != nullptr && blStr != nullptr) {
+            const int fr = atoi(frStr);
+            const int fl = atoi(flStr);
+            const int br = atoi(brStr);
+            const int bl = atoi(blStr);
+            if (fromMasterUart) {
+                rpmMotor(fr, fl, br, bl);
+                out.printf("RPM: FR=%d FL=%d BR=%d BL=%d\n", fr, fl, br, bl);
+            } else {
+                pwmMotor(0, fr);
+                pwmMotor(1, fl);
+                pwmMotor(2, br);
+                pwmMotor(3, bl);
+                out.printf("Test PWM: FR=%d FL=%d BR=%d BL=%d\n", fr, fl, br, bl);
+            }
+        } else {
+            out.println("Format: rpm <fr> <fl> <br> <bl>");
+        }
+    } else if (strcmp(token, "stop") == 0) {
+        rpmMotor(0, 0, 0, 0);
+        out.println("Semua motor BERHENTI.");
+    } else if (strcmp(token, "autotune") == 0) {
+        char* arg = strtok(nullptr, " ");
+        if (arg == nullptr) {
+            out.println("Format: autotune <motor|all>");
+        } else if (strcmp(arg, "all") == 0) {
+            startAutoTuneAll();
+        } else {
+            startAutoTune(atoi(arg));
+        }
+    } else if (strcmp(token, "calibrate") == 0) {
+        motorStopAll();
+        calibrateGyro();
+    } else if (strcmp(token, "calclear") == 0) {
+        calibClearNVS();
+    } else if (strcmp(token, "tuneyaw") == 0) {
+        char* kpStr = strtok(nullptr, " ");
+        char* kiStr = strtok(nullptr, " ");
+        char* kdStr = strtok(nullptr, " ");
+        if (kpStr != nullptr && kiStr != nullptr && kdStr != nullptr) {
+            const float kp = atof(kpStr);
+            const float ki = atof(kiStr);
+            const float kd = atof(kdStr);
+            pidKinematicYaw.kp = kp;
+            pidKinematicYaw.ki = ki;
+            pidKinematicYaw.kd = kd;
+            pidKinematicYaw.reset();
+            out.printf("Yaw PID updated: Kp=%.3f Ki=%.3f Kd=%.3f\n", kp, ki, kd);
+        } else {
+            out.println("Format: tuneyaw <kp> <ki> <kd>");
+        }
+    } else if (strcmp(token, "saveyaw") == 0) {
+        saveYawPid();
+    } else if (strcmp(token, "loadyaw") == 0) {
+        initYawPid();
+    } else if (strcmp(token, "showyaw") == 0) {
+        showYawPid();
+    } else {
+        printHelp(out);
+    }
+}
+
+void readSerialLine(Stream& port, char* buf, uint8_t& idx, Print& out, bool fromMasterUart) {
+    while (port.available() > 0) {
+        const char c = port.read();
+        if (c == '\n' || c == '\r') {
+            if (idx > 0) {
+                buf[idx] = '\0';
+                parseAndExecuteCommand(buf, out, fromMasterUart);
+                idx = 0;
+            }
+        } else if (idx < SERIAL_CMD_BUF_SIZE - 1) {
+            buf[idx++] = c;
+        } else {
+            out.println("Error: command terlalu panjang");
+            idx = 0;
+        }
+    }
+}
+
+}  // namespace
+
 // =====================================================================
 //  SETUP
 // =====================================================================
 
 void setupSerial() {
-    // WSN-31 SET HIGH = mode normal
     pinMode(WSN_SET_PIN, OUTPUT);
     digitalWrite(WSN_SET_PIN, HIGH);
 
-    // UART ke WSN-31 (receiver)
     Serial2.begin(SERIAL_WSN_BAUD, SERIAL_8N1, SERIAL_WSN_RX, SERIAL_WSN_TX);
-    // UART ke Master (forwarder)
     Serial1.begin(SERIAL_MASTER_BAUD, SERIAL_8N1, SERIAL_MASTER_RX, SERIAL_MASTER_TX);
 
-    Serial.printf("[WSN-31] Relay init — RX=%d TX=%d → Master TX=%d RX=%d\n",
-                  SERIAL_WSN_RX, SERIAL_WSN_TX, SERIAL_MASTER_TX, SERIAL_MASTER_RX);
+    Serial.printf("[Serial] Master UART RX=%d TX=%d @ %lu baud | WSN RX=%d TX=%d\n",
+                  SERIAL_MASTER_RX, SERIAL_MASTER_TX, (unsigned long)SERIAL_MASTER_BAUD,
+                  SERIAL_WSN_RX, SERIAL_WSN_TX);
 }
 
 // =====================================================================
@@ -37,111 +176,16 @@ void setupSerial() {
 
 void serialRelayTick() {
     while (Serial2.available()) {
-        uint8_t b = Serial2.read();
+        const uint8_t b = Serial2.read();
         Serial1.write(b);
     }
 }
 
 // =====================================================================
-//  PARSER USB SERIAL (Tuning PID)
+//  COMMAND HANDLER — USB Serial + UART master
 // =====================================================================
 
-void parseSerialCommand() {
-    if (!Serial.available()) return;
-
-    String input = Serial.readStringUntil('\n');
-    input.trim();
-    if (input.length() == 0) return;
-
-    // Format: "tune <motor_idx> <kp> <ki> <kd> <kf>"
-    // Contoh: "tune 0 1.5 0.1 0.05 2.0"
-    if (input.startsWith("tune ")) {
-        int idx;
-        float kp, ki, kd, kf;
-        if (sscanf(input.c_str(), "tune %d %f %f %f %f", &idx, &kp, &ki, &kd, &kf) == 5) {
-            pidSetGains(idx, kp, ki, kd, kf);
-            Serial.printf("Motor %d PID updated: Kp=%.2f Ki=%.2f Kd=%.2f Kf=%.2f\n", idx, kp, ki, kd, kf);
-        } else {
-            Serial.println("Format salah! Gunakan: tune <motorIdx> <kp> <ki> <kd> <kf>");
-        }
-    }
-    // Format: "save" -> Simpan semua PID ke NVS
-    else if (input.equals("save")) {
-        extern PIDState pidStates[]; // akses dari pid.ino
-        for (int i = 0; i < 4; i++) {
-            pidSaveToNVS(i, pidStates[i].kp, pidStates[i].ki, pidStates[i].kd, pidStates[i].kf);
-        }
-        Serial.println("Semua konstanta PID tersimpan ke NVS.");
-    }
-    // Format: "rpm <fr> <fl> <br> <bl>" -> Test motor langsung (bypass PID)
-    // Contoh: "rpm 100 100 100 100"
-    else if (input.startsWith("rpm ")) {
-        int r1, r2, r3, r4;
-        if (sscanf(input.c_str(), "rpm %d %d %d %d", &r1, &r2, &r3, &r4) == 4) {
-            pwmMotor(0, r1);
-            pwmMotor(1, r2);
-            pwmMotor(2, r3);
-            pwmMotor(3, r4);
-            Serial.printf("Test PWM: FR=%d FL=%d BR=%d BL=%d\n", r1, r2, r3, r4);
-        } else {
-            Serial.println("Format salah! Gunakan: rpm <fr> <fl> <br> <bl>");
-        }
-    }
-    // Stop semua
-    else if (input.equals("stop")) {
-        rpmMotor(0, 0, 0, 0);
-        Serial.println("Semua motor BERHENTI.");
-    }
-    // AutoTune Command
-    else if (input.equals("autotune all")) {
-        startAutoTuneAll();
-    }
-    else if (input.startsWith("autotune ")) {
-        int idx = input.substring(9).toInt();
-        startAutoTune(idx);
-    }
-    // MPU Calibration
-    else if (input.equals("calibrate")) {
-        motorStopAll();
-        calibrateGyro();
-    }
-    else if (input.equals("calclear")) {
-        calibClearNVS();
-    }
-    // Yaw PID
-    else if (input.startsWith("tuneyaw ")) {
-        float kp, ki, kd;
-        if (sscanf(input.c_str(), "tuneyaw %f %f %f", &kp, &ki, &kd) == 3) {
-            pidKinematicYaw.kp = kp;
-            pidKinematicYaw.ki = ki;
-            pidKinematicYaw.kd = kd;
-            pidKinematicYaw.reset();
-            Serial.printf("Yaw PID updated: Kp=%.3f Ki=%.3f Kd=%.3f\n", kp, ki, kd);
-        } else {
-            Serial.println("Format: tuneyaw <kp> <ki> <kd>");
-        }
-    }
-    else if (input.equals("saveyaw")) {
-        saveYawPid();
-    }
-    else if (input.equals("loadyaw")) {
-        initYawPid();
-    }
-    else if (input.equals("showyaw")) {
-        showYawPid();
-    }
-    else {
-        Serial.println("Commands:");
-        Serial.println("  tune <idx> <kp> <ki> <kf> <db>   — set motor PID");
-        Serial.println("  save                              — save motor PID to NVS");
-        Serial.println("  tuneyaw <kp> <ki> <kd>            — set yaw PID");
-        Serial.println("  saveyaw                           — save yaw PID to NVS");
-        Serial.println("  loadyaw                           — reload yaw PID from NVS");
-        Serial.println("  showyaw                           — show yaw PID values");
-        Serial.println("  rpm <fr> <fl> <br> <bl>           — raw PWM test");
-        Serial.println("  stop                              — stop all motors");
-        Serial.println("  autotune <motor|all>              — run auto-tuner");
-        Serial.println("  calibrate                         — calibrate gyro (robot must be STILL)");
-        Serial.println("  calclear                          — clear calibration from NVS");
-    }
+void serialCommandTick() {
+    readSerialLine(Serial, pcBuf, pcBufIdx, Serial, false);
+    readSerialLine(Serial1, masterBuf, masterBufIdx, Serial1, true);
 }

@@ -111,4 +111,18 @@ struct Jeda {
     }
 };
 
+// =====================================================================
+//  SHARED STATE — GripperState (akses dari gripper.ino & gripper_control.ino)
+// =====================================================================
+
+enum GripperState { IDLE, CLOSING, STRAIGHTEN, READY_TO_STAB };
+extern GripperState gGripperState;
+
+// =====================================================================
+//  SHARED STATE — InputMode (akses dari motion_control.ino & gripper_control.ino)
+// =====================================================================
+
+enum InputMode { MODE_ANALOG, MODE_DPAD };
+extern InputMode gInputMode;
+
 #endif // CONFIG_H

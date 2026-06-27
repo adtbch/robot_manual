@@ -55,16 +55,16 @@ KRAI2026Manual/master/
 ├── master.ino                  ← main entry: setup() + loop()
 │
 ├── config.h                    ← shared types: ControlPacket, BTN_*, Jeda
-├── espnow.h                    ← ESP-NOW config: MAC whitelist, channel, magic
+├── espnow.h                    ← ESP-NOW config: MAC whitelist, channel, magic, function declarations
 ├── motor.h                     ← Motor: pin, PWM, MotorConfig struct
 ├── encoder.h                   ← Encoder: pin, ESP32Encoder library
 ├── limit_switch.h              ← Limit switch: pin
 ├── servo.h                     ← Servo: pin, PWM 50Hz, ServoConfig struct
 ├── relay.h                     ← Relay: pin
 ├── proximity.h                 ← Proximity: pin
-├── serial.h                    ← Serial: UART1→slave1 (SLAVE1_RX/TX), UART2→slave2 (SLAVE2_RX/TX)
+├── serial.h                    ← Serial: UART1→slave1, UART2→slave2, function declarations
 │
-├── espnow.ino                  ← ESP-NOW: init, peer, callback, fetchPacket
+├── espnow.ino                  ← ESP-NOW: init, peer, callback, fetchPacket, isLinkAlive
 ├── motor.ino                   ← SetupMotors(), pwmMotor(), motorStopAll()
 ├── encoder.ino                 ← setupEncoders(), getEncoderCount(), resetEncoderCount()
 ├── limit_switch.ino            ← setupLimits(), readLimitSwitch() — double-read anti-noise
@@ -72,15 +72,12 @@ KRAI2026Manual/master/
 ├── relay.ino                   ← setupRelay(), relayOn(), relayOff(), relayToggle()
 ├── proximity.ino               ← setupProximity(), readProximity()
 ├── serial.ino                  ← Unified command handler: PC + slave1 + slave2
+├── serial_command.ino          ← Helper: sendRpmCommand() ke slave1
 │
-├── arm_control.ino             ← setHoming(), moveToCenter(), updateMotorPositioning()
-├── mecanum_control.ino         ← kinematik mecanum ke slave1
-├── gripper_control.ino         ← toggle servo + motor jog (MODE_GRIPPING)
-├── armbox_control.ino          ← kontrol slave2 (MODE_ARM_BOX)
-├── motion_serial.ino           ← UART1 binary protocol ke slave1
-├── manipulator_serial.ino      ← UART2 ke slave2
-├── jeda.ino                    ← placeholder
-└── mode_control.ino            ← GRIPPING/ARM_BOX toggle, NVS save
+├── gripper.ino                 ← Auto gripper: proximity → close servo d → straighten servo b
+├── gripper_control.ino         ← Mapping tombol → gripper (R1/L1/R2/L2/Segitiga)
+├── motion_control.ino          ← Mapping joystick/dpad → mecanum ke slave1 (SHARE toggle)
+└── armbox_control.ino          ← kontrol slave2 (nanti)
 ```
 
 ### Serial Architecture — Unified Command Handler
@@ -103,7 +100,89 @@ KRAI2026Manual/master/
 - **`HardwareSerial slave2Serial(2)`** — RX=47, TX=21 → slave2
 - **3 buffer terpisah** — PC, slave1, slave2 tidak saling ganggu
 - **Response balik ke sumber** — `parseAndExecuteCommand(cmd, Print& out)` tulis ke `out`
-- **Command sama** dari mana pun — `motor1 500`, `servo1 90`, `status`, dll
+- **Command sama** dari mana pun — `motor x 500`, `servo d 90`, `gripper reset`, `status`, dll
+
+### Serial Commands
+
+```
+motor <id> <pwm>         — Set motor PWM (contoh: motor x 500)
+motorstop                — Stop semua motor
+servo <id> <angle>       — Set servo sudut (contoh: servo d 90)
+relay <on|off|t>         — Relay on/off/toggle
+enc                      — Baca encoder
+encreset                 — Reset encoder
+limit                    — Baca limit switch
+prox                     — Baca proximity
+gripper <reset|homing>   — Reset atau homing gripper
+status                   — Tampilkan semua status
+stop                     — Stop semua motor + servo
+help                     — Tampilkan daftar command
+```
+
+### Controller Mapping — Gripper (`gripper_control.ino`)
+
+| Tombol | Aksi |
+|--------|------|
+| R1 | Tutup gripper (servo d = 90) |
+| L1 | Buka gripper (servo d = 0) |
+| R2 | Homing (buka + lengan awal) |
+| L2 | Reset state gripper |
+| Segitiga | Siap stab (`gripperReadytoStab()`) |
+
+- **Edge detection** — trigger sekali saat tombol ditekan, tidak trigger saat dihold
+- **Mapping gampang** — edit konstanta `BTN_GRIPPER_*` di atas file
+
+### Controller Mapping — Motion (`motion_control.ino`)
+
+| Input | Aksi |
+|-------|------|
+| DPAD/Analog kiri | Maju/mundur/geser (mecanum) |
+| SHARE | Toggle input mode (DPAD ↔ ANALOG) |
+| R1 hold | Fast mode (1.5x speed) |
+| L1 hold | Slow mode (0.5x speed) |
+
+- **Default mode: DPAD** — tekan SHARE untuk switch ke analog
+- **Deadzone 20** — filter noise joystick
+- **Safety stop** — PS4 disconnect / ESP-NOW putus → motor stop otomatis
+
+### Serial Command ke Slave1 (`serial_command.ino`)
+
+```
+rpm <fr> <fl> <br> <bl>    — 4 motor mecanum RPM
+contoh: rpm 500 -500 500 -500
+```
+
+### Kinematik Mecanum
+
+```
+FR = LY + LX
+FL = LY - LX
+BR = LY - LX
+BL = LY + LX
+```
+
+### Auto Gripper (`gripper.ino`)
+
+```
+┌──────────┐
+│   IDLE   │ ← proximity tidak aktif
+└────┬─────┘
+     │ proximity = detected
+     ▼
+┌──────────────┐
+│  CLOSING     │ ← servo d tutup (timeout 1s)
+└────┬─────────┘
+     │ timeout 1s
+     ▼
+┌──────────────┐
+│  STRAIGHTEN  │ ← servo b lurus (no timeout)
+└──────────────┘
+```
+
+- **`gripperZone1()`** — panggil di loop(), non-blocking
+- **`setServoHoming()`** — buka gripper + lengan ke posisi awal
+- **`gripperReset()`** — reset state ke IDLE
+- **`gripperReadytoStab()`** — lengan ke posisi siap stab
 
 ### Build & Upload
 
@@ -112,7 +191,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32s3 KRAI2026Manual/master
 arduino-cli upload -p COM3 --fqbn esp32:esp32:esp32s3 KRAI2026Manual/master
 ```
 
-Flash: ~891KB (68%), RAM: ~44KB (13%)
+Flash: ~892KB (68%), RAM: ~44KB (13%)
 
 ---
 

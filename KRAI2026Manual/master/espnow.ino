@@ -333,41 +333,9 @@ bool espNowControlReadPacket(ControlPacket &outPacket) {
     return fetchPacket(outPacket);
 }
 
-void espNowControlPrintPacket(const ControlPacket &pkt) {
-    Serial.printf(
-        "[PKT] seq=%u conn=%d | "
-        "sticks: LX=%4d LY=%4d RX=%4d RY=%4d | "
-        "trig: L2=%3u R2=%3u | "
-        "btn: 0x%08lX",
-        pkt.seq,
-        pkt.connected,
-        pkt.lx, pkt.ly,
-        pkt.rx, pkt.ry,
-        pkt.l2Value, pkt.r2Value,
-        (unsigned long)pkt.buttons
-    );
-
-    if (pkt.buttons) {
-        Serial.print(" [");
-        if (pkt.buttons & BTN_UP)       Serial.print("UP ");
-        if (pkt.buttons & BTN_DOWN)     Serial.print("DN ");
-        if (pkt.buttons & BTN_LEFT)     Serial.print("LT ");
-        if (pkt.buttons & BTN_RIGHT)    Serial.print("RT ");
-        if (pkt.buttons & BTN_CROSS)    Serial.print("X ");
-        if (pkt.buttons & BTN_CIRCLE)   Serial.print("O ");
-        if (pkt.buttons & BTN_TRIANGLE) Serial.print("T ");
-        if (pkt.buttons & BTN_SQUARE)   Serial.print("S ");
-        if (pkt.buttons & BTN_L1)       Serial.print("L1 ");
-        if (pkt.buttons & BTN_R1)       Serial.print("R1 ");
-        if (pkt.buttons & BTN_L2)       Serial.print("L2d ");
-        if (pkt.buttons & BTN_R2)       Serial.print("R2d ");
-        if (pkt.buttons & BTN_L3)       Serial.print("L3 ");
-        if (pkt.buttons & BTN_R3)       Serial.print("R3 ");
-        if (pkt.buttons & BTN_SHARE)    Serial.print("SH ");
-        if (pkt.buttons & BTN_OPTIONS)  Serial.print("OP ");
-        if (pkt.buttons & BTN_PS)       Serial.print("PS ");
-        if (pkt.buttons & BTN_TOUCHPAD) Serial.print("TP ");
-        Serial.print("]");
+bool espNowControlIsLinkAlive() {
+    if (!gEspNow.isReady) {
+        return false;
     }
-    Serial.println();
+    return (millis() - gEspNow.lastPacketRxMs) <= espNowLinkAliveMs;
 }

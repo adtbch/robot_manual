@@ -18,18 +18,24 @@
 // =====================================================================
 
 // UART1 — komunikasi ke slave1
-constexpr uint8_t SLAVE1_RX = 45;
-constexpr uint8_t SLAVE1_TX = 48;
+constexpr uint8_t SLAVE1_RX = 47;
+constexpr uint8_t SLAVE1_TX = 21;
 
 // UART2 — komunikasi ke slave2
-constexpr uint8_t SLAVE2_RX = 47;
-constexpr uint8_t SLAVE2_TX = 21;
+constexpr uint8_t SLAVE2_RX = 45;
+constexpr uint8_t SLAVE2_TX = 48;
 
 // =====================================================================
 //  BAUD RATE
 // =====================================================================
 constexpr uint32_t SLAVE1_BAUD = 921600;
 constexpr uint32_t SLAVE2_BAUD = 921600;
+
+// =====================================================================
+//  UART INSTANCES — global, bisa diakses modul lain
+// =====================================================================
+extern HardwareSerial slave1Serial;
+extern HardwareSerial slave2Serial;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS

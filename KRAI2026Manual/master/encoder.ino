@@ -22,6 +22,13 @@ namespace {
 
 ESP32Encoder encoders[ENCODER_COUNT];
 
+// Mapping: 'x' = encoder axis X, 'y' = encoder axis Y
+int findEncoderIndex(char id) {
+    if (id == 'x') return 0;
+    if (id == 'y') return 1;
+    return -1;
+}
+
 } // anonymous namespace
 
 // =====================================================================
@@ -42,20 +49,18 @@ void setupEncoders() {
 //  READ
 // =====================================================================
 
-long getEncoderCount(char encoderIndex) {
-    if (encoderIndex >= ENCODER_COUNT) {
-        return 0;
-    }
-    return (long)encoders[encoderIndex].getCount();
+long getEncoderCount(char id) {
+    int idx = findEncoderIndex(id);
+    if (idx < 0) return 0;
+    return (long)encoders[idx].getCount();
 }
 
 // =====================================================================
 //  RESET
 // =====================================================================
 
-void resetEncoderCount(char encoderIndex) {
-    if (encoderIndex >= ENCODER_COUNT) {
-        return;
-    }
-    encoders[encoderIndex].clearCount();
+void resetEncoderCount(char id) {
+    int idx = findEncoderIndex(id);
+    if (idx < 0) return;
+    encoders[idx].clearCount();
 }

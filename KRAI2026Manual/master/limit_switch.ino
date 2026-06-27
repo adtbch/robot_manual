@@ -16,10 +16,10 @@
 namespace {
 
 constexpr uint8_t limitPins[LIMIT_COUNT] = {
-    LIMIT_SWITCH_1,
-    LIMIT_SWITCH_2,
-    LIMIT_SWITCH_3,
-    LIMIT_SWITCH_4
+    LIMIT_SWITCH_X1,
+    LIMIT_SWITCH_X2,
+    LIMIT_SWITCH_X3,
+    LIMIT_SWITCH_X4
 };
 
 } // anonymous namespace
@@ -38,9 +38,7 @@ void setupLimits() {
 //  READ — langsung baca GPIO
 // =====================================================================
 
-bool readLimitSwitch(char index) {
-    if (index >= LIMIT_COUNT) {
-        return false;
-    }
+bool readLimitSwitch(uint8_t index) {
+    if (index >= LIMIT_COUNT) return false;
     return (digitalRead(limitPins[index]) == LOW);
 }
