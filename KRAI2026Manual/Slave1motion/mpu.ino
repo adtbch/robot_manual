@@ -10,9 +10,11 @@
  */
 
 #include "mpu.h"
+#include "i2c_bus.h"
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps612.h"
 #include <Preferences.h>
+#include <Wire.h>
 
 // =====================================================================
 //  STATE
@@ -39,6 +41,55 @@ VectorFloat gravity;
 float ypr[3];
 
 volatile bool mpuInterrupt = false;
+
+constexpr uint32_t kWatchdogTimeoutMs = 2500;
+constexpr uint32_t kRecoverCooldownMs = 3000;
+constexpr uint32_t kDmpRecoverDelayMs = 10;
+constexpr float kGyroMoveThresholdDps = 1.5f;
+constexpr uint32_t kDriftFreezeHoldMs = 500;
+constexpr uint32_t kPollMinIntervalMs = 10;  // throttle: max ~100Hz baca FIFO, tidak bergantung INT
+
+// Core 3.x: setelah NACK, slave bisa menahan SDA low / driver master stuck.
+// Bebaskan bus secara manual: clock SCL 9x agar slave melepas SDA, kirim STOP,
+// lalu re-init Wire. Tanpa ini, reset DMP via I2C percuma karena bus masih nyangkut.
+void i2cBusRecover() {
+    Wire.end();
+
+    pinMode(I2C_SDA, INPUT_PULLUP);
+    pinMode(I2C_SCL, OUTPUT_OPEN_DRAIN);
+    digitalWrite(I2C_SCL, HIGH);
+    delayMicroseconds(5);
+
+    for (int i = 0; i < 9; i++) {
+        digitalWrite(I2C_SCL, LOW);
+        delayMicroseconds(5);
+        digitalWrite(I2C_SCL, HIGH);
+        delayMicroseconds(5);
+    }
+
+    // STOP condition: SDA transisi low->high saat SCL high
+    pinMode(I2C_SDA, OUTPUT_OPEN_DRAIN);
+    digitalWrite(I2C_SDA, LOW);
+    delayMicroseconds(5);
+    digitalWrite(I2C_SCL, HIGH);
+    delayMicroseconds(5);
+    digitalWrite(I2C_SDA, HIGH);
+    delayMicroseconds(5);
+
+    Wire.begin(I2C_SDA, I2C_SCL);
+    Wire.setClock(100000);
+    Wire.setTimeOut(100);
+}
+
+void recoverDmpFifo() {
+    i2cBusRecover();
+    mpu.resetFIFO();
+    mpu.setDMPEnabled(false);
+    delay(kDmpRecoverDelayMs);
+    mpu.setDMPEnabled(true);
+    mpu.getIntStatus();
+    mpuInterrupt = false;
+}
 
 void IRAM_ATTR dmpDataReady() {
     mpuInterrupt = true;
@@ -239,7 +290,24 @@ void updateYaw() {
     static bool hasSeenPacket = false;
     static uint32_t lastPacketMs = 0;
     static uint32_t lastRecoverMs = 0;
+    static uint32_t lastReadMs = 0;
+    static bool wasMoving = false;
+    static uint32_t lastMoveMs = 0;
 
+    uint32_t now = millis();
+
+    // Baca FIFO saat INT aktif ATAU throttle interval lewat (fallback tanpa kabel INT).
+    bool shouldRead = mpuInterrupt || (now - lastReadMs >= kPollMinIntervalMs);
+    if (!shouldRead) return;
+
+    if (!I2cBus::acquire(I2cBus::Owner::MPU)) return;
+
+    mpuInterrupt = false;
+    lastReadMs = now;
+
+    // dmpGetCurrentFIFOPacket() sudah overflow-proof & mengembalikan packet TERBARU.
+    // Panggil SEKALI (if), bukan while — while bisa memblokir s/d 11ms menunggu packet
+    // parsial & menembak I2C berulang (memperparah NACK saat motor bising).
     if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         mpu.dmpGetGravity(&gravity, &q);
@@ -252,12 +320,9 @@ void updateYaw() {
         hasSeenPacket = true;
         lastPacketMs = millis();
 
-        // Drift freeze
-        static bool wasMoving = false;
-        static uint32_t lastMoveMs = 0;
-
-        int16_t gzRaw = mpu.getRotationZ();
-        bool isMoving = (fabsf(gzRaw / 131.0f) > 0.3f);
+        int16_t gyroSample[3];
+        mpu.dmpGetGyro(gyroSample, fifoBuffer);
+        bool isMoving = (fabsf(gyroSample[2] / 131.0f) > kGyroMoveThresholdDps);
 
         if (isMoving) {
             yawActive = yaw;
@@ -268,21 +333,21 @@ void updateYaw() {
             wasMoving = false;
         }
 
-        if (isMoving || (millis() - lastMoveMs <= 500)) {
+        if (isMoving || (millis() - lastMoveMs <= kDriftFreezeHoldMs)) {
             yaw = yawActive;
         }
-    } else {
-        if (!hasSeenPacket) return;
-        uint32_t now = millis();
-        if ((now - lastPacketMs > 2000) && (now - lastRecoverMs > 2000)) {
-            Serial.println("[MPU WATCHDOG] No DMP packet for >2s — resetting FIFO & DMP");
-            mpu.resetFIFO();
-            mpu.setDMPEnabled(false);
-            delay(5);
-            mpu.setDMPEnabled(true);
-            mpuInterrupt = false;
-            hasSeenPacket = false;
-            lastRecoverMs = millis();
-        }
     }
+
+    // Watchdog: tidak ada packet valid dalam waktu lama → reset DMP/FIFO
+    if (hasSeenPacket &&
+        (now - lastPacketMs > kWatchdogTimeoutMs) &&
+        (now - lastRecoverMs > kRecoverCooldownMs)) {
+        Serial.printf("[MPU WATCHDOG] No DMP packet for >%lums — resetting FIFO & DMP\n",
+                      (unsigned long)kWatchdogTimeoutMs);
+        recoverDmpFifo();
+        hasSeenPacket = false;
+        lastRecoverMs = millis();
+    }
+
+    I2cBus::release(I2cBus::Owner::MPU);
 }

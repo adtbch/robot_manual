@@ -13,6 +13,7 @@
 
 #include "oled.h"
 #include "button.h"
+#include "i2c_bus.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
@@ -179,6 +180,7 @@ void updateOLED() {
 
     // Prioritas: kalau tombol sedang ditahan ≥ 3 detik, tampilkan pesan khusus
     if (isButtonLongHolding()) {
+        if (!I2cBus::acquire(I2cBus::Owner::OLED)) return;
         display.clearDisplay();
         display.setTextColor(SSD1306_WHITE);
         display.setTextSize(2);
@@ -189,18 +191,21 @@ void updateOLED() {
         display.println("Tahan 3 detik...");
         display.println("Lepas utk mulai");
         display.display();
+        I2cBus::release(I2cBus::Owner::OLED);
         return;
     }
 
     // Jika autotuner sedang jalan, biarkan autotuner yang menggambar layar
     if (isAutoTunerRunning()) {
-        return; 
+        return;
     }
 
     // Ganti mode HANYA jika tombol ditekan singkat (< 3 detik)
     if (isButtonShortPressed()) {
         currentMode = (OledMode)((currentMode + 1) % OLED_MODE_COUNT);
     }
+
+    if (!I2cBus::acquire(I2cBus::Owner::OLED)) return;
 
     switch (currentMode) {
         case OLED_MODE_YAW:   drawYawMode();   break;
@@ -209,10 +214,12 @@ void updateOLED() {
     }
 
     display.display();
+    I2cBus::release(I2cBus::Owner::OLED);
 }
 
 void oledShowStatus(const char* line1, const char* line2) {
     if (!oledReady) return;
+    if (!I2cBus::acquire(I2cBus::Owner::OLED)) return;
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
     display.setTextSize(2);
@@ -223,4 +230,5 @@ void oledShowStatus(const char* line1, const char* line2) {
         display.println(line2);
     }
     display.display();
+    I2cBus::release(I2cBus::Owner::OLED);
 }

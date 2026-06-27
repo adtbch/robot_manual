@@ -26,8 +26,10 @@
 #include "webconfig.h"
 #include "pid.h"
 #include "mpu.h"
+#include "motor.h"
 #include "encoder.h"
 #include "autoTuner.h"
+#include "kinematik.h"
 
 // =====================================================================
 //  STATE
@@ -59,6 +61,7 @@ h1{font-size:1.2em;margin-bottom:12px;color:#38bdf8}
 .btn-green{background:#16a34a;color:#fff}
 .btn-orange{background:#ea580c;color:#fff}
 .btn-red{background:#dc2626;color:#fff}
+.btn-purple{background:#9333ea;color:#fff}
 .btn:active{opacity:0.8}
 .status{font-size:0.75em;color:#64748b;margin-top:6px}
 .motor-label{font-size:0.8em;color:#38bdf8;font-weight:600;margin-bottom:2px}
@@ -74,6 +77,16 @@ h1{font-size:1.2em;margin-bottom:12px;color:#38bdf8}
 <div style="margin-top:6px">
 <button class="btn btn-blue" onclick="saveYawPid()">Save Yaw</button>
 <button class="btn btn-green" onclick="saveAll()">Save All to NVS</button>
+</div>
+<div style="margin-top:10px">
+<h2 style="font-size:0.8em;color:#cbd5e1">Test Yaw Target</h2>
+<div style="display:flex;gap:4px;flex-wrap:wrap">
+<button class="btn btn-purple" onclick="testYaw(0)">0°</button>
+<button class="btn btn-purple" onclick="testYaw(90)">90°</button>
+<button class="btn btn-purple" onclick="testYaw(-90)">-90°</button>
+<button class="btn btn-purple" onclick="testYaw(180)">180°</button>
+<button class="btn btn-red" onclick="testYaw(null)">STOP</button>
+</div>
 </div>
 </div>
 <div class="card">
@@ -99,6 +112,7 @@ function loadPid(){fetch('/api/pid').then(r=>r.json()).then(d=>{for(let i=0;i<4;
 function saveM(i){const b=JSON.stringify({idx:i,kp:parseFloat(document.getElementById('m'+i+'kp').value),ki:parseFloat(document.getElementById('m'+i+'ki').value),kf:parseFloat(document.getElementById('m'+i+'kf').value),db:parseFloat(document.getElementById('m'+i+'db').value)});fetch('/api/pid',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('M'+i+': '+d.ok)).catch(e=>log('ERR: '+e));}
 function saveYawPid(){const b=JSON.stringify({kp:parseFloat(document.getElementById('ykp').value),ki:parseFloat(document.getElementById('yki').value),kd:parseFloat(document.getElementById('ykd').value)});fetch('/api/yawpid',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('Yaw: '+d.ok)).catch(e=>log('ERR: '+e));}
 function saveAll(){saveM(0);saveM(1);saveM(2);saveM(3);saveYawPid();setTimeout(()=>fetch('/api/save',{method:'POST'}),200);log('All saved to NVS');}
+function testYaw(target){const b=JSON.stringify(target===null?{stop:true}:{stop:false,target:target});fetch('/api/testyaw',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log(target===null?'Test Yaw STOP':'Test Yaw Target: '+target+'°')).catch(e=>log('ERR: '+e));}
 function autoTune(i){if(!confirm('Auto-tune motor '+i+'? Robot harus diam.'))return;fetch('/api/autotune',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idx:i})}).then(r=>r.json()).then(d=>log('AT: '+d.ok)).catch(e=>log('ERR: '+e));}
 function loadStatus(){fetch('/api/status').then(r=>r.json()).then(d=>{let s='Yaw: '+Number(d.yaw||0).toFixed(1)+' | Enc: '+(d.enc||[]).join(', ')+' | RPM: '+(d.rpm||[]).join(', ');document.getElementById('st').textContent=s;}).catch(()=>{});}
 buildCards();loadPid();setInterval(loadStatus,500);
@@ -131,30 +145,47 @@ static void handleApiPidGet() {
     server.send(200, "application/json", json);
 }
 
+// Helper untuk parsing JSON secara manual
+static float getJsonFloat(const String& json, const String& key) {
+    String search = "\"" + key + "\"";
+    int idx = json.indexOf(search);
+    if (idx < 0) return 0.0f;
+    
+    int colonIdx = json.indexOf(':', idx + search.length());
+    if (colonIdx < 0) return 0.0f;
+    
+    return json.substring(colonIdx + 1).toFloat();
+}
+
+static int getJsonInt(const String& json, const String& key) {
+    String search = "\"" + key + "\"";
+    int idx = json.indexOf(search);
+    if (idx < 0) return -1;
+    
+    int colonIdx = json.indexOf(':', idx + search.length());
+    if (colonIdx < 0) return -1;
+    
+    return json.substring(colonIdx + 1).toInt();
+}
+
 static void handleApiPidPost() {
     if (server.method() != HTTP_POST) {
         server.send(405, "application/json", "{\"error\":\"POST only\"}");
         return;
     }
     String body = server.arg("plain");
-    int idx = -1;
-    float kp = 0, ki = 0, kf = 0, db = 0;
-
-    int idxIdx = body.indexOf("\"idx\"");
-    if (idxIdx >= 0) idx = body.substring(idxIdx + 5).toInt();
-    int kpIdx = body.indexOf("\"kp\"");
-    if (kpIdx >= 0) kp = body.substring(kpIdx + 4).toFloat();
-    int kiIdx = body.indexOf("\"ki\"");
-    if (kiIdx >= 0) ki = body.substring(kiIdx + 4).toFloat();
-    int kfIdx = body.indexOf("\"kf\"");
-    if (kfIdx >= 0) kf = body.substring(kfIdx + 4).toFloat();
-    int dbIdx = body.indexOf("\"db\"");
-    if (dbIdx >= 0) db = body.substring(dbIdx + 4).toFloat();
-
+    
+    int idx = getJsonInt(body, "idx");
     if (idx < 0 || idx > 3) {
         server.send(400, "application/json", "{\"error\":\"invalid idx\"}");
         return;
     }
+
+    float kp = getJsonFloat(body, "kp");
+    float ki = getJsonFloat(body, "ki");
+    float kf = getJsonFloat(body, "kf");
+    float db = getJsonFloat(body, "db");
+
     pidSetGains(idx, kp, ki, kf, db);
     Serial.printf("[WEB] Motor %d PID: Kp=%.3f Ki=%.3f Kf=%.3f Db=%.1f\n", idx, kp, ki, kf, db);
     server.send(200, "application/json", "{\"ok\":true}");
@@ -166,19 +197,16 @@ static void handleApiYawPid() {
         return;
     }
     String body = server.arg("plain");
-    float kp = 0, ki = 0, kd = 0;
-
-    int kpIdx = body.indexOf("\"kp\"");
-    if (kpIdx >= 0) kp = body.substring(kpIdx + 4).toFloat();
-    int kiIdx = body.indexOf("\"ki\"");
-    if (kiIdx >= 0) ki = body.substring(kiIdx + 4).toFloat();
-    int kdIdx = body.indexOf("\"kd\"");
-    if (kdIdx >= 0) kd = body.substring(kdIdx + 4).toFloat();
+    
+    float kp = getJsonFloat(body, "kp");
+    float ki = getJsonFloat(body, "ki");
+    float kd = getJsonFloat(body, "kd");
 
     pidKinematicYaw.kp = kp;
     pidKinematicYaw.ki = ki;
     pidKinematicYaw.kd = kd;
     pidKinematicYaw.reset();
+    
     Serial.printf("[WEB] Yaw PID: Kp=%.3f Ki=%.3f Kd=%.3f\n", kp, ki, kd);
     server.send(200, "application/json", "{\"ok\":true}");
 }
@@ -202,29 +230,61 @@ static void handleApiAutotune() {
         return;
     }
     String body = server.arg("plain");
-    int idx = -1;
 
-    int idxIdx = body.indexOf("\"idx\"");
-    if (idxIdx >= 0) {
-        int q1 = body.indexOf('"', idxIdx + 5);
-        int q2 = body.indexOf('"', q1 + 1);
-        String val = body.substring(q1 + 1, q2);
-        if (val == "all") {
-            startAutoTuneAll();
-            server.send(200, "application/json", "{\"ok\":true,\"target\":\"all\"}");
-            Serial.println("[WEB] Auto-tune ALL started");
-            return;
-        }
-        idx = val.toInt();
+    // Matikan testYawMode secara paksa saat mulai autotune
+    if (testYawMode) {
+        testYawMode = false;
+        motorStopAll();
     }
-
+    
+    // Check if string "all"
+    if (body.indexOf("\"all\"") >= 0) {
+        startAutoTuneAll();
+        server.send(200, "application/json", "{\"ok\":true,\"target\":\"all\"}");
+        Serial.println("[WEB] Auto-tune ALL started");
+        return;
+    }
+    
+    int idx = getJsonInt(body, "idx");
     if (idx < 0 || idx > 3) {
         server.send(400, "application/json", "{\"error\":\"invalid idx\"}");
         return;
     }
+    
     startAutoTune(idx);
     Serial.printf("[WEB] Auto-tune motor %d started\n", idx);
     server.send(200, "application/json", "{\"ok\":true,\"target\":" + String(idx) + "}");
+}
+
+static void handleApiTestYaw() {
+    if (server.method() != HTTP_POST) {
+        server.send(405, "application/json", "{\"error\":\"POST only\"}");
+        return;
+    }
+    String body = server.arg("plain");
+
+    if (body.indexOf("\"stop\":true") >= 0) {
+        testYawMode = false;
+        motorStopAll();
+        Serial.println("[WEB] Test Yaw STOPPED");
+        server.send(200, "application/json", "{\"ok\":true}");
+        return;
+    }
+
+    int targetIdx = body.indexOf("\"target\"");
+    if (targetIdx >= 0) {
+        int valIdx = body.indexOf(':', targetIdx) + 1;
+        testYawTarget = body.substring(valIdx).toInt();
+        testYawMode = true;
+        
+        // Reset PID integral/state when starting test
+        pidKinematicYaw.reset();
+        
+        Serial.printf("[WEB] Test Yaw STARTED: Target %d°\n", testYawTarget);
+        server.send(200, "application/json", "{\"ok\":true,\"target\":" + String(testYawTarget) + "}");
+    } else {
+        server.send(400, "application/json", "{\"error\":\"missing target\"}");
+    }
 }
 
 static void handleApiStatus() {
@@ -270,6 +330,7 @@ void setupWebServer() {
     server.on("/api/pid", HTTP_GET, handleApiPidGet);
     server.on("/api/pid", HTTP_POST, handleApiPidPost);
     server.on("/api/yawpid", HTTP_POST, handleApiYawPid);
+    server.on("/api/testyaw", HTTP_POST, handleApiTestYaw);
     server.on("/api/save", HTTP_POST, handleApiSave);
     server.on("/api/autotune", HTTP_POST, handleApiAutotune);
     server.on("/api/status", HTTP_GET, handleApiStatus);

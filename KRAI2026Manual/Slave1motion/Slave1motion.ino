@@ -99,7 +99,10 @@ void loop() {
         convertEncoderToRPM();
     }
 
-    updateYaw();
+    // Saat autotune motor jalan: skip MPU agar bus I2C tidak berebut dengan OLED
+    if (!isAutoTunerRunning()) {
+        updateYaw();
+    }
     updateOdometry();
 
     // Test Yaw PID Mode

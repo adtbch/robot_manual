@@ -13,6 +13,7 @@
 #include "motor.h"
 #include "mpu.h"
 #include "autoTuner.h"
+#include "kinematik.h"
 
 namespace {
 
@@ -31,6 +32,7 @@ void printHelp(Print& out) {
     out.println("  tuneyaw <kp> <ki> <kd>            — set yaw PID");
     out.println("  saveyaw / loadyaw / showyaw       — yaw PID NVS");
     out.println("  rpm <fr> <fl> <br> <bl>           — USB: raw PWM | Master: PID RPM");
+    out.println("  kn <vx> <vy> <yaw>                — field-cent RPM + yaw correction");
     out.println("  stop                              — stop all motors");
     out.println("  autotune <motor|all>              — run auto-tuner");
     out.println("  calibrate / calclear              — gyro calibration NVS");
@@ -89,6 +91,19 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             }
         } else {
             out.println("Format: rpm <fr> <fl> <br> <bl>");
+        }
+    } else if (strcmp(token, "kn") == 0) {
+        char* vxStr = strtok(nullptr, " ");
+        char* vyStr = strtok(nullptr, " ");
+        char* yawStr = strtok(nullptr, " ");
+        if (vxStr != nullptr && vyStr != nullptr && yawStr != nullptr) {
+            const int vx = atoi(vxStr);
+            const int vy = atoi(vyStr);
+            const int yaw = atoi(yawStr);
+            driveFieldCentricWithYawCorrection(vx, vy, yaw);
+            out.printf("KN: vx=%d vy=%d yaw=%d\n", vx, vy, yaw);
+        } else {
+            out.println("Format: kn <vx> <vy> <yawDeg>");
         }
     } else if (strcmp(token, "stop") == 0) {
         rpmMotor(0, 0, 0, 0);

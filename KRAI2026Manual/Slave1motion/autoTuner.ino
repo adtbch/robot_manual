@@ -12,7 +12,7 @@
 
 namespace AutoTunerNS {
     constexpr uint32_t kPidTickMs = 40;
-    constexpr uint32_t kQuickLogThresholdMs = 200;
+    constexpr uint32_t kQuickLogThresholdMs = 500;
     constexpr float kTargetRpm = AUTOTUNE_TARGET_RPM;
     constexpr float kSteadyStateStartFraction = 0.60f;
     constexpr float kBurstThreshold = 1.30f;
