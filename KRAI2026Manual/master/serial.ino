@@ -206,10 +206,10 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
 
     // ── LIMIT ───────────────────────────────────────────────────
     else if (strcmp(token, "limit") == 0) {
-        for (size_t i = 0; i < LIMIT_COUNT; i++) {
-            out.printf("  Limit%zu: %s\n", i + 1,
-                       readLimitSwitch(i) ? "TRIGGERED" : "clear");
-        }
+        out.printf("  LimY_Bawah       : %s\n", readLimitSwitch(LIMIT_Y_BAWAH)         ? "TRIGGERED" : "clear");
+        out.printf("  LimX_Mundur      : %s\n", readLimitSwitch(LIMIT_X_MUNDUR)        ? "TRIGGERED" : "clear");
+        out.printf("  LimArmBox_Depan  : %s\n", readLimitSwitch(LIMIT_ARMBOX_DEPAN)    ? "TRIGGERED" : "clear");
+        out.printf("  LimArmBox_Belakang: %s\n", readLimitSwitch(LIMIT_ARMBOX_BELAKANG) ? "TRIGGERED" : "clear");
     }
 
     // ── PROX ────────────────────────────────────────────────────
@@ -225,8 +225,10 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
             gripperReset();
             out.println("Gripper: RESET ke IDLE");
         } else if (sub != nullptr && strcmp(sub, "homing") == 0) {
+            gripperHomingCancel();
             setServoHoming();
-            out.println("Gripper: HOMING (buka + lengan awal)");
+            gripperMotorYResetLevel();
+            out.println("Gripper: servo homing + motor Y level 0");
         } else {
             out.println("Usage: gripper <reset|homing>");
         }
@@ -239,10 +241,10 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         out.printf("  Prox    : %s\n", readProximity() ? "DETECTED" : "clear");
         out.printf("  EncX    : %ld\n", getEncoderCount('x'));
         out.printf("  EncY    : %ld\n", getEncoderCount('y'));
-        out.printf("  LimX1   : %s\n", readLimitSwitch(LIMIT_SWITCH_X1) ? "TRIGGERED" : "clear");
-        out.printf("  LimX2   : %s\n", readLimitSwitch(LIMIT_SWITCH_X2) ? "TRIGGERED" : "clear");
-        out.printf("  LimX3   : %s\n", readLimitSwitch(LIMIT_SWITCH_X3) ? "TRIGGERED" : "clear");
-        out.printf("  LimX4   : %s\n", readLimitSwitch(LIMIT_SWITCH_X4) ? "TRIGGERED" : "clear");
+        out.printf("  LimY_Bawah       : %s\n", readLimitSwitch(LIMIT_Y_BAWAH)         ? "TRIGGERED" : "clear");
+        out.printf("  LimX_Mundur      : %s\n", readLimitSwitch(LIMIT_X_MUNDUR)        ? "TRIGGERED" : "clear");
+        out.printf("  LimArmBox_Depan  : %s\n", readLimitSwitch(LIMIT_ARMBOX_DEPAN)    ? "TRIGGERED" : "clear");
+        out.printf("  LimArmBox_Belakang: %s\n", readLimitSwitch(LIMIT_ARMBOX_BELAKANG) ? "TRIGGERED" : "clear");
         out.println("==============");
     }
 

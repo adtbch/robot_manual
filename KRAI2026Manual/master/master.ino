@@ -89,15 +89,11 @@ void loop() {
     motorHomingTick();
 
     // ESP-NOW receiver
-    // 1. Cetak statistik periodik
     espNowControlTick();
-    // 2. Ambil paket terbaru & proses
-    ControlPacket gLastRxPacket = {};
-    if (espNowControlReadPacket(gLastRxPacket)) {
-        // 3. Dispatch ke modul control
-        gripperControlTick(gLastRxPacket);
-        motionControlTick(gLastRxPacket);
-    }
+    static ControlPacket gLastRxPacket = {};
+    espNowControlReadPacket(gLastRxPacket);
+    gripperControlTick(gLastRxPacket);
+    motionControlTick(gLastRxPacket);
 
     // Encoder positioning motor X/Y
     motorXPositionTick();

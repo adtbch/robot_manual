@@ -45,11 +45,29 @@ constexpr int PWM_MIN        = -1023;
 constexpr int PWM_FREQUENCY  = 20000;   // Hz
 constexpr int PWM_RESOLUTION = 10;      // bit (2^10 = 1024)
 
-// Encoder travel limits — sesuaikan setelah kalibrasi hardware
-constexpr long MOTOR_X_ENC_MIN = -2500;
-constexpr long MOTOR_X_ENC_MAX =  2500;
-constexpr long MOTOR_Y_ENC_MIN = -2500;
-constexpr long MOTOR_Y_ENC_MAX =  2500;
+// Encoder travel limits — origin (0) = posisi homing (bawah + mundur)
+constexpr long MOTOR_X_ENC_MIN = 0;
+constexpr long MOTOR_X_ENC_MAX = 2500;
+constexpr long MOTOR_Y_ENC_MIN = 0;
+constexpr long MOTOR_Y_ENC_MAX = 2500;
+
+// Capit senjata — level naik/turun Y (0 = bawah/homing, 5 = paling atas)
+constexpr uint8_t MOTOR_Y_LEVEL_MAX = 5;
+constexpr long MOTOR_Y_LEVEL_0 = 0;
+constexpr long MOTOR_Y_LEVEL_1 = 300;
+constexpr long MOTOR_Y_LEVEL_2 = 600;
+constexpr long MOTOR_Y_LEVEL_3 = 900;
+constexpr long MOTOR_Y_LEVEL_4 = 1200;
+constexpr long MOTOR_Y_LEVEL_5 = 1500;
+
+constexpr long MOTOR_Y_LEVEL_ENC[6] = {
+    MOTOR_Y_LEVEL_0,
+    MOTOR_Y_LEVEL_1,
+    MOTOR_Y_LEVEL_2,
+    MOTOR_Y_LEVEL_3,
+    MOTOR_Y_LEVEL_4,
+    MOTOR_Y_LEVEL_5,
+};
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS

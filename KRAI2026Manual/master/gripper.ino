@@ -7,9 +7,9 @@
  *   Proximity detect → tutup gripper (servo d) → luruskan arm (servo b)
  *
  * MOTOR HOMING (sequential):
- *   1. Motor Y naik sampai kena limit → reset encoder Y
- *   2. Motor X ke kanan sampai kena limit → reset encoder X
- *   3. Kedua motor ke posisi tengah (encoder = 0)
+ *   1. Motor Y turun mentok → kena LIMIT_Y_BAWAH → reset encoder Y = 0
+ *   2. Motor X mundur mentok → kena LIMIT_X_MUNDUR → reset encoder X = 0
+ *   Origin encoder (0,0) = posisi bawah + mundur.
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -26,16 +26,9 @@
 // =====================================================================
 
 constexpr int HOMING_PWM = 400;
-constexpr long HOME_X_CENTER = 0;   // posisi tengah X (encoder pulse)
-constexpr long HOME_Y_CENTER = 0;   // posisi tengah Y (encoder pulse)
-constexpr long HOME_THRESHOLD = 5;  // toleransi posisi tengah
 
 // =====================================================================
 //  STATE
-// =====================================================================
-
-// =====================================================================
-//  STATE — gGripperState didefinisikan di sini (extern di config.h)
 // =====================================================================
 
 GripperState gGripperState = IDLE;
@@ -44,8 +37,7 @@ namespace {
 
 Jeda gJeda;
 
-// Motor homing — sequential
-enum HomingState { HOMING_IDLE, HOMING_Y, HOMING_X, HOMING_CENTER };
+enum HomingState { HOMING_IDLE, HOMING_Y_DOWN, HOMING_X_MUNDUR };
 HomingState gHomingState = HOMING_IDLE;
 
 } // anonymous namespace
@@ -59,13 +51,20 @@ void setServoHoming() {
 void setMotorHoming() {
     motorXStop();
     motorYStop();
-    gHomingState = HOMING_Y;
-    pwmMotor('y', -HOMING_PWM);  // Y naik terus
+    gHomingState = HOMING_Y_DOWN;
+    pwmMotor('y', HOMING_PWM);  // Y turun mentok
 }
 
 void setHomingAll() {
     setMotorHoming();
     setServoHoming();
+}
+
+void gripperHomingCancel() {
+    if (gHomingState == HOMING_IDLE) return;
+    pwmMotor('x', 0);
+    pwmMotor('y', 0);
+    gHomingState = HOMING_IDLE;
 }
 
 // =====================================================================
@@ -78,43 +77,26 @@ void motorHomingTick() {
         case HOMING_IDLE:
             break;
 
-        // ── Step 1: Y naik sampai limit ─────────────────────────
-        case HOMING_Y:
-            if (readLimitSwitch(LIMIT_SWITCH_X1)) {
+        // ── Step 1: Y turun sampai limit bawah ──────────────────
+        case HOMING_Y_DOWN:
+            if (readLimitSwitch(LIMIT_Y_BAWAH)) {
                 pwmMotor('y', 0);
                 resetEncoderCount('y');
-                gHomingState = HOMING_X;
-                pwmMotor('x', -HOMING_PWM);  // X ke kanan
+                gHomingState = HOMING_X_MUNDUR;
+                pwmMotor('x', HOMING_PWM);  // X mundur mentok
             }
             break;
 
-        // ── Step 2: X ke kanan sampai limit ────────────────────
-        case HOMING_X:
-            if (readLimitSwitch(LIMIT_SWITCH_X2)) {
+        // ── Step 2: X mundur sampai limit depan ─────────────────
+        case HOMING_X_MUNDUR:
+            if (readLimitSwitch(LIMIT_X_MUNDUR)) {
                 pwmMotor('x', 0);
                 resetEncoderCount('x');
-                gHomingState = HOMING_CENTER;
-                // Gerak ke arah tengah (berlawanan dari limit)
-                pwmMotor('x', HOMING_PWM);
-                pwmMotor('y', HOMING_PWM);
-            }
-            break;
-
-        // ── Step 3: Gerak ke tengah (encoder = 0) ──────────────
-        case HOMING_CENTER: {
-            long encX = getEncoderCount('x');
-            long encY = getEncoderCount('y');
-            bool xDone = (abs(encX - HOME_X_CENTER) <= HOME_THRESHOLD);
-            bool yDone = (abs(encY - HOME_Y_CENTER) <= HOME_THRESHOLD);
-
-            if (xDone) pwmMotor('x', 0);
-            if (yDone) pwmMotor('y', 0);
-
-            if (xDone && yDone) {
                 gHomingState = HOMING_IDLE;
+                gripperMotorYResetLevel();
+                motorXSetTarget(0);
             }
             break;
-        }
     }
 }
 
@@ -152,7 +134,7 @@ void gripperReadytoStab() {
     if (gGripperState == STRAIGHTEN) {
         setServoAngle('b', 0);
         gGripperState = READY_TO_STAB;
-    } else return; 
+    } else return;
 }
 
 // =====================================================================

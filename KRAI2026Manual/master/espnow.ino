@@ -126,6 +126,7 @@ void updatePacketFromIsr(const ControlPacket &packet) {
     portENTER_CRITICAL(&espNowPacketMux);
     gEspNow.latestPacket = packet;
     gEspNow.packetAvailable = true;
+    gEspNow.lastPacketRxMs = millis();  // timestamp saat packet tiba, bukan saat dibaca
     portEXIT_CRITICAL(&espNowPacketMux);
 }
 
