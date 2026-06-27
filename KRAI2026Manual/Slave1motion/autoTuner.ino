@@ -413,6 +413,13 @@ void autoTunerTick(bool bootPressed) {
 
             float rpm = fabsf(getEncoderVelocityRpm(tMotorIdx));
             
+            // Debug print setiap 500ms
+            static uint32_t lastDbDebugMs = 0;
+            if (now - lastDbDebugMs >= 500) {
+                lastDbDebugMs = now;
+                Serial.printf("[AUTOTUNE-DEBUG] M%d Deadband Wait: PWM=%d, RPM=%.2f\n", tMotorIdx, deadbandPwm, rpm);
+            }
+
             // If motor starts spinning
             if (rpm >= 2.0f) {
                 baseDeadband = (float)deadbandPwm;
@@ -505,8 +512,8 @@ void autoTunerTick(bool bootPressed) {
 
         if (now - lastPidTickMs >= AutoTunerNS::kPidTickMs) {
             lastPidTickMs = now;
-            convertEncoderToRPM();
-
+            // Dihapus: convertEncoderToRPM(); karena loop() utama sudah memanggilnya
+            
             float rpm = getEncoderVelocityRpm(tMotorIdx);
             int pwm = pidCompute(tMotorIdx, AutoTunerNS::kTargetRpm, AutoTunerNS::kPidTickMs / 1000.0f);
             pwmMotor(tMotorIdx, pwm);

@@ -47,7 +47,7 @@ void setup() {
     // Init I2C
     Wire.begin(I2C_SDA, I2C_SCL);
     Wire.setTimeOut(100);  // Timeout 100ms agar I2C tidak hang jika bus error
-    Wire.setClock(400000);
+    Wire.setClock(100000); // ponytail: diturunkan ke 100kHz untuk meningkatkan toleransi terhadap noise/NACK dari BTS
 
     // Init OLED
     if (!setupOLED()) {
@@ -82,6 +82,9 @@ void setup() {
 //  LOOP
 // =====================================================================
 
+bool testYawMode = false;
+int testYawTarget = 0;
+
 void loop() {
     // Handle OTA update (WiFi)
     handleOTA();
@@ -94,6 +97,8 @@ void loop() {
 
     // Tombol tahan 3 detik -> trigger auto-tune
     if (isButtonLongPressed() && !isAutoTunerRunning()) {
+        testYawMode = false; // Matikan mode test yaw jika menyala
+        motorStopAll();
         Serial.println("\n[AUTOTUNE] Button Long Press -> Starting!");
         startAutoTuneAll();
     }
@@ -115,6 +120,14 @@ void loop() {
 
     // Update odometry dari external encoder (setiap loop, sudah ada dt guard)
     updateOdometry();
+
+    // Test Yaw PID Mode
+    if (testYawMode && !isAutoTunerRunning()) {
+        static Jeda jedaYawTest;
+        if (jedaYawTest.check(20)) { // 50Hz update loop
+            driveFieldCentricWithYawCorrection(0, 0, testYawTarget);
+        }
+    }
 
     // Update OLED display
     updateOLED();

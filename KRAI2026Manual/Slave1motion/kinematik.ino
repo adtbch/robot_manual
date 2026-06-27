@@ -70,7 +70,7 @@ void driveFieldCentricWithYawCorrection(int vx, int vy, int yawTarget) {
 
     float currentYaw = getYaw();
     int correctionYaw = pidComputeYaw(pidKinematicYaw, (float)yawTarget, currentYaw, dt);
-    driveFieldCentricRpm(vx, vy, -correctionYaw);
+    driveFieldCentricRpm(vx, vy, correctionYaw);
 }
 
 // =====================================================================

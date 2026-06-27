@@ -17,6 +17,9 @@
 
 extern WebServer server;
 
+extern bool testYawMode;
+extern int testYawTarget;
+
 void setupWebServer();
 void webServerTick();
 
