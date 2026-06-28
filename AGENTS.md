@@ -46,7 +46,7 @@ Port: cek dengan `arduino-cli board list`.
 
 ## KRAI2026Manual/master — Master Board
 
-Board master untuk KRAI 2026. Flat .ino approach. ESP-NOW receiver dari controller, relay ke slave1 (UART1) dan slave2 (UART2).
+Board master untuk KRAI 2026. Flat .ino approach. ESP-NOW receiver dari controller, motor X/Y (arm capit senjata), servo gripper, relay ke slave1 (UART1) dan slave2 (UART2).
 
 ### Struktur Folder
 
@@ -54,30 +54,29 @@ Board master untuk KRAI 2026. Flat .ino approach. ESP-NOW receiver dari controll
 KRAI2026Manual/master/
 ├── master.ino                  ← main entry: setup() + loop()
 │
-├── config.h                    ← shared types: ControlPacket, BTN_*, Jeda
+├── config.h                    ← shared types: ControlPacket, BTN_*, Jeda, GripperState, InputMode, gYawTarget, gModeInvert
 ├── espnow.h                    ← ESP-NOW config: MAC whitelist, channel, magic, function declarations
-├── motor.h                     ← Motor: pin, PWM, MotorConfig struct
+├── motor.h                     ← Motor: pin, PWM, MotorConfig struct, level presets, encoder position API
 ├── encoder.h                   ← Encoder: pin, ESP32Encoder library
-├── limit_switch.h              ← Limit switch: pin
+├── limit_switch.h              ← Limit switch: pin (LIMIT_Y_BAWAH, LIMIT_X_MUNDUR, LIMIT_ARMBOX_*)
 ├── servo.h                     ← Servo: pin, PWM 50Hz, ServoConfig struct
 ├── relay.h                     ← Relay: pin
 ├── proximity.h                 ← Proximity: pin
 ├── serial.h                    ← Serial: UART1→slave1, UART2→slave2, function declarations
 │
 ├── espnow.ino                  ← ESP-NOW: init, peer, callback, fetchPacket, isLinkAlive
-├── motor.ino                   ← SetupMotors(), pwmMotor(), motorStopAll()
-├── encoder.ino                 ← setupEncoders(), getEncoderCount(), resetEncoderCount()
-├── limit_switch.ino            ← setupLimits(), readLimitSwitch() — double-read anti-noise
+├── motor.ino                   ← SetupMotors(), pwmMotor(), motorStopAll(), position control X/Y, level Y
+├── encoder.ino                 ← setupEncoders(), getEncoderCount(char), resetEncoderCount(char)
+├── limit_switch.ino            ← setupLimits(), readLimitSwitch(uint8_t)
 ├── servo.ino                   ← setupServos(), setServoAngle()
 ├── relay.ino                   ← setupRelay(), relayOn(), relayOff(), relayToggle()
 ├── proximity.ino               ← setupProximity(), readProximity()
 ├── serial.ino                  ← Unified command handler: PC + slave1 + slave2
-├── serial_command.ino          ← Helper: sendRpmCommand() ke slave1
+├── serial_command.ino          ← Helper: sendKnCommand() ke slave1
 │
-├── gripper.ino                 ← Auto gripper: proximity → close servo d → straighten servo b
-├── gripper_control.ino         ← Mapping tombol → gripper (R1/L1/R2/L2/Segitiga)
-├── motion_control.ino          ← Mapping joystick/dpad → mecanum ke slave1 (SHARE toggle)
-└── armbox_control.ino          ← kontrol slave2 (nanti)
+├── gripper.ino                 ← Auto gripper state machine (IDLE→CLOSING→UP→STRAIGHTEN→READY_TO_STAB)
+├── gripper_control.ino         ← Mapping tombol → motor X/Y jog, servo B manual, setupZone1
+└── motion_control.ino          ← Mapping joystick/dpad → field-centric kn ke slave1 (SHARE toggle)
 ```
 
 ### Serial Architecture — Unified Command Handler
@@ -107,6 +106,8 @@ KRAI2026Manual/master/
 ```
 motor <id> <pwm>         — Set motor PWM (contoh: motor x 500)
 motorstop                — Stop semua motor
+motortarget <x|y> <enc>  — Set encoder target (alias: motorpid)
+motortargetstop <x|y>    — Stop positioning (alias: motorpidstop)
 servo <id> <angle>       — Set servo sudut (contoh: servo d 90)
 relay <on|off|t>         — Relay on/off/toggle
 enc                      — Baca encoder
@@ -115,7 +116,7 @@ limit                    — Baca limit switch
 prox                     — Baca proximity
 gripper <reset|homing>   — Reset atau homing gripper
 status                   — Tampilkan semua status
-stop                     — Stop semua motor + servo
+stop                     — Stop semua motor + servo tengah (90)
 help                     — Tampilkan daftar command
 ```
 
@@ -123,33 +124,38 @@ help                     — Tampilkan daftar command
 
 | Tombol | Aksi |
 |--------|------|
-| R1 | Tutup gripper (servo d = 90) |
-| L1 | Buka gripper (servo d = 0) |
-| R2 | Homing (buka + lengan awal) |
-| L2 | Reset state gripper |
-| Segitiga | Siap stab (`gripperReadytoStab()`) |
+| Options | Setup zone1 (servo homing + motor Y level 0 + motor X encoder 200) |
+| Segitiga tahan + analog/DPAD | Jog motor X/Y (manual) |
+| Segitiga + L2 | Homing (servo + motor) |
+| READY_TO_STAB + R2 tahan + analog/DPAD | Servo B manual |
 
 - **Edge detection** — trigger sekali saat tombol ditekan, tidak trigger saat dihold
-- **Mapping gampang** — edit konstanta `BTN_GRIPPER_*` di atas file
+- **Inverted input** — analog/DPAD berlawanan dengan motion_control (baca bagian Motion)
+- **Level Y** — 6 level (0–5): 0=0, 1=300, 2=600, 3=900, 4=1200, 5=1500 encoder pulse
+- **Speed modes** — R1=fast (40), normal=15, L1=slow (5) encoder pulse/step
 
 ### Controller Mapping — Motion (`motion_control.ino`)
 
 | Input | Aksi |
 |-------|------|
-| DPAD/Analog kiri | Maju/mundur/geser (mecanum) |
+| DPAD/Analog kiri | Maju/mundur/geser (mecanum → slave1) |
+| Analog kanan (rx) | Yaw target (±1° per step) |
 | SHARE | Toggle input mode (DPAD ↔ ANALOG) |
-| R1 hold | Fast mode (1.5x speed) |
-| L1 hold | Slow mode (0.5x speed) |
+| L1+R1+L2+R2 | Toggle invert input (atas↔bawah, kiri↔kanan) |
+| R1 hold | Fast mode (150 RPM, yaw step 25ms) |
+| L1 hold | Slow mode (25 RPM, yaw step 150ms) |
 
 - **Default mode: DPAD** — tekan SHARE untuk switch ke analog
 - **Deadzone 20** — filter noise joystick
-- **Safety stop** — PS4 disconnect / ESP-NOW putus → motor stop otomatis
+- **Stream kn selalu** — kirim kn tiap 20ms, link mati → `kn 0 0 <yawTarget>` (cegah motor jalan sendiri)
+- **gYawTarget** — yaw angle ±180°, disimpan di master, dikirim sebagai argumen ke-3 kn
+- **gModeInvert** — toggle L1+R1+L2+R2, balik lx/ly untuk motion; gripper_control baca terpisah
 
 ### Serial Command ke Slave1 (`serial_command.ino`)
 
 ```
-rpm <fr> <fl> <br> <bl>    — 4 motor mecanum RPM
-contoh: rpm 500 -500 500 -500
+kn <vx> <vy> <yawTarget>  — field-centric mecanum + yaw target
+contoh: kn 75 0 -90
 ```
 
 ### Kinematik Mecanum
@@ -170,19 +176,31 @@ BL = LY + LX
      │ proximity = detected
      ▼
 ┌──────────────┐
-│  CLOSING     │ ← servo d tutup (timeout 1s)
+│  CLOSING     │ ← servo d tutup (timeout 300ms)
 └────┬─────────┘
-     │ timeout 1s
+     │ timeout 300ms
      ▼
 ┌──────────────┐
-│  STRAIGHTEN  │ ← servo b lurus (no timeout)
+│  UP          │ ← servo b lurus + motor Y ke level 1
+└────┬─────────┘
+     │ motor Y sampai level 1
+     ▼
+┌──────────────┐
+│  STRAIGHTEN  │ ← servo b ke posisi awal, gYawTarget = -90
+└────┬─────────┘
+     │ gripperReadytoStab() / timeout
+     ▼
+┌──────────────┐
+│  READY_TO_STAB │ ← siap stab
 └──────────────┘
 ```
 
 - **`gripperZone1()`** — panggil di loop(), non-blocking
 - **`setServoHoming()`** — buka gripper + lengan ke posisi awal
+- **`setMotorHoming()`** — sequential: Y ke limit → reset enc Y → X ke limit → reset enc X
+- **`setupZone1()`** — blocking waypoint: setServoHoming + gYawTarget=180 + motor Y level 0 + motor X enc 200
 - **`gripperReset()`** — reset state ke IDLE
-- **`gripperReadytoStab()`** — lengan ke posisi siap stab
+- **`gripperReadytoStab()`** — state STRAIGHTEN → servo b = 0, state = READY_TO_STAB
 
 ### Build & Upload
 
@@ -191,7 +209,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32s3 KRAI2026Manual/master
 arduino-cli upload -p COM3 --fqbn esp32:esp32:esp32s3 KRAI2026Manual/master
 ```
 
-Flash: ~892KB (68%), RAM: ~44KB (13%)
+Flash: ~893KB (68%), RAM: ~44KB (13%)
 
 ---
 

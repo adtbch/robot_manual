@@ -97,6 +97,15 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
     // Lowercase untuk case-insensitive
     for (char* p = token; *p; ++p) *p = tolower(*p);
 
+    // ── BOX — dari slave2arm (proximity detect) ─────────────────
+    if (strcmp(token, "boxr") == 0 || strcmp(token, "boxl") == 0) {
+        char side = token[3];  // 'r' atau 'l'
+        motorYSetTarget(MOTOR_Y_LEVEL_1);  // naik ke level 1
+        boxSetPending(side);
+        out.printf("Box %c: motor Y naik ke level 1\n", side);
+        return;
+    }
+
     // ── MOTOR <id> <pwm> ────────────────────────────────────────
     if (strcmp(token, "motor") == 0) {
         char* id = strtok(nullptr, " ");

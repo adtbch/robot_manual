@@ -75,7 +75,6 @@ void setHomingAll() {
 void setupZone1() {
     setServoHoming();
     // WAYPOINT: ready to setup zone1
-    gYawTarget = 180;
     gripperMotorYSetLevel(0);
     motorXSetTarget(200);
 }
@@ -113,7 +112,7 @@ void gripperZone1() {
         case STRAIGHTEN:
             // Cek WAYPOINT
             gripperReadytoStab();
-            gYawTarget = -90;
+            gYawTarget = 90;
             // WAYPOINT menuju ke arah stab
             break;
         

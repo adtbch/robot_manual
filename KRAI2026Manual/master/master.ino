@@ -31,6 +31,26 @@
 #include "serial.h"
 
 // =====================================================================
+//  BOX STATE — tracking motor Y untuk kirim "box done" ke slave2
+// =====================================================================
+
+namespace {
+char gBoxPendingSide = 0;  // 'r', 'l', atau 0 (tidak ada)
+} // anonymous namespace
+
+void boxSetPending(char side) {
+    gBoxPendingSide = side;
+}
+
+void boxCheckDone() {
+    if (gBoxPendingSide != 0 && !motorYIsActive()) {
+        slave2Serial.printf("box%c done\n", gBoxPendingSide);
+        Serial.printf("Box %c: DONE dikirim ke slave2\n", gBoxPendingSide);
+        gBoxPendingSide = 0;
+    }
+}
+
+// =====================================================================
 //  SETUP
 // =====================================================================
 
@@ -83,4 +103,7 @@ void loop() {
     // Encoder positioning motor X/Y
     motorXPositionTick();
     motorYPositionTick();
+
+    // Box done — cek motor Y sampai, kirim ke slave2
+    boxCheckDone();
 }
