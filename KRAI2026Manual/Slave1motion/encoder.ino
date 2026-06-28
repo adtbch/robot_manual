@@ -1,4 +1,5 @@
 #include "encoder.h"
+#include "mpu.h"
 #include <ESP32Encoder.h>
 
 // =====================================================================
@@ -12,6 +13,7 @@ static const uint8_t intPinA[INT_ENCODER_COUNT] = {INT_ENC_FR_A, INT_ENC_FL_A, I
 static const uint8_t intPinB[INT_ENCODER_COUNT] = {INT_ENC_FR_B, INT_ENC_FL_B, INT_ENC_BR_B, INT_ENC_BL_B};
 
 volatile int64_t intEncCount[INT_ENCODER_COUNT] = {0};
+volatile uint32_t lastIntTime[INT_ENCODER_COUNT] = {0};
 portMUX_TYPE intEncMux = portMUX_INITIALIZER_UNLOCKED;
 
 float motorVelocityRpm[INT_ENCODER_COUNT] = {0};
@@ -46,6 +48,11 @@ float odomTheta = 0.0f;    // derajat
 
 void IRAM_ATTR intEncoderISR(void* arg) {
     int idx = (int)(size_t)arg;
+    uint32_t now = micros();
+    
+    // 50µs allows max speed up to ~4000 RPM at 270 PPR before missing real pulses.
+    if (now - lastIntTime[idx] < 50) return;
+    lastIntTime[idx] = now;
 
     uint32_t g0 = REG_READ(GPIO_IN_REG);
     uint32_t g1 = REG_READ(GPIO_IN1_REG);
@@ -77,7 +84,7 @@ static void setupExtEncoders() {
     ESP32Encoder::useInternalWeakPullResistors = puType::up;
 
     for (int i = 0; i < EXT_ENCODER_COUNT; i++) {
-        extEncoders[i].attachHalfQuad(extPinA[i], extPinB[i]);
+        extEncoders[i].attachFullQuad(extPinA[i], extPinB[i]);
         // Aktifkan hardware glitch filter (maksimal 1023) untuk mencegah false count saat getar
         extEncoders[i].setFilter(1023); 
         extEncoders[i].clearCount();
@@ -171,16 +178,21 @@ void updateOdometry() {
         v[i] = (float)delta * TICKS_TO_M / dt;
     }
 
-    // Forward kinematics X-config
-    float vx = (v[0] - v[1] + v[2] - v[3]) * COS45;
-    float vy = (v[0] + v[1] - v[2] - v[3]) * COS45;
+    // Forward kinematics
+    // Faktanya: Maju = semua encoder positif (+v0, +v1, +v2, +v3)
+    // Geser kanan = v0(FR)+, v1(FL)-, v2(BR)-, v3(BL)+
+    float vx = (v[0] + v[1] + v[2] + v[3]) * 0.25f;
+    float vy = (v[0] - v[1] - v[2] + v[3]) * 0.25f;
 
-    // Rotasi vx/vy berdasarkan heading saat ini
+    // Update heading dari MPU yaw
+    odomTheta = getYaw();
+
+    // Rotasi field-centric standar (heading CCW-positive)
     float thetaRad = odomTheta * (PI / 180.0f);
     float cosT = cosf(thetaRad);
     float sinT = sinf(thetaRad);
-    float vxWorld = vx * cosT - vy * sinT;
-    float vyWorld = vx * sinT + vy * cosT;
+    float vxWorld =  vx * cosT + vy * sinT;
+    float vyWorld =  vx * sinT - vy * cosT;
 
     // Integrasi posisi
     odomX += vxWorld * dt;

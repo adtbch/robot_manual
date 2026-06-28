@@ -58,7 +58,10 @@ constexpr float WHEEL_RADIUS_M = 0.03f;        // meter (3 cm)
 //  ODOMETRY CONFIG (X-config omni wheels)
 // =====================================================================
 // External encoder PPR — sesuaikan dengan encoder yang dipasang
-constexpr int EXT_ENCODER_PPR = 400;
+// PPR total = PPR asli x Mode Quadrature
+// PPR asli encoder rotary = 400
+// FullQuad (4x) = 400 * 4 = 1600
+constexpr int EXT_ENCODER_PPR = 1600;  // <-- GANTI INI JIKA PPR ASLI BERBEDA (PPR asli * 4)
 // Internal motor encoder PPR
 constexpr int ENCODER_PPR = 270;              // pulses per revolution
 // Jarak pusat robot ke sumbu roda (m)

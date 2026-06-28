@@ -18,6 +18,7 @@
 #include "button.h"
 #include "ota.h"
 #include "autoTuner.h"
+#include "waypoint.h"
 #include <WebServer.h>
 #include "webconfig.h"
 #include <Wire.h>
@@ -41,7 +42,7 @@ void setup() {
     setupWebServer();
 
     Wire.begin(I2C_SDA, I2C_SCL);
-    Wire.setTimeOut(100);  // Timeout 100ms agar I2C tidak hang jika bus error
+    Wire.setTimeOut(20);  // 20ms cukup untuk 42-byte DMP packet di 100kHz; timeout cepat saat bus stuck
     Wire.setClock(100000); // ponytail: diturunkan ke 100kHz untuk meningkatkan toleransi terhadap noise/NACK dari BTS
 
     if (!setupOLED()) {
@@ -53,6 +54,7 @@ void setup() {
 
     pidControllerInit();
     initYawPid();
+    initWaypointPid();
     Serial.println("PID: READY");
 
     setupEncoders();
@@ -105,11 +107,15 @@ void loop() {
     }
     updateOdometry();
 
-    // Test Yaw PID Mode
-    if (testYawMode && !isAutoTunerRunning()) {
-        static Jeda jedaYawTest;
-        if (jedaYawTest.check(20)) { // 50Hz update loop
-            driveFieldCentricWithYawCorrection(0, 0, testYawTarget);
+    // Waypoint dan TestYaw mutex — waypoint lebih prioritas
+    if (!isAutoTunerRunning()) {
+        if (isWaypointActive()) {
+            waypointTick(wpTargetX_m * 100.0f, wpTargetY_m * 100.0f, wpTargetYaw_deg, wpMaxSpeed);
+        } else if (testYawMode) {
+            static Jeda jedaYawTest;
+            if (jedaYawTest.check(20)) {
+                driveFieldCentricWithYawCorrection(0, 0, testYawTarget);
+            }
         }
     }
 

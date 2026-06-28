@@ -44,10 +44,16 @@ volatile bool mpuInterrupt = false;
 
 constexpr uint32_t kWatchdogTimeoutMs = 2500;
 constexpr uint32_t kRecoverCooldownMs = 3000;
-constexpr uint32_t kDmpRecoverDelayMs = 10;
+constexpr uint32_t kRecoverySettleMs  = 15;   // jeda antar step recovery (non-blocking)
 constexpr float kGyroMoveThresholdDps = 1.5f;
 constexpr uint32_t kDriftFreezeHoldMs = 500;
 constexpr uint32_t kPollMinIntervalMs = 10;  // throttle: max ~100Hz baca FIFO, tidak bergantung INT
+
+// Tiga state recovery DMP — dieksekusi satu step per iterasi loop() agar tidak blocking.
+// ponytail: state machine sederhana, tidak perlu FreeRTOS task.
+enum class DmpRecovery : uint8_t { IDLE, BUS_RECOVER, WAIT_SETTLE, DMP_ENABLE };
+DmpRecovery dmpRecoveryStep = DmpRecovery::IDLE;
+uint32_t    dmpRecoveryStepMs = 0;
 
 // Core 3.x: setelah NACK, slave bisa menahan SDA low / driver master stuck.
 // Bebaskan bus secara manual: clock SCL 9x agar slave melepas SDA, kirim STOP,
@@ -78,17 +84,7 @@ void i2cBusRecover() {
 
     Wire.begin(I2C_SDA, I2C_SCL);
     Wire.setClock(100000);
-    Wire.setTimeOut(100);
-}
-
-void recoverDmpFifo() {
-    i2cBusRecover();
-    mpu.resetFIFO();
-    mpu.setDMPEnabled(false);
-    delay(kDmpRecoverDelayMs);
-    mpu.setDMPEnabled(true);
-    mpu.getIntStatus();
-    mpuInterrupt = false;
+    Wire.setTimeOut(20);
 }
 
 void IRAM_ATTR dmpDataReady() {
@@ -296,6 +292,36 @@ void updateYaw() {
 
     uint32_t now = millis();
 
+    // Non-blocking recovery: satu step per iterasi loop() → max blocking per step
+    // = 3 I2C ops × 20ms timeout = 60ms, bukan 400ms sekaligus.
+    if (dmpRecoveryStep != DmpRecovery::IDLE) {
+        if (!I2cBus::acquire(I2cBus::Owner::MPU)) return;
+        switch (dmpRecoveryStep) {
+            case DmpRecovery::BUS_RECOVER:
+                i2cBusRecover();
+                mpu.resetFIFO();
+                mpu.setDMPEnabled(false);
+                dmpRecoveryStep = DmpRecovery::WAIT_SETTLE;
+                dmpRecoveryStepMs = millis();
+                break;
+            case DmpRecovery::WAIT_SETTLE:
+                if (millis() - dmpRecoveryStepMs >= kRecoverySettleMs) {
+                    dmpRecoveryStep = DmpRecovery::DMP_ENABLE;
+                }
+                break;
+            case DmpRecovery::DMP_ENABLE:
+                mpu.setDMPEnabled(true);
+                mpu.getIntStatus();
+                mpuInterrupt = false;
+                dmpRecoveryStep = DmpRecovery::IDLE;
+                lastRecoverMs = millis();
+                break;
+            default: break;
+        }
+        I2cBus::release(I2cBus::Owner::MPU);
+        return;  // skip baca FIFO selama recovery berlangsung
+    }
+
     // Baca FIFO saat INT aktif ATAU throttle interval lewat (fallback tanpa kabel INT).
     bool shouldRead = mpuInterrupt || (now - lastReadMs >= kPollMinIntervalMs);
     if (!shouldRead) return;
@@ -338,16 +364,15 @@ void updateYaw() {
         }
     }
 
-    // Watchdog: tidak ada packet valid dalam waktu lama → reset DMP/FIFO
-    if (hasSeenPacket &&
-        (now - lastPacketMs > kWatchdogTimeoutMs) &&
-        (now - lastRecoverMs > kRecoverCooldownMs)) {
-        Serial.printf("[MPU WATCHDOG] No DMP packet for >%lums — resetting FIFO & DMP\n",
-                      (unsigned long)kWatchdogTimeoutMs);
-        recoverDmpFifo();
-        hasSeenPacket = false;
-        lastRecoverMs = millis();
-    }
+    // // Watchdog: tidak ada packet valid → mulai recovery non-blocking
+    // if (hasSeenPacket &&
+    //     (now - lastPacketMs > kWatchdogTimeoutMs) &&
+    //     (now - lastRecoverMs > kRecoverCooldownMs)) {
+    //     Serial.printf("[MPU WATCHDOG] No DMP packet for >%lums — starting non-blocking recovery\n",
+    //                   (unsigned long)kWatchdogTimeoutMs);
+    //     dmpRecoveryStep = DmpRecovery::BUS_RECOVER;
+    //     hasSeenPacket = false;
+    // }
 
     I2cBus::release(I2cBus::Owner::MPU);
 }
