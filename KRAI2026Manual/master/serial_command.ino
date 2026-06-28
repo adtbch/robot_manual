@@ -18,10 +18,7 @@
 
 void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
     slave1Serial.printf("kn %d %d %d\n", vx, vy, yawTarget);
-}
-
-void sendSlave1Stop() {
-    slave1Serial.println("stop");
+    Serial.printf("kn %d %d %d\n", vx, vy, yawTarget);  // debug
 }
 
 // =====================================================================

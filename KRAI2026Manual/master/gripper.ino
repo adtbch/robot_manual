@@ -1,15 +1,18 @@
 /*
  * =====================================================================
  * FILE    : gripper.ino
- * PERAN   : Auto gripper & motor homing — non-blocking.
+ * PERAN   : Auto gripper (non-blocking loop) + motor homing (blocking, setup saja).
  *
  * AUTO GRIPPER:
- *   Proximity detect → tutup gripper (servo d) → luruskan arm (servo b)
+ *   Proximity → tutup (servo d) → CLOSING → servo b lurus
+ *   → UP: motor Y ke level 1 → STRAIGHTEN (tunggu Segitiga)
  *
- * MOTOR HOMING (sequential):
- *   1. Motor Y turun mentok → kena LIMIT_Y_BAWAH → reset encoder Y = 0
- *   2. Motor X mundur mentok → kena LIMIT_X_MUNDUR → reset encoder X = 0
- *   Origin encoder (0,0) = posisi bawah + mundur.
+ * SETUP ZONE1 (blocking, dipanggil sekali dari setup()):
+ *   Waypoint limit Y bawah → reset enc Y
+ *   Waypoint limit X mundur → reset enc X
+ *   Motor Y level 0, motor X target encoder 0
+ *
+ * setHomingAll() — servo + setMotorHoming() (serial / manual re-homing)
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -37,9 +40,6 @@ namespace {
 
 Jeda gJeda;
 
-enum HomingState { HOMING_IDLE, HOMING_Y_DOWN, HOMING_X_MUNDUR };
-HomingState gHomingState = HOMING_IDLE;
-
 } // anonymous namespace
 
 void setServoHoming() {
@@ -51,8 +51,20 @@ void setServoHoming() {
 void setMotorHoming() {
     motorXStop();
     motorYStop();
-    gHomingState = HOMING_Y_DOWN;
-    pwmMotor('y', HOMING_PWM);  // Y turun mentok
+
+    pwmMotor('y', HOMING_PWM);
+    while (!readLimitSwitch(LIMIT_Y_BAWAH)) {
+        delay(2);
+    }
+    pwmMotor('y', 0);
+    resetEncoderCount('y');
+    
+    pwmMotor('x', HOMING_PWM);
+    while (!readLimitSwitch(LIMIT_X_MUNDUR)) {
+        delay(2);
+    }
+    pwmMotor('x', 0);
+    resetEncoderCount('x');
 }
 
 void setHomingAll() {
@@ -60,48 +72,12 @@ void setHomingAll() {
     setServoHoming();
 }
 
-void gripperHomingCancel() {
-    if (gHomingState == HOMING_IDLE) return;
-    pwmMotor('x', 0);
-    pwmMotor('y', 0);
-    gHomingState = HOMING_IDLE;
-}
-
-// =====================================================================
-//  MOTOR HOMING TICK — panggil di loop(), non-blocking
-// =====================================================================
-
-void motorHomingTick() {
-    switch (gHomingState) {
-
-        case HOMING_IDLE:
-            break;
-
-        // ── Step 1: Y turun sampai limit bawah ──────────────────
-        case HOMING_Y_DOWN:
-            if (readLimitSwitch(LIMIT_Y_BAWAH)) {
-                pwmMotor('y', 0);
-                resetEncoderCount('y');
-                gHomingState = HOMING_X_MUNDUR;
-                pwmMotor('x', HOMING_PWM);  // X mundur mentok
-            }
-            break;
-
-        // ── Step 2: X mundur sampai limit depan ─────────────────
-        case HOMING_X_MUNDUR:
-            if (readLimitSwitch(LIMIT_X_MUNDUR)) {
-                pwmMotor('x', 0);
-                resetEncoderCount('x');
-                gHomingState = HOMING_IDLE;
-                gripperMotorYResetLevel();
-                motorXSetTarget(0);
-            }
-            break;
-    }
-}
-
-bool motorHomingIsActive() {
-    return gHomingState != HOMING_IDLE;
+void setupZone1() {
+    setServoHoming();
+    // WAYPOINT: ready to setup zone1
+    gYawTarget = 180;
+    gripperMotorYSetLevel(0);
+    motorXSetTarget(200);
 }
 
 // =====================================================================
@@ -120,13 +96,29 @@ void gripperZone1() {
             break;
 
         case CLOSING:
-            if (gJeda.check(1000)) {
+            if (gJeda.check(300)) {
                 setServoAngle('b', 100);
-                gGripperState = STRAIGHTEN;
+                gripperMotorYSetLevel(1);
+                gGripperState = UP;
             }
             break;
 
-        case STRAIGHTEN: break;
+        case UP:
+            if (motorYAtLevel(1)) {
+                // WAYPOINT: ready to setup zone1
+                gGripperState = STRAIGHTEN;
+            };
+            break;
+
+        case STRAIGHTEN:
+            // Cek WAYPOINT
+            gripperReadytoStab();
+            gYawTarget = -90;
+            // WAYPOINT menuju ke arah stab
+            break;
+        
+        case READY_TO_STAB:
+            break;
     }
 }
 

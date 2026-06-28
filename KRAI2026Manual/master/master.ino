@@ -35,43 +35,31 @@
 // =====================================================================
 
 void setup() {
+    delay(8000);
     Serial.begin(115200);
     Serial.println("=== KRAI 2026 Master Board ===");
 
     // Init ESP-NOW receiver
     bool espNowReady = espNowControlInit();
-    Serial.printf("ESP-NOW control: %s\n", espNowReady ? "READY" : "ERROR");
-
     // Init motors
     SetupMotors();
-    Serial.println("Motors: READY");
-
     // Init encoders
     setupEncoders();
-    Serial.println("Encoders: READY");
-
     // Init limit switches
     setupLimits();
-    Serial.println("Limit switches: READY");
-
     // Init servos
     setupServos();
-    Serial.println("Servos: READY");
-
     // Init relay
     setupRelay();
-    Serial.println("Relay: READY");
-
     // Init proximity
     setupProximity();
-    Serial.println("Proximity: READY");
-
     // Init serial (UART1 + UART2)
     setupSerial();
-    Serial.println("Serial: READY");
-
     // Init serial command handler
     setupSerialCommand();
+
+    setHomingAll();
+    Serial.println("Setup zone1: limit Y/X + motor Y lv0 + motor X enc0");
 }
 
 // =====================================================================
@@ -84,9 +72,6 @@ void loop() {
 
     // Gripper non-blocking update
     gripperZone1();
-
-    // Motor homing (limit switch)
-    motorHomingTick();
 
     // ESP-NOW receiver
     espNowControlTick();

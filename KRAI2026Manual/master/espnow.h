@@ -23,10 +23,10 @@
 //  MAC ADDRESS — WAJIB DIISI SEBELUM UPLOAD
 // =====================================================================
 // MAC WiFi STA pengirim (s3controllerespnow).
-// Aktifkan/dinonaktifkan via espNowEnableMacWhitelist. 94:A9:90:D2:32:90
+// Aktifkan/dinonaktifkan via espNowEnableMacWhitelist. 94:A9:90:D3:14:70
 constexpr bool espNowEnableMacWhitelist = true;
-constexpr uint8_t espNowAllowedTransmitterStaMac[6] = {0x94, 0xA9, 0x90, 0xD2, 0x32, 0x90};
-constexpr uint8_t espNowAllowedTransmitterApMac[6]  = {0x94, 0xA9, 0x90, 0xD2, 0x32, 0x90};
+constexpr uint8_t espNowAllowedTransmitterStaMac[6] = {0x94, 0xA9, 0x90, 0xD3, 0x14, 0x70};
+constexpr uint8_t espNowAllowedTransmitterApMac[6]  = {0x94, 0xA9, 0x90, 0xD3, 0x14, 0x70};
 
 // =====================================================================
 //  KONFIGURASI ESP-NOW

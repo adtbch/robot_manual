@@ -202,3 +202,10 @@ void motorYPositionTick() {
         pwmMotor('y', -MOTOR_Y_MOVE_PWM);
     }
 }
+
+bool motorYAtLevel(uint8_t level) {
+    if (level > MOTOR_Y_LEVEL_MAX) return false;
+    const long current = getEncoderCount('y');
+    const long target = MOTOR_Y_LEVEL_ENC[level];
+    return abs(current - target) <= MOTOR_Y_POSITION_TOLERANCE;
+}

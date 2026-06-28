@@ -2,22 +2,24 @@
  * =====================================================================
  * FILE    : motion_control.ino
  * PERAN   : Mapping joystick/dpad → field-centric motion ke slave1motion
- *           via UART1 (kn vx vy yaw).
+ *           via UART1 (kn vx vy yawTarget).
  *
- * INPUT MODE (toggle dengan SHARE):
- *   ANALOG → analog kiri joystick (default)
+ * INPUT MODE (toggle dengan SHARE) — hanya untuk vx/vy:
+ *   ANALOG → analog kiri joystick
  *   DPAD   → tombol panah (digital, full RPM)
  *
- * SPEED MODE:
- *   R1 hold → fast (1.5x)
- *   L1 hold → slow (0.5x)
- *   default → normal (1.0x)
+ * YAW (terpisah dari input mode di atas):
+ *   Analog kanan (rx) → ±yaw manual, selalu aktif (DPAD/ANALOG tidak mempengaruhi)
+ *   rx ±1° per step — normal 50ms, L1 slow 150ms, R1 fast 25ms
+ *   Nilai disimpan di gYawTarget master → dikirim sebagai argumen ke-3 pada kn
  *
- * YAW TARGET:
- *   Analog kanan (rx) → geser target heading ±1..5° per tick
+ * SPEED MODE: vx/vy RPM max — normal 75, L1 slow 25, R1 fast 150
  *
- * SERIAL COMMAND KE SLAVE1:
- *   kn <vx> <vy> <yawDeg>  — field-cent RPM + yaw correction (slave1)
+ * INVERT INPUT (toggle L1+R1+L2+R2): gModeInvert — atas↔bawah, kiri↔kanan
+ *
+ * STREAM KE SLAVE1 (selalu, link hidup/mati):
+ *   kirim kn tiap KN_SEND_INTERVAL_MS
+ *   idle / link mati → kn 0 0 <yawTarget>  (cegah motor jalan sendiri)
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -31,33 +33,54 @@
 //  CONFIG
 // =====================================================================
 
-constexpr int16_t JOYSTICK_DEADZONE = 20;     // noise filter
-constexpr int16_t JOYSTICK_MAX      = 127;    // max joystick value
-constexpr int16_t RPM_MAX           = 100;    // max RPM ke slave1
+constexpr int16_t JOYSTICK_DEADZONE = 20;
+constexpr int16_t JOYSTICK_MAX      = 127;
 
-// Speed multiplier (hold R1/L1)
-constexpr float SPEED_FAST   = 1.5f;
-constexpr float SPEED_NORMAL = 1.0f;
-constexpr float SPEED_SLOW   = 0.5f;
+constexpr int16_t SPEED_RPM_NORMAL = 75;
+constexpr int16_t SPEED_RPM_SLOW   = 25;
+constexpr int16_t SPEED_RPM_FAST   = 150;
+
+constexpr int16_t YAW_STICK_THRESHOLD = 30;
+constexpr uint32_t YAW_STEP_INTERVAL_NORMAL_MS = 50;
+constexpr uint32_t YAW_STEP_INTERVAL_SLOW_MS   = 150;
+constexpr uint32_t YAW_STEP_INTERVAL_FAST_MS   = 25;
+constexpr uint32_t KN_SEND_INTERVAL_MS = 20;
 
 // =====================================================================
-//  STATE — gInputMode didefinisikan di sini (extern di config.h)
+//  STATE — gInputMode, gYawTarget, gModeInvert (extern di config.h)
 // =====================================================================
 
 InputMode gInputMode = MODE_DPAD;
+int16_t gYawTarget = 0;
+bool gModeInvert = false;
 
 namespace {
 
-uint32_t gMotionPrevButtons = 0;  // edge detection untuk SHARE
-int16_t gYawTarget = 0;
-int16_t gPrevVx = 0;
-int16_t gPrevVy = 0;
-int16_t gPrevYaw = 0;
-bool gWasActive = false;
+uint32_t gMotionPrevButtons = 0;
+Jeda gJedaYawStep;
+Jeda gJedaKnSend;
+
+constexpr uint32_t BTN_INVERT_COMBO = BTN_L1 | BTN_R1 | BTN_L2 | BTN_R2;
+
+bool allInvertComboHeld(uint32_t buttons) {
+    return (buttons & BTN_INVERT_COMBO) == BTN_INVERT_COMBO;
+}
 
 int16_t mapJoystickToRpm(int16_t joyVal, int16_t rpmMax) {
     if (abs(joyVal) < JOYSTICK_DEADZONE) return 0;
     return (int16_t)((int32_t)joyVal * rpmMax / JOYSTICK_MAX);
+}
+
+int16_t applyStickDeadzone(int16_t val) {
+    if (abs(val) < JOYSTICK_DEADZONE) return 0;
+    if (val > 0) return map(val, JOYSTICK_DEADZONE, JOYSTICK_MAX, 0, JOYSTICK_MAX);
+    return -map(-val, JOYSTICK_DEADZONE, JOYSTICK_MAX, 0, JOYSTICK_MAX);
+}
+
+int16_t wrapYawTarget(int16_t angle) {
+    while (angle > 180) angle -= 360;
+    while (angle < -179) angle += 360;
+    return angle;
 }
 
 void scaleFieldVelocity(int16_t &vx, int16_t &vy, int16_t limit) {
@@ -67,17 +90,12 @@ void scaleFieldVelocity(int16_t &vx, int16_t &vy, int16_t limit) {
     vy = (int16_t)((int32_t)vy * limit / peak);
 }
 
-void adjustYawTargetFromStick(int16_t rx) {
-    if (abs(rx) < JOYSTICK_DEADZONE) return;
+void updateYawTargetFromStick(int16_t rawRx, uint32_t stepIntervalMs) {
+    if (abs(rawRx) <= YAW_STICK_THRESHOLD) return;
+    if (!gJedaYawStep.check(stepIntervalMs)) return;
 
-    const int inc = map(abs(rx), JOYSTICK_DEADZONE, JOYSTICK_MAX, 1, 5);
-    if (rx > 0) {
-        gYawTarget += inc;
-        if (gYawTarget > 180) gYawTarget = -179;
-    } else {
-        gYawTarget -= inc;
-        if (gYawTarget < -179) gYawTarget = 180;
-    }
+    const int dir = (rawRx > 0) ? 1 : -1;
+    gYawTarget = wrapYawTarget(gYawTarget + dir);
 }
 
 } // anonymous namespace
@@ -87,61 +105,58 @@ void adjustYawTargetFromStick(int16_t rx) {
 // =====================================================================
 
 void motionControlTick(const ControlPacket &pkt) {
-    //  SAFETY: PS4 disconnected ATAU ESP-NOW putus → STOP
-    if (!pkt.connected || !espNowControlIsLinkAlive()) {
-        if (gWasActive) {
-            sendSlave1Stop();
-            gWasActive = false;
-            gPrevVx = gPrevVy = 0;
+    int16_t vx = 0;
+    int16_t vy = 0;
+
+    const bool linkUp = pkt.connected && espNowControlIsLinkAlive();
+
+    if (linkUp) {
+        bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
+        if (shareNow && !(gMotionPrevButtons & BTN_SHARE)) {
+            gInputMode = (gInputMode == MODE_ANALOG) ? MODE_DPAD : MODE_ANALOG;
         }
-        return;
+        if (allInvertComboHeld(pkt.buttons) && !allInvertComboHeld(gMotionPrevButtons)) {
+            gModeInvert = !gModeInvert;
+        }
+        gMotionPrevButtons = pkt.buttons;
+
+        int16_t lx = 0, ly = 0;
+
+        if (gInputMode == MODE_ANALOG) {
+            lx = pkt.lx;
+            ly = -(int16_t)pkt.ly;
+        } else {
+            if (pkt.buttons & BTN_UP)    ly =  127;
+            if (pkt.buttons & BTN_DOWN)  ly = -127;
+            if (pkt.buttons & BTN_LEFT)  lx = -127;
+            if (pkt.buttons & BTN_RIGHT) lx =  127;
+        }
+
+        if (gModeInvert) {
+            lx = -lx;
+            ly = -ly;
+        }
+
+        int16_t rpmMax = SPEED_RPM_NORMAL;
+        uint32_t yawStepMs = YAW_STEP_INTERVAL_NORMAL_MS;
+        if (pkt.buttons & BTN_R1) {
+            rpmMax = SPEED_RPM_FAST;
+            yawStepMs = YAW_STEP_INTERVAL_FAST_MS;
+        } else if (pkt.buttons & BTN_L1) {
+            rpmMax = SPEED_RPM_SLOW;
+            yawStepMs = YAW_STEP_INTERVAL_SLOW_MS;
+        }
+
+        vx = mapJoystickToRpm(ly, rpmMax);
+        vy = mapJoystickToRpm(lx, rpmMax);
+        scaleFieldVelocity(vx, vy, rpmMax);
+
+        const int16_t rawRx = applyStickDeadzone(pkt.rx);
+        updateYawTargetFromStick(rawRx, yawStepMs);
     }
 
-    // ============================================================
-    //  TOGGLE INPUT MODE — SHARE (edge detection)
-    // ============================================================
-    bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
-    if (shareNow && !(gMotionPrevButtons & BTN_SHARE)) {
-        gInputMode = (gInputMode == MODE_ANALOG) ? MODE_DPAD : MODE_ANALOG;
-    }
-    gMotionPrevButtons = pkt.buttons;
-
-    // ============================================================
-    //  BACA INPUT — analog atau dpad
-    // ============================================================
-    int16_t lx = 0, ly = 0;
-
-    if (gInputMode == MODE_ANALOG) {
-        lx = pkt.lx;
-        ly = -(int16_t)pkt.ly;  // int16_t: -(-128) = +128, tidak overflow int8_t
-    } else {
-        if (pkt.buttons & BTN_UP)    ly =  127;
-        if (pkt.buttons & BTN_DOWN)  ly = -127;
-        if (pkt.buttons & BTN_LEFT)  lx = -127;
-        if (pkt.buttons & BTN_RIGHT) lx =  127;
-    }
-
-    // Speed mode → skala rpmMax (bukan multiply setelah map, supaya R1/L1 kelihatan)
-    float speedMul = SPEED_NORMAL;
-    if (pkt.buttons & BTN_R1) speedMul = SPEED_FAST;
-    else if (pkt.buttons & BTN_L1) speedMul = SPEED_SLOW;
-    const int16_t rpmMax = (int16_t)(RPM_MAX * speedMul);
-
-    int16_t vx = mapJoystickToRpm(ly, rpmMax);
-    int16_t vy = mapJoystickToRpm(lx, rpmMax);
-    scaleFieldVelocity(vx, vy, rpmMax);
-
-    adjustYawTargetFromStick(pkt.rx);
-
-    const bool translating = (vx != 0 || vy != 0);
-    const bool changed = (vx != gPrevVx || vy != gPrevVy || gYawTarget != gPrevYaw);
-
-    if (translating || changed || gWasActive) {
+    // ponytail: stream kn selalu — link mati/idle = kn 0 0 <yawTarget>
+    if (gJedaKnSend.check(KN_SEND_INTERVAL_MS)) {
         sendKnCommand(vx, vy, gYawTarget);
     }
-
-    gPrevVx = vx;
-    gPrevVy = vy;
-    gPrevYaw = gYawTarget;
-    gWasActive = translating;
 }

@@ -95,5 +95,6 @@ long motorYGetTarget();
 void motorYStop();
 bool motorYIsActive();
 void motorYPositionTick();
+bool motorYAtLevel(uint8_t level);
 
 #endif // MOTOR_H

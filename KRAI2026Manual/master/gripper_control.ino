@@ -8,9 +8,10 @@
  *   Segitiga + L2 → setServoHoming + motor Y ke level 0
  *
  * INPUT (berlawanan motion control — lihat motion_control.ino):
- *   Motor Y (tanpa Segitiga)     → level 0–5
- *   Motor X (tahan Segitiga)     → axis horizontal
- *   Servo B (READY_TO_STAB)      → axis vertikal
+ *   Motor Y (tanpa Segitiga)     → jog encoder step (manual)
+ *   Motor X (tahan Segitiga)     → jog encoder step
+ *   Level Y (0–5)                → gripperMotorYSetLevel() / auto gripper
+ *   Servo B (READY_TO_STAB + R2 hold) → axis vertikal
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -29,8 +30,15 @@
 constexpr int8_t  AXIS_DEADZONE = 30;
 constexpr int8_t  AXIS_MAX      = 127;
 
-constexpr uint32_t MOTOR_Y_LEVEL_INTERVAL_MS  = 300;
-constexpr uint32_t MOTOR_X_STEP_INTERVAL_MS     = 50;
+constexpr uint32_t MOTOR_Y_STEP_INTERVAL_MS = 50;
+constexpr uint32_t MOTOR_X_STEP_INTERVAL_MS = 50;
+
+// ponytail: level Y — dead until tombol dipetakan (pakai driveMotorYByLevel nanti)
+constexpr uint32_t MOTOR_Y_LEVEL_INTERVAL_MS = 150;
+
+constexpr long MOTOR_Y_STEP_SLOW   = 5;
+constexpr long MOTOR_Y_STEP_NORMAL = 15;
+constexpr long MOTOR_Y_STEP_FAST   = 40;
 
 constexpr long MOTOR_X_STEP_SLOW   = 5;
 constexpr long MOTOR_X_STEP_NORMAL = 15;
@@ -50,13 +58,16 @@ namespace {
 
 uint32_t gPrevButtons = 0;
 int gServoBAngle = 70;
-Jeda gJedaMotorYLevel;
+Jeda gJedaMotorYStep;
+Jeda gJedaMotorYLevel;  // ponytail: untuk driveMotorYByLevel (belum dipakai)
 Jeda gJedaMotorXStep;
 
 // ── Input helpers (inverted vs motion_control.ino) ─────────────────
+// ly: int16_t + negasi — aman untuk ly=-128 (-(-128) = +128)
+// lx: int8_t cukup (tidak di-negate)
 
-int8_t readInvertedAxisY(const ControlPacket &pkt) {
-    if (gInputMode == MODE_DPAD) return pkt.ly;
+int16_t readInvertedAxisY(const ControlPacket &pkt) {
+    if (gInputMode == MODE_DPAD) return -(int16_t)pkt.ly;
     if (pkt.buttons & BTN_UP)    return AXIS_MAX;
     if (pkt.buttons & BTN_DOWN)  return -AXIS_MAX;
     return 0;
@@ -69,7 +80,11 @@ int8_t readInvertedAxisX(const ControlPacket &pkt) {
     return 0;
 }
 
-int8_t applyDeadzone(int8_t axis) {
+int16_t applyDeadzoneY(int16_t axis) {
+    return (abs(axis) < AXIS_DEADZONE) ? 0 : axis;
+}
+
+int8_t applyDeadzoneX(int8_t axis) {
     return (abs(axis) < AXIS_DEADZONE) ? 0 : axis;
 }
 
@@ -94,12 +109,29 @@ T pickSpeedStep(uint32_t buttons, T normal, T slow, T fast) {
     return normal;
 }
 
-// ── Motor Y ────────────────────────────────────────────────────────
+// ── Motor Y — jog encoder (level → gripperMotorYSetLevel) ──────────
 
-int motorYLevelDir(int8_t ly) {
+void driveMotorY(int16_t ly, uint32_t buttons) {
+    if (ly == 0) {
+        if (!motorYIsActive()) {
+            motorYSetTarget(getEncoderCount('y'));
+        }
+        return;
+    }
+    if (!gJedaMotorYStep.check(MOTOR_Y_STEP_INTERVAL_MS)) return;
+
+    const long step = pickSpeedStep(buttons,
+        MOTOR_Y_STEP_NORMAL, MOTOR_Y_STEP_SLOW, MOTOR_Y_STEP_FAST);
+    if (ly < 0 && readLimitSwitch(LIMIT_Y_BAWAH)) return;
+
+    motorYAdjustTarget((ly > 0) ? step : -step);
+}
+
+// ponytail: dead — naik/turun level preset; wiring tombol belum ditentukan
+int motorYLevelDir(int16_t ly) {
     if (gInputMode == MODE_DPAD) {
-        if (ly < -AXIS_DEADZONE) return +1;
-        if (ly >  AXIS_DEADZONE) return -1;
+        if (ly <= -120) return +1;
+        if (ly >= 120) return -1;
         return 0;
     }
     if (ly > 0) return +1;
@@ -107,7 +139,7 @@ int motorYLevelDir(int8_t ly) {
     return 0;
 }
 
-void driveMotorY(int8_t ly) {
+void driveMotorYByLevel(int16_t ly) {
     const int dir = motorYLevelDir(ly);
     if (dir == 0) return;
     if (!gJedaMotorYLevel.check(MOTOR_Y_LEVEL_INTERVAL_MS)) return;
@@ -123,6 +155,8 @@ void driveMotorY(int8_t ly) {
 // ── Motor X ────────────────────────────────────────────────────────
 
 void driveMotorX(int8_t lx, uint32_t buttons) {
+    if (gModeInvert) lx = (int8_t)(-lx);
+
     if (lx == 0) {
         if (!motorXIsActive()) {
             motorXSetTarget(getEncoderCount('x'));
@@ -142,8 +176,9 @@ void driveMotorX(int8_t lx, uint32_t buttons) {
 
 int servoBMoveDir(const ControlPacket &pkt) {
     if (gInputMode == MODE_DPAD) {
-        if (pkt.ly >  AXIS_DEADZONE) return +1;
-        if (pkt.ly < -AXIS_DEADZONE) return -1;
+        const int16_t ly = -(int16_t)pkt.ly;
+        if (ly >  AXIS_DEADZONE) return +1;
+        if (ly < -AXIS_DEADZONE) return -1;
         return 0;
     }
     if (pkt.buttons & BTN_DOWN) return +1;
@@ -154,19 +189,14 @@ int servoBMoveDir(const ControlPacket &pkt) {
 // ── Tick sections ──────────────────────────────────────────────────
 
 void handleGripperButtons(const ControlPacket &pkt) {
-    if (isComboEdge(pkt.buttons, gPrevButtons, BTN_TRIANGLE, BTN_L2)) {
-        gripperHomingCancel();
-        setServoHoming();
-        gripperMotorYResetLevel();
+    if (isPressed(pkt.buttons, BTN_OPTIONS)) {
+        setupZone1();
         return;
-    }
-    if (isPressed(pkt.buttons, BTN_TRIANGLE)) {
-        gripperReadytoStab();
     }
 }
 
 void handleManualServoB(const ControlPacket &pkt) {
-    if (gGripperState != READY_TO_STAB || !isTriangleHeld(pkt.buttons)) return;
+    if (gGripperState != READY_TO_STAB || !(pkt.buttons & BTN_R2)) return;
 
     const int dir = servoBMoveDir(pkt);
     if (dir == 0) return;
@@ -175,21 +205,23 @@ void handleManualServoB(const ControlPacket &pkt) {
     setServoBAngle(gServoBAngle + dir * step);
 }
 
-void handleGripperMotors(const ControlPacket &pkt) {
-    if (motorHomingIsActive()) return;
-
-    driveMotorY(applyDeadzone(readInvertedAxisY(pkt)));
-
+void handleGripperMotors(const ControlPacket &pkt) { 
     if (isTriangleHeld(pkt.buttons)) {
-        driveMotorX(applyDeadzone(readInvertedAxisX(pkt)), pkt.buttons);
+        driveMotorY(applyDeadzoneY(readInvertedAxisY(pkt)), pkt.buttons);
+        driveMotorX(applyDeadzoneX(readInvertedAxisX(pkt)), pkt.buttons);
     }
 }
 
 } // anonymous namespace
 
+void gripperMotorYSetLevel(uint8_t level) {
+    level = constrain(level, 0, MOTOR_Y_LEVEL_MAX);
+    gMotorYLevel = level;
+    motorYSetTarget(MOTOR_Y_LEVEL_ENC[level]);
+}
+
 void gripperMotorYResetLevel() {
-    gMotorYLevel = 0;
-    motorYSetTarget(MOTOR_Y_LEVEL_ENC[0]);
+    gripperMotorYSetLevel(0);
 }
 
 int getServoBAngle() {

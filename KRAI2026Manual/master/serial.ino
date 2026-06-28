@@ -225,10 +225,8 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
             gripperReset();
             out.println("Gripper: RESET ke IDLE");
         } else if (sub != nullptr && strcmp(sub, "homing") == 0) {
-            gripperHomingCancel();
-            setServoHoming();
-            gripperMotorYResetLevel();
-            out.println("Gripper: servo homing + motor Y level 0");
+            setHomingAll();
+            out.println("Gripper: homing motor (limit) + servo awal");
         } else {
             out.println("Usage: gripper <reset|homing>");
         }

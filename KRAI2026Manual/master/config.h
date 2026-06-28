@@ -115,7 +115,7 @@ struct Jeda {
 //  SHARED STATE — GripperState (akses dari gripper.ino & gripper_control.ino)
 // =====================================================================
 
-enum GripperState { IDLE, CLOSING, STRAIGHTEN, READY_TO_STAB };
+enum GripperState { IDLE, CLOSING, UP, STRAIGHTEN, READY_TO_STAB };
 extern GripperState gGripperState;
 
 // =====================================================================
@@ -124,5 +124,17 @@ extern GripperState gGripperState;
 
 enum InputMode { MODE_ANALOG, MODE_DPAD };
 extern InputMode gInputMode;
+
+// =====================================================================
+//  SHARED STATE — gYawTarget (akses dari motion_control.ino & modul lain)
+// =====================================================================
+
+extern int16_t gYawTarget;
+
+// =====================================================================
+//  SHARED STATE — gModeInvert (toggle L1+R1+L2+R2; motion lx/ly; gripper lx di driveMotorX saja)
+// =====================================================================
+
+extern bool gModeInvert;
 
 #endif // CONFIG_H
