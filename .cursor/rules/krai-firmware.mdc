@@ -1,0 +1,59 @@
+---
+description: KRAI 2026 firmware — flat .ino, ESP32 Core 3, serial, PID, safety
+globs: KRAI2026Manual/**/*
+alwaysApply: true
+---
+
+# KRAI 2026 Firmware
+
+Board-specific docs, pin maps, and commands: `AGENTS.md`.
+Load `arduino-code-generator` skill before editing Arduino/embedded code.
+
+## Flat .ino layout
+
+- Main `.ino` first alphabetically; all `.ino` in one folder compile together.
+- Per-module `.h` (`motor.h`, `encoder.h`, …) holds that module's config/API.
+- Each `.ino` `#include`s its module `.h`.
+- Internal helpers: **anonymous namespace** (not `static`).
+- Globals: **define** in module `.ino`, **`extern`** in `config.h`.
+- Pin configs: `constexpr` (compile-time). PID/mapping/presets: NVS, editable via web UI.
+
+## ESP32 Arduino Core 3.1.1
+
+```cpp
+// ❌ Core 2.x
+ledcSetup(ch, freq, res); ledcAttachPin(pin, ch); ledcWrite(ch, duty);
+
+// ✅ Core 3.x
+ledcAttach(pin, freq, res); ledcWrite(pin, duty);
+```
+
+- ESP-NOW recv callback: `void(const esp_now_recv_info* info, const uint8_t* data, int len)` — MAC via `info->src_addr`.
+- No `ledc_channel` in MotorConfig/ServoConfig.
+
+## Serial command pattern (master, slave1, slave2)
+
+- `parseAndExecuteCommand(char* cmd, Print& out)` — same commands from any port.
+- Separate line buffers per source (USB vs UART); response always goes back to `out`.
+- Use `strtok` on `cmd`; constrain motor PWM before `pwmMotor()`.
+
+## PID (canonical)
+
+1. `initXxx()` in `setup()` — load from Preferences, defaults if empty.
+2. `saveXxx()` on serial command — unique NVS namespace (`"pid_tuning"`, `"yaw_pid"`).
+3. On load: `pidState.reset()`, `lastTarget = 0.0f`.
+4. Generic `int pidCompute(PIDState&, target, current, dt)` → constrain ±maxPwm.
+5. Wrap angle error and derivative to `[-180, 180]` before yaw PID.
+
+## Safety & hardware
+
+- **Limit switch**: non-blocking double-read, 2 ms apart — `updateLimitSwitches()` every `loop()`, read via `readLimitSwitch(idx)`.
+- **Encoder**: global vars from `encoder.ino` are the single source of truth.
+- **Slave1 MPU6050**: I2cdevlib v1.4.4 broken on Core 3.x — use Adafruit MPU6050 or patch `I2Cdev.cpp`.
+- **Yaw**: relative from boot; calibrate only via `CALIB_GYRO`; `getYaw()` in `[-180, 180]`.
+
+## Clean code
+
+- Delete dead code; descriptive names with units (`_deg`, `_rpm`, `_ms`).
+- One responsibility per function (`pidComputeYaw` only computes yaw PID).
+- `static constexpr` for constants: `static constexpr const char* NVS_NS = "yaw_pid";`
