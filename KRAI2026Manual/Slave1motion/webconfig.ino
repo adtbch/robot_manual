@@ -117,6 +117,14 @@ h1{font-size:1.2em;margin-bottom:12px;color:#38bdf8}
 <button class="btn btn-green" onclick="wpGo()">Go</button>
 <button class="btn btn-red" onclick="wpStop()">Stop</button>
 </div>
+<div style="margin-top:10px">
+<h2 style="font-size:0.8em;color:#cbd5e1">Combo P1 → P2</h2>
+<div class="row" style="margin-bottom:2px"><span style="font-size:0.75em;color:#64748b;width:24px">P1</span><input id="wp1X" type="number" placeholder="X cm" value="0" style="width:55px"><input id="wp1Y" type="number" placeholder="Y cm" value="0" style="width:55px"><input id="wp1Yaw" type="number" placeholder="Yaw" value="0" style="width:55px"></div>
+<div class="row"><span style="font-size:0.75em;color:#64748b;width:24px">P2</span><input id="wp2X" type="number" placeholder="X cm" value="100" style="width:55px"><input id="wp2Y" type="number" placeholder="Y cm" value="50" style="width:55px"><input id="wp2Yaw" type="number" placeholder="Yaw" value="90" style="width:55px"></div>
+<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center">
+<input id="wpComboSpeed" type="number" placeholder="RPM" value="300" style="width:60px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#e2e8f0;padding:4px">
+<button class="btn btn-green" onclick="wpComboGo()">Combo Go</button>
+</div>
 </div>
 </div>
 <div class="card">
@@ -136,8 +144,9 @@ function testYaw(target){const b=JSON.stringify(target===null?{stop:true}:{stop:
 function autoTune(i){if(!confirm('Auto-tune motor '+i+'? Robot harus diam.'))return;fetch('/api/autotune',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idx:i})}).then(r=>r.json()).then(d=>log('AT: '+d.ok)).catch(e=>log('ERR: '+e));}
 function saveWp(){const b=JSON.stringify({kp:parseFloat(document.getElementById('wpKp').value)||200,tol_pos:parseFloat(document.getElementById('wpTol').value)||5,tol_yaw:parseFloat(document.getElementById('wpTolYaw').value)||3});fetch('/api/waypoint',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('WP: '+d.ok)).catch(e=>log('ERR: '+e));}
 function wpGo(){const x=parseFloat(document.getElementById('wpX').value)||0,y=parseFloat(document.getElementById('wpY').value)||0,yaw=parseFloat(document.getElementById('wpYaw').value)||0,spd=parseFloat(document.getElementById('wpSpeed').value)||300;fetch('/api/wpgoto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({x:x,y:y,yaw:yaw,max_speed:spd})}).then(r=>r.json()).then(d=>log('WP Go: '+d.ok)).catch(e=>log('ERR: '+e));}
+function wpComboGo(){const spd=parseFloat(document.getElementById('wpComboSpeed').value)||300;const b=JSON.stringify({x1:parseFloat(document.getElementById('wp1X').value)||0,y1:parseFloat(document.getElementById('wp1Y').value)||0,yaw1:parseFloat(document.getElementById('wp1Yaw').value)||0,x2:parseFloat(document.getElementById('wp2X').value)||0,y2:parseFloat(document.getElementById('wp2Y').value)||0,yaw2:parseFloat(document.getElementById('wp2Yaw').value)||0,max_speed:spd});fetch('/api/wpcombo',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('WP Combo: '+d.ok)).catch(e=>log('ERR: '+e));}
 function wpStop(){fetch('/api/wpstop',{method:'POST'}).then(r=>r.json()).then(d=>log('WP Stop: '+d.ok)).catch(e=>log('ERR: '+e));}
-function wpStatus(){fetch('/api/wpstatus').then(r=>r.json()).then(d=>{log('WP: state='+d.state+' target=('+d.target_x+','+d.target_y+') yaw='+d.target_yaw+'°');}).catch(e=>log('ERR: '+e));}
+function wpStatus(){fetch('/api/wpstatus').then(r=>r.json()).then(d=>{let m='WP: state='+d.state+' target=('+d.target_x+','+d.target_y+') yaw='+d.target_yaw+'°';if(d.combo_step)m+=' combo step='+d.combo_step;log(m);}).catch(e=>log('ERR: '+e));}
 function loadStatus(){fetch('/api/status').then(r=>r.json()).then(d=>{let s='Yaw: '+Number(d.yaw||0).toFixed(1)+' | Enc: '+(d.enc||[]).join(', ')+' | RPM: '+(d.rpm||[]).join(', ');document.getElementById('st').textContent=s;}).catch(()=>{});}
 buildCards();loadPid();setInterval(loadStatus,500);
 </script>
@@ -369,9 +378,30 @@ static void handleApiWpGo() {
     if (maxSpd < 1) maxSpd = wpMaxSpeed;
 
     testYawMode = false;
-    wpMaxSpeed = maxSpd;
-    waypointTick(x_cm, y_cm, yaw, wpMaxSpeed);
+    startWaypoint(x_cm, y_cm, yaw, maxSpd);
     Serial.printf("[WEB] WP Go: (%.0f, %.0f)cm yaw=%.1f° speed=%.0fRPM\n", x_cm, y_cm, yaw, maxSpd);
+    server.send(200, "application/json", "{\"ok\":true}");
+}
+
+static void handleApiWpCombo() {
+    if (server.method() != HTTP_POST) {
+        server.send(405, "application/json", "{\"error\":\"POST only\"}");
+        return;
+    }
+    String body = server.arg("plain");
+    float x1   = getJsonFloat(body, "x1");
+    float y1   = getJsonFloat(body, "y1");
+    float yaw1 = getJsonFloat(body, "yaw1");
+    float x2   = getJsonFloat(body, "x2");
+    float y2   = getJsonFloat(body, "y2");
+    float yaw2 = getJsonFloat(body, "yaw2");
+    float maxSpd = getJsonFloat(body, "max_speed");
+    if (maxSpd < 1) maxSpd = wpMaxSpeed;
+
+    testYawMode = false;
+    startWaypointCombo(x1, y1, yaw1, x2, y2, yaw2, maxSpd);
+    Serial.printf("[WEB] WP Combo: P1(%.0f,%.0f) P2(%.0f,%.0f) speed=%.0fRPM\n",
+                  x1, y1, x2, y2, maxSpd);
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -385,9 +415,11 @@ static void handleApiWpStatus() {
     const char* states[] = {"IDLE", "RUNNING", "REACHED"};
     String json = "{";
     json += "\"state\":\"" + String(states[(int)getWaypointState()]) + "\"";
-    json += ",\"target_x\":" + String(wpTargetX_m, 2);
-    json += ",\"target_y\":" + String(wpTargetY_m, 2);
+    json += ",\"target_x\":" + String(wpTargetX_m * 100.0f, 1);
+    json += ",\"target_y\":" + String(wpTargetY_m * 100.0f, 1);
     json += ",\"target_yaw\":" + String(wpTargetYaw_deg, 1);
+    json += ",\"combo_active\":" + String(isWaypointComboActive() ? "true" : "false");
+    json += ",\"combo_step\":" + String(getWaypointComboStep());
     json += "}";
     server.send(200, "application/json", json);
 }
@@ -421,6 +453,7 @@ void setupWebServer() {
     server.on("/api/autotune", HTTP_POST, handleApiAutotune);
     server.on("/api/waypoint", HTTP_POST, handleApiWaypoint);
     server.on("/api/wpgoto", HTTP_POST, handleApiWpGo);
+    server.on("/api/wpcombo", HTTP_POST, handleApiWpCombo);
     server.on("/api/wpstop", HTTP_POST, handleApiWpStop);
     server.on("/api/wpstatus", HTTP_GET, handleApiWpStatus);
     server.on("/api/status", HTTP_GET, handleApiStatus);

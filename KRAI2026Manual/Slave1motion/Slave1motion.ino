@@ -110,7 +110,7 @@ void loop() {
     // Waypoint dan TestYaw mutex — waypoint lebih prioritas
     if (!isAutoTunerRunning()) {
         if (isWaypointActive()) {
-            waypointTick(wpTargetX_m * 100.0f, wpTargetY_m * 100.0f, wpTargetYaw_deg, wpMaxSpeed);  // m→cm for tick
+            waypointTick(wpMaxSpeed);
         } else if (testYawMode) {
             static Jeda jedaYawTest;
             if (jedaYawTest.check(20)) {

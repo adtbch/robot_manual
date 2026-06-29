@@ -135,22 +135,12 @@ void pidReloadFromNVS() {
 // =====================================================================
 
 int pidCompute(PIDState &pid, float target, float current, float dt) {
-    // Target change detection
-    if (pid.lastTarget != 0.0f && fabs(target - pid.lastTarget) > fabs(pid.lastTarget) * 0.20f) {
-        pid.integral = 0.0f;
-    }
     pid.lastTarget = target;
 
     float error = target - current;
 
     // Proportional
     float pOut = pid.kp * error;
-
-    // Integral with anti-windup
-    float integralLimit = (pid.ki > 0.0001f) ? (float)PWM_MAX / pid.ki : 2000.0f;
-    pid.integral += error * dt;
-    pid.integral = constrain(pid.integral, -integralLimit, integralLimit);
-    float iOut = pid.ki * pid.integral;
 
     // Derivative on measurement
     float dOut = 0.0f;
@@ -165,6 +155,17 @@ int pidCompute(PIDState &pid, float target, float current, float dt) {
     } else if (target < -0.5f) {
         ffOut = (pid.kf * target) - pid.deadband;
     }
+
+    // Integral with anti-windup (clamp + conditional integration saat output saturasi)
+    float integralLimit = (pid.ki > 0.0001f) ? (float)PWM_MAX / pid.ki : 2000.0f;
+    float preOutput = pOut + ffOut + dOut + pid.ki * pid.integral;
+    bool saturatedHigh = (preOutput >= (float)PWM_MAX) && (error > 0.0f);
+    bool saturatedLow  = (preOutput <= (float)PWM_MIN) && (error < 0.0f);
+    if (!saturatedHigh && !saturatedLow) {
+        pid.integral += error * dt;
+        pid.integral = constrain(pid.integral, -integralLimit, integralLimit);
+    }
+    float iOut = pid.ki * pid.integral;
 
     float output = pOut + iOut + dOut + ffOut;
     int pwmOutput = (int)constrain(output, (float)PWM_MIN, (float)PWM_MAX);

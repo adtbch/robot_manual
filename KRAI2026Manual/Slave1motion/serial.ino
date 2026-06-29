@@ -41,7 +41,7 @@ void printHelp(Print& out) {
     out.println("  stop                                    — stop all motors");
     out.println("  autotune <motor|all>                    — run auto-tuner");
     out.println("  calibrate / calclear                    — gyro calibration NVS");
-    out.println("  goto <x_cm> <y_cm> <yaw_deg>           — gerak ke waypoint");
+    out.println("  goto <x_cm> <y_cm> <yaw_deg> [speed_rpm] — gerak ke waypoint");
     out.println("  wp cancel|status                        — batal/status waypoint");
     out.println("  tunewp <kp> [tol_pos_cm] [tol_yaw_deg] — tuning waypoint");
     out.println("  savewp                                  — simpan waypoint params ke NVS");
@@ -117,18 +117,25 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             if (!fromMasterUart) out.println("Format: kn <vx> <vy> <yawDeg>");
         }
     } else if (strcmp(token, "goto") == 0) {
-        char* xStr   = strtok(nullptr, " ");
-        char* yStr   = strtok(nullptr, " ");
-        char* yawStr = strtok(nullptr, " ");
+        char* xStr    = strtok(nullptr, " ");
+        char* yStr    = strtok(nullptr, " ");
+        char* yawStr  = strtok(nullptr, " ");
+        char* spdStr  = strtok(nullptr, " ");  // opsional
         if (xStr != nullptr && yStr != nullptr && yawStr != nullptr) {
-            const float x_cm = atof(xStr);
-            const float y_cm = atof(yStr);
-            const float yaw  = atof(yawStr);
+            const float x_cm   = atof(xStr);
+            const float y_cm   = atof(yStr);
+            const float yaw    = atof(yawStr);
+            const float speed  = (spdStr != nullptr) ? atof(spdStr) : wpMaxSpeed;
             testYawMode = false;
-            waypointTick(x_cm, y_cm, yaw, wpMaxSpeed);
-            if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg\n", x_cm, y_cm, yaw);
+            startWaypoint(x_cm, y_cm, yaw, speed);
+            if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg speed=%.0f rpm\n", x_cm, y_cm, yaw, speed);
+            if (wpState != WaypointState::REACHED) {
+                Serial1.printf("WP: RUNNING\n");
+            } else {
+                Serial1.printf("WP: REACHED\n");
+            }
         } else {
-            if (!fromMasterUart) out.println("Format: goto <x_cm> <y_cm> <yaw_deg>");
+            if (!fromMasterUart) out.println("Format: goto <x_cm> <y_cm> <yaw_deg> [speed_rpm]");
         }
     } else if (strcmp(token, "wp") == 0) {
         char* arg = strtok(nullptr, " ");

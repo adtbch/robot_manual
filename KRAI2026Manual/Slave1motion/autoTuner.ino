@@ -26,6 +26,11 @@ namespace AutoTunerNS {
     constexpr uint32_t KF_RUN_MS = 2000;
     constexpr float KF_MIN_RPM = 10.0f;
 
+    // Emulasi beban tanjakan saat motor diangkat: PWM yang dikurangi dari output
+    // selama window steady-state. Memaksa integral wind-up seperti kena gravitasi.
+    // ponytail: estimasi konstan ~25% PWM_MAX; sesuaikan dari selisih PWM datar vs tanjakan.
+    constexpr int LOAD_INJECT_PWM = 250;
+
     constexpr float HIGH_OVERSHOOT_PCT = 10.0f;
     constexpr float MEDIUM_OVERSHOOT_PCT = 5.0f;
     constexpr float LOW_OVERSHOOT_PCT = 3.0f;
@@ -516,7 +521,15 @@ void autoTunerTick(bool bootPressed) {
             
             float rpm = getEncoderVelocityRpm(tMotorIdx);
             int pwm = pidCompute(tMotorIdx, AutoTunerNS::kTargetRpm, AutoTunerNS::kPidTickMs / 1000.0f);
-            pwmMotor(tMotorIdx, pwm);
+
+            // Emulasi beban tanjakan di paruh kedua (window steady-state).
+            // Loop tetap melihat RPM dari PWM terpasang -> integral dipaksa recovery.
+            int applied = pwm;
+            if (elapsed >= (uint32_t)(AUTOTUNE_RUN_MS * AutoTunerNS::kSteadyStateStartFraction)) {
+                applied = (int)constrain((float)pwm - AutoTunerNS::LOAD_INJECT_PWM,
+                                         (float)PWM_MIN, (float)PWM_MAX);
+            }
+            pwmMotor(tMotorIdx, applied);
 
             // Metrics
             if (rpm > metrics.peak_rpm) metrics.peak_rpm = rpm;
