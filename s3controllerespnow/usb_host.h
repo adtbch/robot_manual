@@ -226,6 +226,7 @@ public:
   usb_transfer_t *xfer = NULL;
   uint8_t epLen = 64;
   uint8_t ifNum = 0xFF;
+  bool needsRestart = false;
 
   void cleanup() {
     if (xfer) { usb_host_transfer_free(xfer); xfer = NULL; }
@@ -253,8 +254,7 @@ public:
 
   void onDisconnect(void) override {
     cleanup();
-    Serial.println("Disconnected. Waiting...");
-    ESP.restart();
+    needsRestart = true;
   }
 
   void onConfig(const uint8_t type, const uint8_t *p) override {

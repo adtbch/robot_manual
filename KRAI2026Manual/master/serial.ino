@@ -46,10 +46,10 @@ HardwareSerial slave2Serial(2);
 
 void setupSerial() {
     // UART1 — ke slave1
-    slave1Serial.begin(SLAVE1_BAUD, SERIAL_8N1, SLAVE1_RX, SLAVE1_TX);
+    slave1Serial.begin(SLAVE_BAUD, SERIAL_8N1, SLAVE1_RX, SLAVE1_TX);
 
     // UART2 — ke slave2
-    slave2Serial.begin(SLAVE2_BAUD, SERIAL_8N1, SLAVE2_RX, SLAVE2_TX);
+    slave2Serial.begin(SLAVE_BAUD, SERIAL_8N1, SLAVE2_RX, SLAVE2_TX);
 }
 
 // =====================================================================
@@ -75,6 +75,7 @@ void printHelp(Print& out) {
     out.println("--- Daftar Command ---");
     out.println("  motor <id> <pwm>  (contoh: motor x 500)");
     out.println("  motorstop        stop semua motor");
+    out.println("  motorlevel <0-5> motor Y ke level preset");
     out.println("  motortarget <x|y> <enc>  set encoder target (alias: motorpid)");
     out.println("  motortargetstop <x|y>    stop positioning (alias: motorpidstop)");
     out.println("  servo <id> <angle> (contoh: servo d 90)");
@@ -106,8 +107,20 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         return;
     }
 
+    // ── MOTORLEVEL <0-5> — motor Y ke level preset ──────────────
+    if (strcmp(token, "motorlevel") == 0) {
+        char* val = strtok(nullptr, " ");
+        if (val != nullptr) {
+            int level = constrain(atoi(val), 0, MOTOR_Y_LEVEL_MAX);
+            motorYSetTarget(MOTOR_Y_LEVEL_ENC[level]);
+            out.printf("Motor Y level: %d (enc %ld)\n", level, MOTOR_Y_LEVEL_ENC[level]);
+        } else {
+            out.println("Usage: motorlevel <0-5>");
+        }
+    }
+
     // ── MOTOR <id> <pwm> ────────────────────────────────────────
-    if (strcmp(token, "motor") == 0) {
+    else if (strcmp(token, "motor") == 0) {
         char* id = strtok(nullptr, " ");
         char* val = strtok(nullptr, " ");
         if (id != nullptr && val != nullptr) {
@@ -325,13 +338,17 @@ void serialCommandTick() {
         }
     }
 
-    // ── Slave2 (UART2) ──────────────────────────────────────────
+    // ── Slave2 (UART2) — sensor data + command ──────────────────
     while (slave2Serial.available() > 0) {
         char c = slave2Serial.read();
         if (c == '\n' || c == '\r') {
             if (slave2BufIdx > 0) {
                 slave2Buf[slave2BufIdx] = '\0';
-                parseAndExecuteCommand(slave2Buf, slave2Serial);
+                // Sensor data (prox/enc/limit/pne) → update state
+                if (!parseSlave2Sensor(slave2Buf)) {
+                    // Bukan sensor → command biasa
+                    parseAndExecuteCommand(slave2Buf, slave2Serial);
+                }
                 slave2BufIdx = 0;
             }
         } else if (slave2BufIdx < SERIAL_CMD_BUF_SIZE - 1) {

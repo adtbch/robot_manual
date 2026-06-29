@@ -78,7 +78,7 @@ void setup() {
     // Init serial command handler
     setupSerialCommand();
 
-    setHomingAll();
+    // setHomingAll();
     Serial.println("Setup zone1: limit Y/X + motor Y lv0 + motor X enc0");
 }
 
@@ -99,6 +99,7 @@ void loop() {
     espNowControlReadPacket(gLastRxPacket);
     gripperControlTick(gLastRxPacket);
     motionControlTick(gLastRxPacket);
+    armBoxControlTick(gLastRxPacket);
 
     // Encoder positioning motor X/Y
     motorXPositionTick();
@@ -106,4 +107,7 @@ void loop() {
 
     // Box done — cek motor Y sampai, kirim ke slave2
     boxCheckDone();
+
+    // Arm box — auto pneumatic + motor dari proximity
+    armBoxTick();
 }

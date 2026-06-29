@@ -15,11 +15,11 @@
 
 namespace {
 
-constexpr uint8_t limitPins[LIMIT_COUNT] = {
-    LIMIT_SWITCH_1,
-    LIMIT_SWITCH_2,
-    LIMIT_SWITCH_3,
-    LIMIT_SWITCH_4
+constexpr uint8_t limitPins[] = {
+    LIMIT_PIN_ARMBOX_DEPAN,
+    LIMIT_PIN_ARMBOX_BELAKANG,
+    LIMIT_PIN_ARMBOX_TURUN,
+    // LIMIT_PIN_UNUSED,  // ponytail: deadcode
 };
 
 } // anonymous namespace

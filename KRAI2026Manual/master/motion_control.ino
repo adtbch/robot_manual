@@ -9,8 +9,10 @@
  *   DPAD   → tombol panah (digital, full RPM)
  *
  * YAW (terpisah dari input mode di atas):
- *   Analog kanan (rx) → ±yaw manual, selalu aktif (DPAD/ANALOG tidak mempengaruhi)
+ *   Analog kanan (rx) → ±yaw manual, selalu aktif (kecuali R2 / L2)
  *   rx ±1° per step — normal 50ms, L1 slow 150ms, R1 fast 25ms
+ *   L2 + analog kanan → snap kardinal: atas 0, kanan 90, bawah 180, kiri -90
+ *   gModeInvert → atas 180, bawah 0, kiri 90, kanan -90
  *   Nilai disimpan di gYawTarget master → dikirim sebagai argumen ke-3 pada kn
  *
  * SPEED MODE: vx/vy RPM max — normal 75, L1 slow 25, R1 fast 150
@@ -98,6 +100,24 @@ void updateYawTargetFromStick(int16_t rawRx, uint32_t stepIntervalMs) {
     gYawTarget = wrapYawTarget(gYawTarget + dir);
 }
 
+void updateYawTargetFromCardinalStick(int16_t rawRx, int16_t rawRy) {
+    if (abs(rawRx) <= YAW_STICK_THRESHOLD && abs(rawRy) <= YAW_STICK_THRESHOLD) return;
+
+    int16_t target;
+    if (abs(rawRx) >= abs(rawRy)) {
+        target = (rawRx > 0) ? 90 : -90;
+    } else {
+        target = (rawRy > 0) ? 0 : 180;
+    }
+    if (gModeInvert) {
+        if (target == 0)   target = 180;
+        else if (target == 180) target = 0;
+        else if (target == 90)  target = -90;
+        else if (target == -90) target = 90;
+    }
+    gYawTarget = wrapYawTarget(target);
+}
+
 } // anonymous namespace
 
 // =====================================================================
@@ -152,11 +172,15 @@ void motionControlTick(const ControlPacket &pkt) {
         scaleFieldVelocity(vx, vy, rpmMax);
 
         const int16_t rawRx = applyStickDeadzone(pkt.rx);
-        updateYawTargetFromStick(rawRx, yawStepMs);
+        const int16_t rawRy = applyStickDeadzone(-(int16_t)pkt.ry);
+        if (pkt.buttons & BTN_L2) {
+            updateYawTargetFromCardinalStick(rawRx, rawRy);
+        } else if (!(pkt.buttons & BTN_R2)) {
+            updateYawTargetFromStick(rawRx, yawStepMs);
+        }
+    } else {
+        vx = 0;
+        vy = 0;
     }
-
-    // ponytail: stream kn selalu — link mati/idle = kn 0 0 <yawTarget>
-    if (gJedaKnSend.check(KN_SEND_INTERVAL_MS)) {
-        sendKnCommand(vx, vy, gYawTarget);
-    }
+    sendKnCommand(vx, vy, gYawTarget);
 }

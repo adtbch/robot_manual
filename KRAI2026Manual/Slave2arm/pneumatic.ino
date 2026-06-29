@@ -15,14 +15,25 @@
 
 namespace {
 
-constexpr uint8_t pneumaticPins[PNEUMATIC_COUNT] = {
-    PNEUMATIC_1_PIN,
-    PNEUMATIC_2_PIN,
-    PNEUMATIC_3_PIN,
-    PNEUMATIC_4_PIN
+struct PneumaticConfig {
+    char id;
+    uint8_t pin;
+};
+
+constexpr PneumaticConfig pneumaticValves[PNEUMATIC_COUNT] = {
+    {'r', PNEUMATIC_R_PIN},
+    {'l', PNEUMATIC_L_PIN},
+    // ponytail: 2 valves deadcode dulu
 };
 
 bool pneumaticActive[PNEUMATIC_COUNT] = {};
+
+int findPneumaticIndex(char id) {
+    for (size_t i = 0; i < PNEUMATIC_COUNT; i++) {
+        if (pneumaticValves[i].id == id) return (int)i;
+    }
+    return -1;
+}
 
 } // anonymous namespace
 
@@ -32,8 +43,8 @@ bool pneumaticActive[PNEUMATIC_COUNT] = {};
 
 void setupPneumatic() {
     for (size_t i = 0; i < PNEUMATIC_COUNT; i++) {
-        pinMode(pneumaticPins[i], OUTPUT);
-        digitalWrite(pneumaticPins[i], LOW);  // default OFF
+        pinMode(pneumaticValves[i].pin, OUTPUT);
+        digitalWrite(pneumaticValves[i].pin, LOW);  // default OFF
     }
 }
 
@@ -41,34 +52,38 @@ void setupPneumatic() {
 //  CONTROL
 // =====================================================================
 
-void pneumaticOn(char index) {
-    if (index >= PNEUMATIC_COUNT) return;
-    digitalWrite(pneumaticPins[index], HIGH);
-    pneumaticActive[index] = true;
+void pneumaticOn(char id) {
+    int idx = findPneumaticIndex(id);
+    if (idx < 0) return;
+    digitalWrite(pneumaticValves[idx].pin, HIGH);
+    pneumaticActive[idx] = true;
 }
 
-void pneumaticOff(char index) {
-    if (index >= PNEUMATIC_COUNT) return;
-    digitalWrite(pneumaticPins[index], LOW);
-    pneumaticActive[index] = false;
+void pneumaticOff(char id) {
+    int idx = findPneumaticIndex(id);
+    if (idx < 0) return;
+    digitalWrite(pneumaticValves[idx].pin, LOW);
+    pneumaticActive[idx] = false;
 }
 
-void pneumaticToggle(char index) {
-    if (index >= PNEUMATIC_COUNT) return;
-    if (pneumaticActive[index]) {
-        pneumaticOff(index);
+void pneumaticToggle(char id) {
+    int idx = findPneumaticIndex(id);
+    if (idx < 0) return;
+    if (pneumaticActive[idx]) {
+        pneumaticOff(id);
     } else {
-        pneumaticOn(index);
+        pneumaticOn(id);
     }
 }
 
-bool pneumaticState(char index) {
-    if (index >= PNEUMATIC_COUNT) return false;
-    return pneumaticActive[index];
+bool pneumaticState(char id) {
+    int idx = findPneumaticIndex(id);
+    if (idx < 0) return false;
+    return pneumaticActive[idx];
 }
 
 void pneumaticAllOff() {
     for (size_t i = 0; i < PNEUMATIC_COUNT; i++) {
-        pneumaticOff(i);
+        pneumaticOff(pneumaticValves[i].id);
     }
 }

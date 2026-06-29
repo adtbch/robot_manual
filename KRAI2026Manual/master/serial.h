@@ -28,8 +28,7 @@ constexpr uint8_t SLAVE2_TX = 48;
 // =====================================================================
 //  BAUD RATE
 // =====================================================================
-constexpr uint32_t SLAVE1_BAUD = 921600;
-constexpr uint32_t SLAVE2_BAUD = 921600;
+constexpr uint32_t SLAVE_BAUD = 921600;
 
 // =====================================================================
 //  UART INSTANCES — global, bisa diakses modul lain
@@ -43,5 +42,22 @@ extern HardwareSerial slave2Serial;
 void setupSerial();
 void setupSerialCommand();
 void serialCommandTick();
+
+// serial_command.ino — sensor data dari slave2
+bool parseSlave2Sensor(char* cmd);
+bool slave2ProxR();
+bool slave2ProxL();
+bool slave2LimitDepan();
+bool slave2LimitBelakang();
+bool slave2LimitTurun();
+long slave2EncX();
+long slave2EncY();
+long slave2EncK();
+bool slave2PneR();
+bool slave2PneL();
+
+// serial_command.ino — kirim command ke slave
+void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget);
+void sendSlave2Command(const char* fmt, ...);
 
 #endif // SERIAL_H
