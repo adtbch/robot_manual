@@ -58,6 +58,7 @@ bool slave2PneL();
 
 // serial_command.ino — kirim command ke slave
 void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget);
+void sendGotoCommand(int16_t x_cm, int16_t y_cm, int16_t yaw_deg, int16_t speedRpm);
 void sendSlave2Command(const char* fmt, ...);
 
 #endif // SERIAL_H

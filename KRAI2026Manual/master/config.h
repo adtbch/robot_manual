@@ -137,4 +137,13 @@ extern int16_t gYawTarget;
 
 extern bool gModeInvert;
 
+// =====================================================================
+//  SHARED STATE — goto target (motion teleop + forest waypoint)
+// =====================================================================
+
+extern float   gTargetX_cm;
+extern float   gTargetY_cm;
+extern int16_t gTargetSpeedRpm;
+extern bool    gMotionWaypointMode;  // true = forest set target, stick diblock
+
 #endif // CONFIG_H
