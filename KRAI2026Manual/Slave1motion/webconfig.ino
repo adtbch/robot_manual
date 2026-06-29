@@ -30,6 +30,7 @@
 #include "encoder.h"
 #include "autoTuner.h"
 #include "kinematik.h"
+#include "waypoint.h"
 
 // =====================================================================
 //  STATE
@@ -100,6 +101,25 @@ h1{font-size:1.2em;margin-bottom:12px;color:#38bdf8}
 </div>
 </div>
 <div class="card">
+<h2>Waypoint</h2>
+<div class="row"><label>Kp</label><input id="wpKp" type="number" step="1"><label>Tol(cm)</label><input id="wpTol" type="number" step="0.5"><label>TolYaw</label><input id="wpTolYaw" type="number" step="0.5"></div>
+<div style="display:flex;gap:4px;margin-top:6px">
+<button class="btn btn-blue" onclick="saveWp()">Save WP</button>
+<button class="btn btn-green" onclick="wpStatus()">Status</button>
+</div>
+<div style="margin-top:10px">
+<h2 style="font-size:0.8em;color:#cbd5e1">Test Waypoint</h2>
+<div style="display:flex;gap:4px;flex-wrap:wrap">
+<input id="wpX" type="number" placeholder="X cm" value="0" style="width:60px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#e2e8f0;padding:4px">
+<input id="wpY" type="number" placeholder="Y cm" value="0" style="width:60px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#e2e8f0;padding:4px">
+<input id="wpYaw" type="number" placeholder="Yaw deg" value="0" style="width:60px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#e2e8f0;padding:4px">
+<input id="wpSpeed" type="number" placeholder="RPM" value="300" style="width:60px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#e2e8f0;padding:4px">
+<button class="btn btn-green" onclick="wpGo()">Go</button>
+<button class="btn btn-red" onclick="wpStop()">Stop</button>
+</div>
+</div>
+</div>
+<div class="card">
 <h2>Status</h2>
 <div id="st" class="status">Loading...</div>
 </div>
@@ -108,12 +128,16 @@ h1{font-size:1.2em;margin-bottom:12px;color:#38bdf8}
 const M=['FR','FL','BR','BL'];
 function log(m){const d=document.getElementById('log');d.innerHTML+=new Date().toLocaleTimeString()+' '+m+'<br>';d.scrollTop=d.scrollHeight;}
 function buildCards(){const c=document.getElementById('motor-pids');let h='';for(let i=0;i<4;i++){h+='<div class="card"><div class="motor-label">Motor '+i+' ('+M[i]+')</div>';h+='<div class="row"><label>Kp</label><input id="m'+i+'kp" type="number" step="0.1"><label>Ki</label><input id="m'+i+'ki" type="number" step="0.01"><label>Kf</label><input id="m'+i+'kf" type="number" step="0.01"></div>';h+='<div class="row"><label>Db</label><input id="m'+i+'db" type="number" step="1"></div>';h+='<div style="margin-top:4px"><button class="btn btn-blue" onclick="saveM('+i+')">Save M'+i+'</button></div></div>';}c.innerHTML=h;}
-function loadPid(){fetch('/api/pid').then(r=>r.json()).then(d=>{for(let i=0;i<4;i++){const p=d.motors[i]||{};document.getElementById('m'+i+'kp').value=p.kp||0;document.getElementById('m'+i+'ki').value=p.ki||0;document.getElementById('m'+i+'kf').value=p.kf||0;document.getElementById('m'+i+'db').value=p.deadband||0;}document.getElementById('ykp').value=d.yaw?.kp||0;document.getElementById('yki').value=d.yaw?.ki||0;document.getElementById('ykd').value=d.yaw?.kd||0;log('PID loaded');}).catch(e=>log('ERR: '+e));}
+function loadPid(){fetch('/api/pid').then(r=>r.json()).then(d=>{for(let i=0;i<4;i++){const p=d.motors[i]||{};document.getElementById('m'+i+'kp').value=p.kp||0;document.getElementById('m'+i+'ki').value=p.ki||0;document.getElementById('m'+i+'kf').value=p.kf||0;document.getElementById('m'+i+'db').value=p.deadband||0;}document.getElementById('ykp').value=d.yaw?.kp||0;document.getElementById('yki').value=d.yaw?.ki||0;document.getElementById('ykd').value=d.yaw?.kd||0;if(d.waypoint){document.getElementById('wpKp').value=d.waypoint.kp||0;document.getElementById('wpTol').value=d.waypoint.tol_pos||0;document.getElementById('wpTolYaw').value=d.waypoint.tol_yaw||0;}log('PID loaded');}).catch(e=>log('ERR: '+e));}
 function saveM(i){const b=JSON.stringify({idx:i,kp:parseFloat(document.getElementById('m'+i+'kp').value),ki:parseFloat(document.getElementById('m'+i+'ki').value),kf:parseFloat(document.getElementById('m'+i+'kf').value),db:parseFloat(document.getElementById('m'+i+'db').value)});fetch('/api/pid',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('M'+i+': '+d.ok)).catch(e=>log('ERR: '+e));}
 function saveYawPid(){const b=JSON.stringify({kp:parseFloat(document.getElementById('ykp').value),ki:parseFloat(document.getElementById('yki').value),kd:parseFloat(document.getElementById('ykd').value)});fetch('/api/yawpid',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('Yaw: '+d.ok)).catch(e=>log('ERR: '+e));}
 function saveAll(){saveM(0);saveM(1);saveM(2);saveM(3);saveYawPid();setTimeout(()=>fetch('/api/save',{method:'POST'}),200);log('All saved to NVS');}
 function testYaw(target){const b=JSON.stringify(target===null?{stop:true}:{stop:false,target:target});fetch('/api/testyaw',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log(target===null?'Test Yaw STOP':'Test Yaw Target: '+target+'°')).catch(e=>log('ERR: '+e));}
 function autoTune(i){if(!confirm('Auto-tune motor '+i+'? Robot harus diam.'))return;fetch('/api/autotune',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idx:i})}).then(r=>r.json()).then(d=>log('AT: '+d.ok)).catch(e=>log('ERR: '+e));}
+function saveWp(){const b=JSON.stringify({kp:parseFloat(document.getElementById('wpKp').value)||200,tol_pos:parseFloat(document.getElementById('wpTol').value)||5,tol_yaw:parseFloat(document.getElementById('wpTolYaw').value)||3});fetch('/api/waypoint',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('WP: '+d.ok)).catch(e=>log('ERR: '+e));}
+function wpGo(){const x=parseFloat(document.getElementById('wpX').value)||0,y=parseFloat(document.getElementById('wpY').value)||0,yaw=parseFloat(document.getElementById('wpYaw').value)||0,spd=parseFloat(document.getElementById('wpSpeed').value)||300;fetch('/api/wpgoto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({x:x,y:y,yaw:yaw,max_speed:spd})}).then(r=>r.json()).then(d=>log('WP Go: '+d.ok)).catch(e=>log('ERR: '+e));}
+function wpStop(){fetch('/api/wpstop',{method:'POST'}).then(r=>r.json()).then(d=>log('WP Stop: '+d.ok)).catch(e=>log('ERR: '+e));}
+function wpStatus(){fetch('/api/wpstatus').then(r=>r.json()).then(d=>{log('WP: state='+d.state+' target=('+d.target_x+','+d.target_y+') yaw='+d.target_yaw+'°');}).catch(e=>log('ERR: '+e));}
 function loadStatus(){fetch('/api/status').then(r=>r.json()).then(d=>{let s='Yaw: '+Number(d.yaw||0).toFixed(1)+' | Enc: '+(d.enc||[]).join(', ')+' | RPM: '+(d.rpm||[]).join(', ');document.getElementById('st').textContent=s;}).catch(()=>{});}
 buildCards();loadPid();setInterval(loadStatus,500);
 </script>
@@ -141,7 +165,11 @@ static void handleApiPidGet() {
     }
     json += "],\"yaw\":{\"kp\":" + String(pidKinematicYaw.kp, 3);
     json += ",\"ki\":" + String(pidKinematicYaw.ki, 3);
-    json += ",\"kd\":" + String(pidKinematicYaw.kd, 3) + "}}";
+    json += ",\"kd\":" + String(pidKinematicYaw.kd, 3) + "}";
+    json += ",\"waypoint\":{\"kp\":" + String(wpKpXY, 1);
+    json += ",\"tol_pos\":" + String(wpTolPos_m * 100.0f, 1);  // m → cm
+    json += ",\"tol_yaw\":" + String(wpTolYaw_deg, 1) + "}";
+    json += "}";
     server.send(200, "application/json", json);
 }
 
@@ -187,7 +215,8 @@ static void handleApiPidPost() {
     float db = getJsonFloat(body, "db");
 
     pidSetGains(idx, kp, ki, kf, db);
-    Serial.printf("[WEB] Motor %d PID: Kp=%.3f Ki=%.3f Kf=%.3f Db=%.1f\n", idx, kp, ki, kf, db);
+    pidSaveToNVS(idx, kp, ki, kf, db);
+    Serial.printf("[WEB] Motor %d PID: Kp=%.3f Ki=%.3f Kf=%.3f Db=%.1f (NVS saved)\n", idx, kp, ki, kf, db);
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -206,8 +235,9 @@ static void handleApiYawPid() {
     pidKinematicYaw.ki = ki;
     pidKinematicYaw.kd = kd;
     pidKinematicYaw.reset();
+    saveYawPid();
     
-    Serial.printf("[WEB] Yaw PID: Kp=%.3f Ki=%.3f Kd=%.3f\n", kp, ki, kd);
+    Serial.printf("[WEB] Yaw PID: Kp=%.3f Ki=%.3f Kd=%.3f (NVS saved)\n", kp, ki, kd);
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -216,7 +246,8 @@ static void handleApiSave() {
         pidSaveToNVS(i, pidStates[i].kp, pidStates[i].ki, pidStates[i].kf, pidStates[i].deadband);
     }
     saveYawPid();
-    Serial.println("[WEB] All PID saved to NVS");
+    saveWaypointPid();
+    Serial.println("[WEB] All PID + Waypoint saved to NVS");
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -306,6 +337,61 @@ static void handleApiStatus() {
     server.send(200, "application/json", json);
 }
 
+// =====================================================================
+//  WAYPOINT HANDLERS
+// =====================================================================
+
+static void handleApiWaypoint() {
+    if (server.method() != HTTP_POST) {
+        server.send(405, "application/json", "{\"error\":\"POST only\"}");
+        return;
+    }
+    String body = server.arg("plain");
+    wpKpXY       = getJsonFloat(body, "kp");
+    wpTolPos_m   = getJsonFloat(body, "tol_pos") * 0.01f;  // cm → m
+    wpTolYaw_deg = getJsonFloat(body, "tol_yaw");
+    saveWaypointPid();
+    Serial.printf("[WEB] Waypoint: Kp=%.1f TolPos=%.2fcm TolYaw=%.1fdeg (NVS saved)\n",
+                  wpKpXY, wpTolPos_m * 100.0f, wpTolYaw_deg);
+    server.send(200, "application/json", "{\"ok\":true}");
+}
+
+static void handleApiWpGo() {
+    if (server.method() != HTTP_POST) {
+        server.send(405, "application/json", "{\"error\":\"POST only\"}");
+        return;
+    }
+    String body = server.arg("plain");
+    float x_cm = getJsonFloat(body, "x");
+    float y_cm = getJsonFloat(body, "y");
+    float yaw  = getJsonFloat(body, "yaw");
+    float maxSpd = getJsonFloat(body, "max_speed");
+    if (maxSpd < 1) maxSpd = wpMaxSpeed;
+
+    testYawMode = false;
+    wpMaxSpeed = maxSpd;
+    waypointTick(x_cm, y_cm, yaw, wpMaxSpeed);
+    Serial.printf("[WEB] WP Go: (%.0f, %.0f)cm yaw=%.1f° speed=%.0fRPM\n", x_cm, y_cm, yaw, maxSpd);
+    server.send(200, "application/json", "{\"ok\":true}");
+}
+
+static void handleApiWpStop() {
+    cancelWaypoint();
+    Serial.println("[WEB] WP Stop");
+    server.send(200, "application/json", "{\"ok\":true}");
+}
+
+static void handleApiWpStatus() {
+    const char* states[] = {"IDLE", "RUNNING", "REACHED"};
+    String json = "{";
+    json += "\"state\":\"" + String(states[(int)getWaypointState()]) + "\"";
+    json += ",\"target_x\":" + String(wpTargetX_m, 2);
+    json += ",\"target_y\":" + String(wpTargetY_m, 2);
+    json += ",\"target_yaw\":" + String(wpTargetYaw_deg, 1);
+    json += "}";
+    server.send(200, "application/json", json);
+}
+
 static void handleNotFound() {
     server.send(404, "text/plain", "404");
 }
@@ -333,6 +419,10 @@ void setupWebServer() {
     server.on("/api/testyaw", HTTP_POST, handleApiTestYaw);
     server.on("/api/save", HTTP_POST, handleApiSave);
     server.on("/api/autotune", HTTP_POST, handleApiAutotune);
+    server.on("/api/waypoint", HTTP_POST, handleApiWaypoint);
+    server.on("/api/wpgoto", HTTP_POST, handleApiWpGo);
+    server.on("/api/wpstop", HTTP_POST, handleApiWpStop);
+    server.on("/api/wpstatus", HTTP_GET, handleApiWpStatus);
     server.on("/api/status", HTTP_GET, handleApiStatus);
     server.onNotFound(handleNotFound);
 

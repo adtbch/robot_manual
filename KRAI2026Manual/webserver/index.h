@@ -91,6 +91,7 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 <nav class="nav">
 <button class="ni on" data-p="mapping" onclick="swP('mapping')">Button Mapping</button>
 <button class="ni" data-p="pid" onclick="swP('pid')">PID Tuning</button>
+<button class="ni" data-p="waypoint" onclick="swP('waypoint')">Waypoint</button>
 <button class="ni" data-p="console" onclick="swP('console')">Console</button>
 </nav>
 
@@ -164,6 +165,40 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 <div class="fg"><label>Kp</label><input type="number" class="i is" id="yawKp" step="0.01"></div>
 <div class="fg"><label>Ki</label><input type="number" class="i is" id="yawKi" step="0.001"></div>
 <div class="fg"><label>Kd</label><input type="number" class="i is" id="yawKd" step="0.001"></div>
+</div>
+</div>
+</div>
+
+</div>
+
+<!-- PAGE: WAYPOINT -->
+<div class="pg h" id="pg-waypoint">
+
+<!-- WAYPOINT CONFIG -->
+<div class="cd">
+<div class="ch"><h2>Waypoint Config</h2><div class="ha"><span class="bg badge-bl">P-controller</span><button class="btn bp" style="padding:4px 10px;font-size:.72rem" onclick="saveSection('waypoint')">Save</button></div></div>
+<div class="cb">
+<div class="fr">
+<div class="fg"><label>Kp (RPM/m)</label><input type="number" class="i is" id="wpKp" step="1"></div>
+<div class="fg"><label>TolPos (cm)</label><input type="number" class="i is" id="wpTolPos" step="0.5"></div>
+<div class="fg"><label>TolYaw (deg)</label><input type="number" class="i is" id="wpTolYaw" step="0.5"></div>
+</div>
+</div>
+</div>
+
+<!-- WAYPOINT TEST -->
+<div class="cd" style="margin-top:14px">
+<div class="ch"><h2>Waypoint Test</h2><div class="ha"><span class="bg badge-grn">Goto</span></div></div>
+<div class="cb">
+<div class="fr">
+<div class="fg"><label>X (cm)</label><input type="number" class="i is" id="wpTestX" value="0" step="1"></div>
+<div class="fg"><label>Y (cm)</label><input type="number" class="i is" id="wpTestY" value="0" step="1"></div>
+<div class="fg"><label>Yaw (deg)</label><input type="number" class="i is" id="wpTestYaw" value="0" step="1"></div>
+<div class="fg"><label>Speed (RPM)</label><input type="number" class="i is" id="wpTestSpeed" value="200" step="10"></div>
+<div style="align-self:flex-end;display:flex;gap:6px">
+<button class="btn bp" onclick="wpGo()">Go</button>
+<button class="btn bdn" onclick="wpStop()">Stop</button>
+</div>
 </div>
 </div>
 </div>
@@ -299,6 +334,7 @@ case 'mapping_arm':return{section:'mapping_arm',data:maps.armbox};
 case 'presets':return{section:'presets',data:presets};
 case 'motor_pos':return{section:'motor_pos',data:motorPos};
 case 'pid':return{section:'pid',data:{motors:pid}};
+case 'waypoint':return{section:'waypoint',data:{kp:parseFloat(v('wpKp'))||200,tol_pos:parseFloat(v('wpTolPos'))||5,tol_yaw:parseFloat(v('wpTolYaw'))||3}};
 case 'yaw_pid':return{section:'yaw_pid',data:{kp:parseFloat(v('yawKp'))||0,ki:parseFloat(v('yawKi'))||0,kd:parseFloat(v('yawKd'))||0}};
 default:return null;
 }
@@ -318,12 +354,14 @@ function collectAll(){
 return{version:'2.0',ts:new Date().toISOString(),
 mappings:{gripping:maps.grip,armbox:maps.armbox},
 presets:presets,motorPositions:motorPos,
-pid:{motors:pid,yaw:{kp:parseFloat(v('yawKp'))||0,ki:parseFloat(v('yawKi'))||0,kd:parseFloat(v('yawKd'))||0}}};
+pid:{motors:pid,yaw:{kp:parseFloat(v('yawKp'))||0,ki:parseFloat(v('yawKi'))||0,kd:parseFloat(v('yawKd'))||0}},
+waypoint:{kp:parseFloat(v('wpKp'))||200,tol_pos:parseFloat(v('wpTolPos'))||5,tol_yaw:parseFloat(v('wpTolYaw'))||3}};
 }
 function aplC(c){
 if(c.mappings){if(c.mappings.gripping)maps.grip=c.mappings.gripping;if(c.mappings.armbox)maps.armbox=c.mappings.armbox;}
 if(c.presets)presets=c.presets;if(c.motorPositions)motorPos=c.motorPositions;
 if(c.pid){if(c.pid.motors)pid=c.pid.motors;if(c.pid.yaw){s('yawKp',c.pid.yaw.kp);s('yawKi',c.pid.yaw.ki);s('yawKd',c.pid.yaw.kd);}}
+if(c.waypoint){s('wpKp',c.waypoint.kp);s('wpTolPos',c.waypoint.tol_pos);s('wpTolYaw',c.waypoint.tol_yaw);}
 mapRender('grip','mapGripList');mapRender('armbox','mapArmList');
 presetRender();motorPosRender();pidRender();
 }
@@ -347,6 +385,21 @@ fetch(ESP_BASE+'/api/serial',{method:'POST',headers:{'Content-Type':'text/plain'
 .then(function(r){return r.text();}).then(function(d){if(d)log('[RX] '+d,'lr');})
 .catch(function(e){log('Error: '+e.message,'le');});
 inp.value='';inp.focus();
+}
+function wpGo(){
+var x=parseFloat(v('wpTestX'))||0,y=parseFloat(v('wpTestY'))||0,yaw=parseFloat(v('wpTestYaw'))||0;
+if(!x&&!y&&!yaw){log('[ERR] Set X/Y/Yaw dulu','le');return;}
+var cmd='goto '+x+' '+y+' '+yaw;
+log('[TX] '+cmd,'lt');
+fetch(ESP_BASE+'/api/serial',{method:'POST',headers:{'Content-Type':'text/plain'},body:cmd})
+.then(function(r){return r.text();}).then(function(d){if(d)log('[RX] '+d,'lr');})
+.catch(function(e){log('Error: '+e.message,'le');});
+}
+function wpStop(){
+log('[TX] wp cancel','lt');
+fetch(ESP_BASE+'/api/serial',{method:'POST',headers:{'Content-Type':'text/plain'},body:'wp cancel'})
+.then(function(r){return r.text();}).then(function(d){if(d)log('[RX] '+d,'lr');})
+.catch(function(e){log('Error: '+e.message,'le');});
 }
 function pollESP(){
 fetch(ESP_BASE+'/api/status').then(function(r){return r.json();}).then(function(d){
@@ -397,6 +450,7 @@ motorPos=[
 ];
 pid=[{kp:0.1,ki:0,kd:0},{kp:0.1,ki:0,kd:0},{kp:0.1,ki:0,kd:0},{kp:0.1,ki:0,kd:0}];
 s('yawKp','2.5');s('yawKi','0.01');s('yawKd','0.1');
+s('wpKp','200');s('wpTolPos','5');s('wpTolYaw','3');
 }
 initDefaults();
 mapRender('grip','mapGripList');mapRender('armbox','mapArmList');

@@ -14,6 +14,11 @@
 #include "mpu.h"
 #include "autoTuner.h"
 #include "kinematik.h"
+#include "waypoint.h"
+#include "encoder.h"
+
+extern bool testYawMode;
+extern int  testYawTarget;
 
 namespace {
 
@@ -27,15 +32,21 @@ uint8_t masterBufIdx = 0;
 
 void printHelp(Print& out) {
     out.println("Commands:");
-    out.println("  tune <idx> <kp> <ki> <kf> <db>   — set motor PID");
-    out.println("  save                              — save motor PID to NVS");
-    out.println("  tuneyaw <kp> <ki> <kd>            — set yaw PID");
-    out.println("  saveyaw / loadyaw / showyaw       — yaw PID NVS");
-    out.println("  rpm <fr> <fl> <br> <bl>           — USB: raw PWM | Master: PID RPM");
-    out.println("  kn <vx> <vy> <yaw>                — field-cent RPM + yaw correction");
-    out.println("  stop                              — stop all motors");
-    out.println("  autotune <motor|all>              — run auto-tuner");
-    out.println("  calibrate / calclear              — gyro calibration NVS");
+    out.println("  tune <idx> <kp> <ki> <kf> <db>         — set motor PID");
+    out.println("  save                                    — save motor PID to NVS");
+    out.println("  tuneyaw <kp> <ki> <kd>                  — set yaw PID");
+    out.println("  saveyaw / loadyaw / showyaw             — yaw PID NVS");
+    out.println("  rpm <fr> <fl> <br> <bl>                 — USB: raw PWM | Master: PID RPM");
+    out.println("  kn <vx> <vy> <yaw>                      — field-cent RPM + yaw correction");
+    out.println("  stop                                    — stop all motors");
+    out.println("  autotune <motor|all>                    — run auto-tuner");
+    out.println("  calibrate / calclear                    — gyro calibration NVS");
+    out.println("  goto <x_cm> <y_cm> <yaw_deg>           — gerak ke waypoint");
+    out.println("  wp cancel|status                        — batal/status waypoint");
+    out.println("  tunewp <kp> [tol_pos_cm] [tol_yaw_deg] — tuning waypoint");
+    out.println("  savewp                                  — simpan waypoint params ke NVS");
+    out.println("  odom                                    — tampilkan odometri");
+    out.println("  odomreset                               — reset odometri ke (0,0,0)");
 }
 
 void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
@@ -58,17 +69,17 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             const float kf = atof(kfStr);
             const float deadband = atof(dbStr);
             pidSetGains(idx, kp, ki, kf, deadband);
-            out.printf("Motor %d PID updated: Kp=%.2f Ki=%.2f Kf=%.2f Db=%.2f\n",
+            if (!fromMasterUart) out.printf("Motor %d PID updated: Kp=%.2f Ki=%.2f Kf=%.2f Db=%.2f\n",
                        idx, kp, ki, kf, deadband);
         } else {
-            out.println("Format: tune <motorIdx> <kp> <ki> <kf> <db>");
+            if (!fromMasterUart) out.println("Format: tune <motorIdx> <kp> <ki> <kf> <db>");
         }
     } else if (strcmp(token, "save") == 0) {
         for (int i = 0; i < 4; i++) {
             pidSaveToNVS(i, pidStates[i].kp, pidStates[i].ki,
                          pidStates[i].kf, pidStates[i].deadband);
         }
-        out.println("Semua konstanta PID tersimpan ke NVS.");
+        if (!fromMasterUart) out.println("Semua konstanta PID tersimpan ke NVS.");
     } else if (strcmp(token, "rpm") == 0) {
         char* frStr = strtok(nullptr, " ");
         char* flStr = strtok(nullptr, " ");
@@ -81,16 +92,16 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             const int bl = atoi(blStr);
             if (fromMasterUart) {
                 rpmMotor(fr, fl, br, bl);
-                out.printf("RPM: FR=%d FL=%d BR=%d BL=%d\n", fr, fl, br, bl);
+                if (!fromMasterUart) out.printf("RPM: FR=%d FL=%d BR=%d BL=%d\n", fr, fl, br, bl);
             } else {
                 pwmMotor(0, fr);
                 pwmMotor(1, fl);
                 pwmMotor(2, br);
                 pwmMotor(3, bl);
-                out.printf("Test PWM: FR=%d FL=%d BR=%d BL=%d\n", fr, fl, br, bl);
+                if (!fromMasterUart) out.printf("Test PWM: FR=%d FL=%d BR=%d BL=%d\n", fr, fl, br, bl);
             }
         } else {
-            out.println("Format: rpm <fr> <fl> <br> <bl>");
+            if (!fromMasterUart) out.println("Format: rpm <fr> <fl> <br> <bl>");
         }
     } else if (strcmp(token, "kn") == 0) {
         char* vxStr = strtok(nullptr, " ");
@@ -101,17 +112,70 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             const int vy = atoi(vyStr);
             const int yaw = atoi(yawStr);
             driveFieldCentricWithYawCorrection(vx, vy, yaw);
-            out.printf("KN: vx=%d vy=%d yaw=%d\n", vx, vy, yaw);
+            if (!fromMasterUart) out.printf("KN: vx=%d vy=%d yaw=%d\n", vx, vy, yaw);
         } else {
-            out.println("Format: kn <vx> <vy> <yawDeg>");
+            if (!fromMasterUart) out.println("Format: kn <vx> <vy> <yawDeg>");
         }
+    } else if (strcmp(token, "goto") == 0) {
+        char* xStr   = strtok(nullptr, " ");
+        char* yStr   = strtok(nullptr, " ");
+        char* yawStr = strtok(nullptr, " ");
+        if (xStr != nullptr && yStr != nullptr && yawStr != nullptr) {
+            const float x_cm = atof(xStr);
+            const float y_cm = atof(yStr);
+            const float yaw  = atof(yawStr);
+            testYawMode = false;
+            waypointTick(x_cm, y_cm, yaw, wpMaxSpeed);
+            if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg\n", x_cm, y_cm, yaw);
+        } else {
+            if (!fromMasterUart) out.println("Format: goto <x_cm> <y_cm> <yaw_deg>");
+        }
+    } else if (strcmp(token, "wp") == 0) {
+        char* arg = strtok(nullptr, " ");
+        if (arg != nullptr && strcmp(arg, "cancel") == 0) {
+            cancelWaypoint();
+            if (!fromMasterUart) out.println("WP dibatalkan.");
+        } else if (arg != nullptr && strcmp(arg, "status") == 0) {
+            const char* states[] = {"IDLE", "RUNNING", "REACHED"};
+            if (!fromMasterUart) out.printf("WP state: %s | target=(%.3f,%.3f)m yaw=%.1fdeg\n",
+                       states[(int)getWaypointState()],
+                       wpTargetX_m, wpTargetY_m, wpTargetYaw_deg);
+            if (!fromMasterUart) out.printf("Odom: x=%.3fm y=%.3fm yaw=%.1fdeg\n",
+                       odomX, odomY, getYaw());
+        } else {
+            if (!fromMasterUart) out.println("Format: wp cancel | wp status");
+        }
+    } else if (strcmp(token, "tunewp") == 0) {
+        char* kpStr      = strtok(nullptr, " ");
+        char* tolPosStr  = strtok(nullptr, " ");
+        char* tolYawStr  = strtok(nullptr, " ");
+        if (kpStr != nullptr) {
+            wpKpXY = atof(kpStr);
+            if (tolPosStr != nullptr) wpTolPos_m   = atof(tolPosStr) * 0.01f;
+            if (tolYawStr != nullptr) wpTolYaw_deg = atof(tolYawStr);
+            if (!fromMasterUart) out.printf("WP params: Kp=%.1f TolPos=%.3fm TolYaw=%.1fdeg\n",
+                       wpKpXY, wpTolPos_m, wpTolYaw_deg);
+        } else {
+            if (!fromMasterUart) out.printf("WP params: Kp=%.1f TolPos=%.3fm TolYaw=%.1fdeg\n",
+                       wpKpXY, wpTolPos_m, wpTolYaw_deg);
+            if (!fromMasterUart) out.println("Format: tunewp <kp> [tol_pos_cm] [tol_yaw_deg]");
+        }
+    } else if (strcmp(token, "savewp") == 0) {
+        saveWaypointPid();
+    } else if (strcmp(token, "odom") == 0) {
+        if (!fromMasterUart) out.printf("Odom: x=%.3fm y=%.3fm theta=%.1fdeg | yaw=%.1fdeg\n",
+                   odomX, odomY, odomTheta, getYaw());
+    } else if (strcmp(token, "odomreset") == 0) {
+        resetOdometry();
+        if (!fromMasterUart) out.println("Odometri direset ke (0,0,0).");
     } else if (strcmp(token, "stop") == 0) {
-        rpmMotor(0, 0, 0, 0);
-        out.println("Semua motor BERHENTI.");
+        cancelWaypoint();
+        testYawMode = false;
+        if (!fromMasterUart) out.println("Semua motor BERHENTI.");
     } else if (strcmp(token, "autotune") == 0) {
         char* arg = strtok(nullptr, " ");
         if (arg == nullptr) {
-            out.println("Format: autotune <motor|all>");
+            if (!fromMasterUart) out.println("Format: autotune <motor|all>");
         } else if (strcmp(arg, "all") == 0) {
             startAutoTuneAll();
         } else {
@@ -134,9 +198,9 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             pidKinematicYaw.ki = ki;
             pidKinematicYaw.kd = kd;
             pidKinematicYaw.reset();
-            out.printf("Yaw PID updated: Kp=%.3f Ki=%.3f Kd=%.3f\n", kp, ki, kd);
+            if (!fromMasterUart) out.printf("Yaw PID updated: Kp=%.3f Ki=%.3f Kd=%.3f\n", kp, ki, kd);
         } else {
-            out.println("Format: tuneyaw <kp> <ki> <kd>");
+            if (!fromMasterUart) out.println("Format: tuneyaw <kp> <ki> <kd>");
         }
     } else if (strcmp(token, "saveyaw") == 0) {
         saveYawPid();
@@ -145,7 +209,7 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
     } else if (strcmp(token, "showyaw") == 0) {
         showYawPid();
     } else {
-        printHelp(out);
+        if (!fromMasterUart) printHelp(out);
     }
 }
 
@@ -161,7 +225,7 @@ void readSerialLine(Stream& port, char* buf, uint8_t& idx, Print& out, bool from
         } else if (idx < SERIAL_CMD_BUF_SIZE - 1) {
             buf[idx++] = c;
         } else {
-            out.println("Error: command terlalu panjang");
+            if (!fromMasterUart) out.println("Error: command terlalu panjang");
             idx = 0;
         }
     }

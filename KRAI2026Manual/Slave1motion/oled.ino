@@ -161,7 +161,7 @@ bool setupOLED() {
         Serial.println("OLED: begin() failed");
         return false;
     }
-
+    display.setRotation(2); // Memutar layar 180 derajat
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
@@ -177,6 +177,10 @@ bool setupOLED() {
 
 void updateOLED() {
     if (!oledReady) return;
+
+    // display.display() kirim ~1KB via I2C → ~80ms; throttle 100ms agar loop() tidak tercekik
+    static Jeda jedaOled;
+    if (!jedaOled.check(100)) return;
 
     // Prioritas: kalau tombol sedang ditahan ≥ 3 detik, tampilkan pesan khusus
     if (isButtonLongHolding()) {

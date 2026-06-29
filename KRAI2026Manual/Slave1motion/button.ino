@@ -19,8 +19,9 @@ bool longPressLocked = false;
 bool flagShortPress = false;
 bool flagLongPress = false;
 
-constexpr uint32_t DEBOUNCE_DELAY_MS = 50;
-constexpr uint32_t LONG_PRESS_MS = 3000;
+constexpr uint32_t DEBOUNCE_DELAY_MS  = 50;
+constexpr uint32_t LONG_PRESS_MS      = 3000;
+constexpr uint32_t STARTUP_IGNORE_MS  = 5000;  // abaikan button selama 5 detik pertama boot
 
 } // anonymous namespace
 
@@ -29,6 +30,7 @@ void setupButton() {
 }
 
 void updateButton() {
+    if (millis() < STARTUP_IGNORE_MS) return;
     bool reading = digitalRead(BOOT_BUTTON_PIN);
     uint32_t now = millis();
 

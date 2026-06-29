@@ -74,7 +74,7 @@ bool ensurePeer(const uint8_t* peerMac, const char* label) {
 //  CALLBACK — dikirim paket
 // =====================================================================
 
-void onEspNowSendComplete(const uint8_t* macAddr, esp_now_send_status_t status) {
+void onEspNowSendComplete(const wifi_tx_info_t* txInfo, esp_now_send_status_t status) {
     if (status == ESP_NOW_SEND_SUCCESS) {
         gMasterConnected = true;
     } else {
