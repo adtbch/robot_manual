@@ -181,8 +181,8 @@ void updateOdometry() {
     // Forward kinematics
     // Faktanya: Maju = semua encoder positif (+v0, +v1, +v2, +v3)
     // Geser kanan = v0(FR)+, v1(FL)-, v2(BR)-, v3(BL)+
-    float vx = (v[0] + v[1] + v[2] + v[3]) * 0.25f;
-    float vy = (v[0] - v[1] - v[2] + v[3]) * 0.25f;
+    float vx = (v[0] + v[1] + v[2] + v[3]) * 0.3535f;
+    float vy = (v[0] - v[1] - v[2] + v[3]) * 0.3535f;
 
     // Update heading dari MPU yaw
     odomTheta = getYaw();

@@ -22,7 +22,6 @@ void initWaypointPid();
 void saveWaypointPid();
 
 // Control
-void setWaypoint(float x_m, float y_m, float yaw_deg);
 void cancelWaypoint();
 void waypointTick(float x_cm, float y_cm, float yaw_deg, float maxRpm);
 
@@ -37,7 +36,7 @@ extern float wpTolPos_m;     // tolerance posisi (meter)
 extern float wpTolYaw_deg;   // tolerance yaw (derajat)
 extern float wpMaxSpeed;     // max RPM for waypoint movement
 
-// Target saat ini (readonly — set via setWaypoint)
+// Target saat ini (readonly — set via waypointTick)
 extern float wpTargetX_m;
 extern float wpTargetY_m;
 extern float wpTargetYaw_deg;

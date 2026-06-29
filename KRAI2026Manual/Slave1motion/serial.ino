@@ -121,12 +121,12 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
         char* yStr   = strtok(nullptr, " ");
         char* yawStr = strtok(nullptr, " ");
         if (xStr != nullptr && yStr != nullptr && yawStr != nullptr) {
-            const float x_m   = atof(xStr)   * 0.01f;  // cm → m
-            const float y_m   = atof(yStr)   * 0.01f;
-            const float yaw   = atof(yawStr);
+            const float x_cm = atof(xStr);
+            const float y_cm = atof(yStr);
+            const float yaw  = atof(yawStr);
             testYawMode = false;
-            setWaypoint(x_m, y_m, yaw);
-            if (!fromMasterUart) out.printf("WP set: x=%.3fm y=%.3fm yaw=%.1fdeg\n", x_m, y_m, yaw);
+            waypointTick(x_cm, y_cm, yaw, wpMaxSpeed);
+            if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg\n", x_cm, y_cm, yaw);
         } else {
             if (!fromMasterUart) out.println("Format: goto <x_cm> <y_cm> <yaw_deg>");
         }

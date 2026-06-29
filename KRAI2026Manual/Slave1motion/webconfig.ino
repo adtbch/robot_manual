@@ -370,7 +370,7 @@ static void handleApiWpGo() {
 
     testYawMode = false;
     wpMaxSpeed = maxSpd;
-    setWaypoint(x_cm * 0.01f, y_cm * 0.01f, yaw);  // cm → m untuk storage
+    waypointTick(x_cm, y_cm, yaw, wpMaxSpeed);
     Serial.printf("[WEB] WP Go: (%.0f, %.0f)cm yaw=%.1f° speed=%.0fRPM\n", x_cm, y_cm, yaw, maxSpd);
     server.send(200, "application/json", "{\"ok\":true}");
 }

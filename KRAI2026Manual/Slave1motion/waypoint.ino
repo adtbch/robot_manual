@@ -76,13 +76,6 @@ void saveWaypointPid() {
 //  PUBLIC API
 // =====================================================================
 
-void setWaypoint(float x_m, float y_m, float yaw_deg) {
-    wpTargetX_m    = x_m;
-    wpTargetY_m    = y_m;
-    wpTargetYaw_deg = yaw_deg;
-    wpState        = WaypointState::RUNNING;
-}
-
 void cancelWaypoint() {
     wpState = WaypointState::IDLE;
     rpmMotor(0, 0, 0, 0);
