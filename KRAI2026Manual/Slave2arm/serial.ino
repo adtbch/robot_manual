@@ -89,20 +89,17 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         char* id = strtok(nullptr, " ");
         char* val = strtok(nullptr, " ");
         if (id != nullptr && val != nullptr) {
-            int pwm = constrain(atoi(val), -PWM_MAX, PWM_MAX);
-            char motorId = id[0];
-            // Motor X/K → continuous run (stop di limit / dari master)
-            if (motorId == 'x' || motorId == 'k') {
-                if (pwm == 0) {
-                    motorRunStop(motorId);
+            const int pwm = constrain(atoi(val), -PWM_MAX, PWM_MAX);
+            const char motorId = id[0];
+            if (executeMotorCommand(motorId, pwm)) {
+                if ((motorId == 'x' || motorId == 'k') && pwm == 0)
                     out.printf("Motor '%c' STOP\n", motorId);
-                } else {
-                    motorRunStart(motorId, pwm);
+                else if (motorId == 'x' || motorId == 'k')
                     out.printf("Motor '%c' RUN: %d\n", motorId, pwm);
-                }
+                else
+                    out.printf("Motor '%c' PWM: %d\n", motorId, pwm);
             } else {
-                pwmMotor(motorId, pwm);
-                out.printf("Motor '%c' PWM: %d\n", motorId, pwm);
+                out.printf("Motor id '%c' tidak valid\n", motorId);
             }
         } else {
             out.println("Usage: motor <id> <pwm>  (x/k=run smp limit, y=pwm)");

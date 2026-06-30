@@ -186,6 +186,10 @@ void motionControlTick(const ControlPacket &pkt) {
         } else if (!(pkt.buttons & BTN_R2)) {
             updateYawTargetFromStick(rawRx, yawStepMs);
         }
+        if (pkt.buttons & BTN_SQUARE) {
+            vx = 0;
+            vy = 0;
+        }
         if (vx == 0 && vy == 0) {
             gTargetSpeedRpm = 0;
             gGotoIntegrateLastMs = millis();
