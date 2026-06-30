@@ -181,15 +181,15 @@ char pickForestArmSide() {
     const int8_t ap = gLastApproachedCol;
     if (ap == 0 || ap == 2) {
         if (gAllianceColor == AllianceColor::BLUE) {
-            side = slave2ProxR() ? 'l' : 'r';
-        } else {
             side = slave2ProxL() ? 'r' : 'l';
+        } else {
+            side = slave2ProxR() ? 'l' : 'r';
         }
     } else if (ap == 1 || ap == 3) {
         if (gAllianceColor == AllianceColor::BLUE) {
-            side = slave2ProxL() ? 'r' : 'l';
-        } else {
             side = slave2ProxR() ? 'l' : 'r';
+        } else {
+            side = slave2ProxL() ? 'r' : 'l';
         }
     }
     return side;

@@ -84,6 +84,9 @@ void armBoxTick() {
 
         case ARMBOX_GRAB:
             break;
+
+        default:
+            break;
     }
 
     // ── Sisi L ─────────────────────────────────────────────────
@@ -104,6 +107,9 @@ void armBoxTick() {
             break;
 
         case ARMBOX_GRAB:
+            break;
+        
+        default:
             break;
     }
 }

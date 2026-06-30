@@ -1,9 +1,9 @@
 /*
  * =====================================================================
  * FILE    : armBox_control.ino
- * PERAN   : Manual arm box — Square hold + arah input kiri.
+ * PERAN   : Manual arm box — Circle hold + arah input kiri.
  *
- * BUTTON MAPPING (tahan Square + arah, edge saat arah berubah):
+ * BUTTON MAPPING (tahan Circle + arah, edge saat arah berubah):
  *   Kanan → armBoxFBToggle('l')  motor k — arah dari limit master (depan/belakang)
  *   Kiri  → armBoxFBToggle('r')  motor x — arah dari slave2LimitDepan/Belakang
  *   Atas  → armBoxDone('l')
@@ -61,10 +61,10 @@ ArmBoxInputDir readArmBoxInputDir(const ControlPacket &pkt) {
 void runArmBoxInputAction(ArmBoxInputDir dir) {
     switch (dir) {
         case ARMBOX_DIR_RIGHT:
-            armBoxFBToggle('l');
+            armBoxFBToggle('r');
             break;
         case ARMBOX_DIR_LEFT:
-            armBoxFBToggle('r');
+            armBoxFBToggle('l');
             break;
         case ARMBOX_DIR_UP:
             armBoxDone('l');
@@ -80,7 +80,7 @@ void runArmBoxInputAction(ArmBoxInputDir dir) {
 } // anonymous namespace
 
 void armBoxControlTick(const ControlPacket &pkt) {
-    if (!(pkt.buttons & BTN_SQUARE)) {
+    if (!(pkt.buttons & BTN_CIRCLE)) {
         gArmBoxPrevDir = ARMBOX_DIR_NONE;
         return;
     }
