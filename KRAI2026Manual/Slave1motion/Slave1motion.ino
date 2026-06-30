@@ -43,7 +43,7 @@ void setup() {
 
     Wire.begin(I2C_SDA, I2C_SCL);
     Wire.setTimeOut(20);  // 20ms cukup untuk 42-byte DMP packet di 100kHz; timeout cepat saat bus stuck
-    Wire.setClock(100000); // ponytail: diturunkan ke 100kHz untuk meningkatkan toleransi terhadap noise/NACK dari BTS
+    Wire.setClock(400000); // ponytail: 400kHz — lebih cepat keluar dari NACK timeout, kurangi positive feedback loop
 
     if (!setupOLED()) {
         Serial.println("OLED: not ready");
@@ -67,7 +67,6 @@ void setup() {
     }
     Serial.println("MPU: READY");
     oledShowStatus("MPU: READY", "Starting...");
-    delay(1000);
 }
 
 // =====================================================================
@@ -78,7 +77,6 @@ bool testYawMode = false;
 int testYawTarget = 0;
 
 void loop() {
-    handleOTA();
 
     // USB Serial (tuning) + UART master (rpm dari motion_control)
     serialCommandTick();
@@ -101,16 +99,13 @@ void loop() {
         convertEncoderToRPM();
     }
 
-    // Saat autotune motor jalan: skip MPU agar bus I2C tidak berebut dengan OLED
-    if (!isAutoTunerRunning()) {
-        updateYaw();
-    }
     updateOdometry();
-
+    
     // Waypoint dan TestYaw mutex — waypoint lebih prioritas
     if (!isAutoTunerRunning()) {
-        if (isWaypointActive()) {
-            waypointTick(wpMaxSpeed);
+        updateYaw();
+        if (getWaypointState() != WaypointState::IDLE) {
+            waypointTick(wpTargetX_m, wpTargetY_m, wpTargetYaw_deg, wpMaxSpeed);
         } else if (testYawMode) {
             static Jeda jedaYawTest;
             if (jedaYawTest.check(20)) {
@@ -118,7 +113,6 @@ void loop() {
             }
         }
     }
-
-    // Update OLED display
+    Serial.printf("%lu %d\n", millis(), (int)getWaypointState());
     updateOLED();
 }

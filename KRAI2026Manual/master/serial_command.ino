@@ -125,10 +125,14 @@ bool parseSlave2Sensor(char* cmd) {
 bool parseSlave1Status(char* line) {
     if (strncmp(line, "WP: REACHED", 11) == 0) {
         gMotionWaypointMode = false;
+        Serial.printf("[Master] Waypoint reached\n");
         return true;
     }
     if (strncmp(line, "WP: RUNNING", 11) == 0) {
-        gMotionWaypointMode = true;
+        // ponytail: tidak set gMotionWaypointMode=true di sini —
+        // flag hanya di-set oleh forest/autonomy yang memang ingin block joystick.
+        // Teleop spam goto tetap jalan, slave ignore kalau RUNNING.
+        Serial.printf("[Master] Waypoint running\n");
         return true;
     }
     return false;
@@ -138,12 +142,34 @@ bool parseSlave1Status(char* line) {
 //  SLAVE1 — Motion (Mecanum)
 // =====================================================================
 
+// Helper to calculate checksum and send packet
+static void sendBinaryMotionCmd(uint8_t type, int16_t x, int16_t y, int16_t yaw, int16_t speed) {
+    SerialMotionCmd cmd;
+    cmd.header1 = 0xAA;
+    cmd.header2 = 0xBB;
+    cmd.type = type;
+    cmd.x = x;
+    cmd.y = y;
+    cmd.yaw = yaw;
+    cmd.speed = speed;
+
+    // Hitung checksum (XOR dari seluruh byte kecuali header1, header2, dan checksum sendiri)
+    uint8_t cs = 0;
+    const uint8_t* ptr = (const uint8_t*)&cmd;
+    for (size_t i = 2; i < sizeof(SerialMotionCmd) - 1; i++) {
+        cs ^= ptr[i];
+    }
+    cmd.checksum = cs;
+
+    slave1Serial.write((const uint8_t*)&cmd, sizeof(SerialMotionCmd));
+}
+
 void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
-    slave1Serial.printf("kn %d %d %d\n", vx, vy, yawTarget);
+    sendBinaryMotionCmd(2, vx, vy, yawTarget, 0);
 }
 
 void sendGotoCommand(int16_t x_cm, int16_t y_cm, int16_t yaw_deg, int16_t speedRpm) {
-    slave1Serial.printf("goto %d %d %d %d\n", x_cm, y_cm, yaw_deg, speedRpm);
+    sendBinaryMotionCmd(1, x_cm, y_cm, yaw_deg, speedRpm);
 }
 
 void sendShowOdomCommand() {

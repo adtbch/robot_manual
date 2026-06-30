@@ -303,6 +303,11 @@ void snapYaw() {
 void updateYaw() {
     if (!mpuReady || !dmpReady) return;
 
+    // Throttle baca MPU agar OLED dapat giliran bus (DMP ODR = 100Hz = 10ms)
+    static uint32_t lastMpuRead = 0;
+    if (millis() - lastMpuRead < 5) return;
+    lastMpuRead = millis();
+
     static bool hasSeenPacket = false;
     static uint32_t lastPacketMs = 0;
     static uint32_t lastRecoverMs = 0;
@@ -354,6 +359,12 @@ void updateYaw() {
     // dmpGetCurrentFIFOPacket() sudah overflow-proof & mengembalikan packet TERBARU.
     // Panggil SEKALI (if), bukan while — while bisa memblokir s/d 11ms menunggu packet
     // parsial & menembak I2C berulang (memperparah NACK saat motor bising).
+    uint16_t fifoCount = mpu.getFIFOCount();
+    if (fifoCount > packetSize * 5) {  // ponytail: >5 packet numpuk → reset FIFO, jangan flush ratusan packet
+        mpu.resetFIFO();
+        I2cBus::release(I2cBus::Owner::MPU);
+        return;
+    }
     if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         mpu.dmpGetGravity(&gravity, &q);
