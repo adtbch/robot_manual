@@ -114,6 +114,7 @@ void startWaypoint(float x_cm, float y_cm, float yaw_deg, float maxRpm) {
     const float y_m = y_cm * 0.01f;
     if (isWithinWaypointTol(x_m, y_m, yaw_deg)) {
         wpState = WaypointState::REACHED;
+        Serial1.println("WP: REACHED");
         rpmMotor(0, 0, 0, 0);
         Serial.printf("[WP] Already at target pos=(%.3f,%.3f)m yaw=%.1fdeg\n",
             odomX, odomY, getYaw());

@@ -146,6 +146,17 @@ void motorYPositionTick() {
     }
 }
 
+void motorYLimitTick() {
+    if (!readLimitSwitch(LIMIT_ARMBOX_TURUN)) return;
+
+    const bool movingUp = gMotorYLastPwm > 0 || gMotorY.target > 0;
+    if (!movingUp) {
+        motorYStop();
+        gMotorY.target = 0;
+        resetEncoderCount('y');
+    }
+}
+
 // =====================================================================
 //  MOTOR X — continuous run with limit switch
 // =====================================================================

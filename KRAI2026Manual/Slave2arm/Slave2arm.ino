@@ -69,6 +69,6 @@ void loop() {
 
     // Motor X/K — continuous run with limit switch
     motorRunTick();
-    // Motor Y — encoder positioning
+    motorYLimitTick();
     motorYPositionTick();
 }

@@ -81,6 +81,7 @@ long motorYGetTarget();
 void motorYStop();
 bool motorYIsActive();
 void motorYPositionTick();
+void motorYLimitTick();
 
 // Motor X — continuous run with limit switch
 void motorRunStart(char id, int pwm);

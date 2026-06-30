@@ -116,6 +116,7 @@ void loop() {
     odomRecordTick(gLastRxPacket);
     // Encoder positioning motor X/Y
     motorXPositionTick();
+    motorYLimitTick();
     motorYPositionTick();
 
     // Forest navigation — lanjutkan goForest/exit yang sedang berjalan

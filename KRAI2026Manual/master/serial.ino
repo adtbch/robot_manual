@@ -85,6 +85,16 @@ bool isSlave2SensorLine(const char* line) {
         || strncmp(line, "pne ", 4) == 0;
 }
 
+// Telemetry Slave1 — cek prefix dulu, jangan strtok sembarangan
+bool isSlave1WaypointLine(const char* line) {
+    return strncmp(line, "WP: REACHED", 11) == 0
+        || strncmp(line, "WP: RUNNING", 11) == 0;
+}
+
+bool isSlave1OdomLine(const char* line) {
+    return strncmp(line, "odomToMaster ", 13) == 0;
+}
+
 // ── Help ─────────────────────────────────────────────────────────
 void printHelp(Print& out) {
     out.println("--- Daftar Command ---");
@@ -510,7 +520,11 @@ void serialCommandTick() {
         if (c == '\n' || c == '\r') {
             if (slave1BufIdx > 0) {
                 slave1Buf[slave1BufIdx] = '\0';
-                if (!parseSlave1Response(slave1Buf) && !parseSlave1Status(slave1Buf)) {
+                if (isSlave1WaypointLine(slave1Buf)) {
+                    parseSlave1Status(slave1Buf);
+                } else if (isSlave1OdomLine(slave1Buf)) {
+                    parseSlave1Response(slave1Buf);
+                } else {
                     parseAndExecuteCommand(slave1Buf, slave1Serial);
                 }
                 slave1BufIdx = 0;

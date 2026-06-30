@@ -46,6 +46,7 @@ namespace {
 
     MotorTarget gMotorX;
     MotorTarget gMotorY;
+    int gMotorYLastPwm = 0;
 
     int findMotorIndex(char id) {
         for (size_t i = 0; i < MOTOR_COUNT; i++) {
@@ -135,6 +136,7 @@ void pwmMotor(char motorId, int pwmValue) {
     if (idx < 0) return;
 
     pwmValue = constrain(pwmValue, PWM_MIN, PWM_MAX);
+    if (motorId == 'y') gMotorYLastPwm = pwmValue;
 
     if (pwmValue > 0) {
         ledcWrite(motors[idx].pin_pwm, pwmValue);
@@ -257,6 +259,17 @@ bool motorYAtLevel(uint8_t level) {
     const long current = getEncoderCount('y');
     const long target = gMotorYLevelEnc[level];
     return abs(current - target) <= MOTOR_Y_POSITION_TOLERANCE;
+}
+
+void motorYLimitTick() {
+    if (!readLimitSwitch(LIMIT_Y_BAWAH)) return;
+
+    const bool movingUp = gMotorYLastPwm > 0 || gMotorY.target > 0;
+    if (!movingUp) {
+        motorYStop();
+        gMotorY.target = 0;
+        resetEncoderCount('y');
+    }
 }
 
 // =====================================================================
