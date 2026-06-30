@@ -59,17 +59,20 @@ struct ForestColApproach {
 extern AllianceColor gAllianceColor;  // default RED
 extern int8_t        gLastApproachedCol;  // -1 = belum pernah approach
 extern int8_t        gLastForestId;       //  0 = belum ada forest terakhir
+extern char          gForestArmSide;      // 'l', 'r', atau 0 = belum dipilih
 
 // =====================================================================
 //  API
 // =====================================================================
 
-// Gerak ke forest id (1-12) — panggil tiap loop().
-// Compute route otomatis (approach + yaw di tiap corridor + goto forest).
-// Return true  = masih berjalan (approach / yaw / gerak ke forest).
-// Return false = sudah tiba di forest id, atau id tidak valid.
-// Panggil dengan id baru kapan saja untuk reset dan recompute route.
+// Gerak ke forest id (1-12) — panggil tiap loop() atau via forestTick().
+// Approach + yaw + goto forest + turun motor Y ke height_enc + pilih sisi arm.
+// Return true  = masih berjalan.
+// Return false = selesai (tiba di forest, Y sampai, gForestArmSide terisi).
 bool goForest(uint8_t id);
+
+// Lanjutkan navigasi forest yang sedang berjalan — panggil tiap loop().
+bool forestTick();
 
 // Batalkan sequence aktif.
 void cancelForestGoto();
