@@ -170,27 +170,63 @@ void computeExitSeq(int8_t seq[4]) {
     }
 }
 
+uint8_t forestWpIdx(uint8_t forestId) {
+    if (forestId == 10 && gLastApproachedCol == FOREST10B_AP) return FOREST10B_IDX;
+    if (forestId == 10) return FOREST10A_IDX;
+    return forestId;
+}
+
+char pickForestArmSide() {
+    char side = 'l';
+    const int8_t ap = gLastApproachedCol;
+    if (ap == 0 || ap == 2) {
+        if (gAllianceColor == AllianceColor::BLUE) {
+            side = slave2ProxL() ? 'r' : 'l';
+        } else {
+            side = slave2ProxR() ? 'l' : 'r';
+        }
+    } else if (ap == 1 || ap == 3) {
+        if (gAllianceColor == AllianceColor::BLUE) {
+            side = slave2ProxR() ? 'l' : 'r';
+        } else {
+            side = slave2ProxL() ? 'r' : 'l';
+        }
+    }
+    return side;
+}
+
+// Arm kiri = master motor Y; arm kanan = slave2 motortarget (sama pola armBox.ino).
+void deployForestArm(char side, long heightEnc) {
+    if (side == 'l')
+        motorYSetTarget(heightEnc);
+    else if (side == 'r')
+        sendSlave2Command("motortarget %ld", heightEnc);
+}
+
 // -------------------------------------------------------------------------
-//  STATE MACHINE INTERNAL — 4 phase
+//  STATE MACHINE INTERNAL
 // -------------------------------------------------------------------------
 
 enum class ForestPhase : uint8_t {
-    COMPUTE,        // hitung/lanjut sequence
-    APPROACH_MOVE,  // bergerak ke approach point, tunggu WP:REACHED
-    APPROACH_YAW,   // rotasi di approach point, tunggu WP:REACHED
-    FOREST_MOVE,    // bergerak ke forest, tunggu WP:REACHED
+    COMPUTE,
+    APPROACH_MOVE,
+    APPROACH_YAW,
+    FOREST_MOVE,
+    FOREST_ARM_Y,      // turun motor Y master ke height_enc forest
+    FOREST_ARM_DEPLOY, // arm kiri: tunggu master Y sampai LEVEL_5
 };
 
 static constexpr uint8_t FOREST_TARGET_EXIT = 255;
 
-uint8_t      sTarget     = 0;
-int8_t       sSeq[4]     = {-1, -1, -1, -1};
-uint8_t      sSeqStep    = 0;
-ForestPhase  sPhase      = ForestPhase::COMPUTE;
-float        sApX        = 0.0f;
-float        sApY        = 0.0f;
-int16_t      sApYaw      = 0;
-bool         sExitMode   = false;
+uint8_t      sTarget          = 0;
+uint8_t      sActiveForestId  = 0;
+int8_t       sSeq[4]          = {-1, -1, -1, -1};
+uint8_t      sSeqStep         = 0;
+ForestPhase  sPhase           = ForestPhase::COMPUTE;
+float        sApX             = 0.0f;
+float        sApY             = 0.0f;
+int16_t      sApYaw           = 0;
+bool         sExitMode        = false;
 
 // Shared state-machine tick — dipakai goForest() dan exitFromForest().
 bool forestNavigate() {
@@ -210,11 +246,11 @@ bool forestNavigate() {
                 }
 
                 const uint8_t forestId = sTarget;
-                gLastForestId = forestId;
-                sTarget       = 0;
+                gLastForestId     = forestId;
+                sActiveForestId   = forestId;
+                sTarget           = 0;
 
-                const uint8_t wpIdx = (forestId == 10 && gLastApproachedCol == FOREST10B_AP)
-                    ? FOREST10B_IDX : (forestId == 10 ? FOREST10A_IDX : forestId);
+                const uint8_t wpIdx = forestWpIdx(forestId);
                 const ForestWaypoint& wp = FOREST_WP_BLUE[wpIdx];
 
                 gTargetX_cm     = wp.x_cm;
@@ -304,7 +340,31 @@ bool forestNavigate() {
 
         case ForestPhase::FOREST_MOVE:
             if (gMotionWaypointMode) return true;
+            if (!sExitMode && sActiveForestId > 0) {
+                motorYSetTarget(FOREST_WP_BLUE[forestWpIdx(sActiveForestId)].height_enc);
+                sPhase = ForestPhase::FOREST_ARM_Y;
+                return true;
+            }
             sPhase = ForestPhase::COMPUTE;
+            return false;
+
+        case ForestPhase::FOREST_ARM_Y:
+            if (motorYIsActive()) return true;
+            gForestArmSide = pickForestArmSide();
+            deployForestArm(gForestArmSide,
+                FOREST_WP_BLUE[forestWpIdx(sActiveForestId)].height_enc);
+            if (gForestArmSide == 'l') {
+                sPhase = ForestPhase::FOREST_ARM_DEPLOY;
+                return true;
+            }
+            sActiveForestId = 0;
+            sPhase          = ForestPhase::COMPUTE;
+            return false;
+
+        case ForestPhase::FOREST_ARM_DEPLOY:
+            if (motorYIsActive()) return true;
+            sActiveForestId = 0;
+            sPhase          = ForestPhase::COMPUTE;
             return false;
         }
     }
@@ -318,6 +378,7 @@ bool forestNavigate() {
 
 int8_t gLastApproachedCol = -1;
 int8_t gLastForestId      = 0;
+char   gForestArmSide     = 0;   // 'l', 'r', atau 0 = belum dipilih
 
 // =====================================================================
 //  API
@@ -326,15 +387,24 @@ int8_t gLastForestId      = 0;
 bool goForest(uint8_t id) {
     if (id == 0 || id > 12 || !FOREST_WP_BLUE[id].valid) return false;
 
-    if (id != sTarget || sExitMode) {
-        sExitMode = false;
-        sTarget   = id;
-        sSeqStep  = 0;
-        sPhase    = ForestPhase::COMPUTE;
+    const bool newMission = sExitMode || (sActiveForestId != id && sTarget != id);
+    if (newMission) {
+        sExitMode         = false;
+        sTarget           = id;
+        sActiveForestId   = id;
+        sSeqStep          = 0;
+        sPhase            = ForestPhase::COMPUTE;
+        gForestArmSide    = 0;
         computeApproachSeq(id, sSeq);
     }
 
     return forestNavigate();
+}
+
+bool forestTick() {
+    if (sExitMode || sTarget == FOREST_TARGET_EXIT) return exitFromForest();
+    if (sActiveForestId > 0 || sTarget > 0) return goForest(sActiveForestId > 0 ? sActiveForestId : sTarget);
+    return false;
 }
 
 bool exitFromForest() {
@@ -352,8 +422,10 @@ bool exitFromForest() {
 void cancelForestGoto() {
     slave1Serial.println("wp cancel");
     gMotionWaypointMode = false;
-    sTarget    = 0;
-    sExitMode  = false;
-    sPhase     = ForestPhase::COMPUTE;
-    sSeqStep   = 0;
+    sTarget           = 0;
+    sActiveForestId   = 0;
+    sExitMode         = false;
+    sPhase            = ForestPhase::COMPUTE;
+    sSeqStep          = 0;
+    gForestArmSide    = 0;
 }

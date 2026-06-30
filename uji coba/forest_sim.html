@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forest Navigation Simulator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f1117; color: #e2e8f0;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 24px 16px; gap: 20px;
+  }
+  h1 { font-size: 1.4rem; font-weight: 700; color: #7dd3fc; letter-spacing: 0.05em; }
+  .main { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+  .canvas-wrap { background: #1e2130; border: 1px solid #2d3250; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  #sim-canvas { display: block; border-radius: 6px; }
+  .panel { background: #1e2130; border: 1px solid #2d3250; border-radius: 12px; padding: 20px; width: 290px; display: flex; flex-direction: column; gap: 14px; }
+  .panel h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; }
+  .field-group { display: flex; flex-direction: column; gap: 5px; }
+  label { font-size: 0.76rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; }
+  select {
+    background: #0f1117; color: #e2e8f0; border: 1px solid #374151;
+    border-radius: 6px; padding: 8px 10px; font-size: 0.87rem; cursor: pointer; outline: none;
+  }
+  select:focus { border-color: #7dd3fc; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn { background: #2563eb; color: #fff; border: none; border-radius: 8px; padding: 11px; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+  .btn:hover:not(:disabled) { background: #1d4ed8; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-dest2 { background: #7c3aed; }
+  .btn-dest2:hover:not(:disabled) { background: #6d28d9; }
+  .btn-finish { background: #059669; }
+  .btn-finish:hover:not(:disabled) { background: #047857; }
+  .btn-reset { background: transparent; border: 1px solid #374151; color: #94a3b8; font-size: 0.8rem; padding: 8px; border-radius: 6px; cursor: pointer; }
+  .btn-reset:hover { border-color: #94a3b8; color: #e2e8f0; }
+
+  /* Alliance toggle */
+  .alliance-row { display: flex; gap: 0; border-radius: 6px; overflow: hidden; border: 1px solid #374151; }
+  .alliance-btn {
+    flex: 1; padding: 8px; font-size: 0.8rem; font-weight: 700; border: none; cursor: pointer;
+    background: #0f1117; color: #6b7280; transition: 0.15s; letter-spacing: 0.05em;
+  }
+  .alliance-btn.active-blue { background: #1e3a8a; color: #7dd3fc; }
+  .alliance-btn.active-red  { background: #7f1d1d; color: #fca5a5; }
+
+  .speed-row { display: flex; align-items: center; gap: 8px; }
+  .speed-row label { white-space: nowrap; }
+  input[type=range] { flex: 1; accent-color: #7dd3fc; }
+  hr { border: none; border-top: 1px solid #2d3250; }
+  .path-log { display: flex; flex-direction: column; max-height: 320px; overflow-y: auto; gap: 1px; }
+  .path-step {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    border-radius: 5px; font-size: 0.82rem; opacity: 0.25;
+    transition: opacity 0.25s, background 0.25s; border-left: 3px solid transparent;
+  }
+  .path-step.active  { opacity: 1; }
+  .path-step.done    { opacity: 0.65; }
+  .path-step.current { background: #1a2540; }
+  .path-step.approach { border-left-color: #f59e0b; }
+  .path-step.yaw      { border-left-color: #a78bfa; padding-left: 22px; }
+  .path-step.target   { border-left-color: #34d399; }
+  .path-step.arm_y    { border-left-color: #f472b6; }
+  .path-step.arm_side   { border-left-color: #fb923c; }
+  .path-step.arm_deploy { border-left-color: #22d3ee; }
+  .path-step.start    { border-left-color: #7dd3fc; }
+  .step-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .approach .step-dot { background: #f59e0b; }
+  .yaw      .step-dot { background: #a78bfa; width: 7px; height: 7px; }
+  .arm_side   .step-dot { background: #fb923c; }
+  .arm_deploy .step-dot { background: #22d3ee; }
+  .arm_y    .step-dot { background: #f472b6; }
+  .target   .step-dot { background: #34d399; }
+  .start    .step-dot { background: #7dd3fc; }
+  .step-meta { margin-left: auto; font-size: 0.68rem; color: #4b5563; font-family: monospace; white-space: nowrap; }
+  .group-badge {
+    display: inline-block; font-size: 0.65rem; padding: 1px 5px; border-radius: 3px;
+    font-weight: 700; letter-spacing: 0.05em; margin-left: 4px;
+  }
+  .badge-top  { background: #1e3a5f; color: #7dd3fc; }
+  .badge-col0 { background: #1a3a1a; color: #4ade80; }
+  .badge-col2 { background: #3a1a3a; color: #c084fc; }
+  .badge-bot  { background: #3a2a1a; color: #fb923c; }
+  .status-bar { font-size: 0.75rem; color: #64748b; text-align: center; padding: 4px 8px; background: #0f1117; border-radius: 4px; border: 1px solid #2d3250; }
+  .status-bar.running { color: #fbbf24; }
+  .status-bar.done    { color: #34d399; }
+  .no-path { color: #64748b; font-size: 0.82rem; text-align: center; padding: 10px 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.73rem; color: #94a3b8; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<h1>🌲 Forest Navigation Simulator</h1>
+
+<div class="main">
+  <div class="canvas-wrap">
+    <canvas id="sim-canvas" width="520" height="460"></canvas>
+    <div style="text-align:center;font-size:0.7rem;color:#4b5563;">
+      Panah = orientasi robot &nbsp;|&nbsp; Garis putus = jalur yang dilalui
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Alliance</h2>
+    <div class="alliance-row">
+      <button class="alliance-btn" id="btn-blue" onclick="setAlliance('blue')">🔵 BLUE</button>
+      <button class="alliance-btn active-red" id="btn-red"  onclick="setAlliance('red')">🔴 RED</button>
+    </div>
+
+    <h2>State Awal</h2>
+    <div class="row2">
+      <div class="field-group">
+        <label>Last Approach</label>
+        <select id="sel-ap">
+          <option value="-1">−1 · Zone 1</option>
+          <option value="0">0 · [0] kiri</option>
+          <option value="1">1 · [1] kanan</option>
+          <option value="2">2 · [2] bot-kiri</option>
+          <option value="3">3 · [3] bot-kanan</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Last Forest</label>
+        <select id="sel-lastforest"><option value="0">— tidak ada</option></select>
+      </div>
+    </div>
+
+    <h2>Proximity Arm (slave2)</h2>
+    <div class="row2">
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;text-transform:none;letter-spacing:0;">
+        <input type="checkbox" id="chk-prox-l" checked> Prox kiri (L) aktif
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;text-transform:none;letter-spacing:0;">
+        <input type="checkbox" id="chk-prox-r"> Prox kanan (R) aktif
+      </label>
+    </div>
+
+    <hr>
+    <h2>Tujuan</h2>
+    <div class="row2">
+      <div class="field-group">
+        <label>Tujuan 1</label>
+        <select id="sel-dest1"></select>
+      </div>
+      <div class="field-group">
+        <label>Tujuan 2</label>
+        <select id="sel-dest2"><option value="0">— tidak ada</option></select>
+      </div>
+    </div>
+
+    <div class="field-group speed-row">
+      <label>Kecepatan</label>
+      <input type="range" id="speed" min="150" max="1200" value="500" step="50">
+    </div>
+
+    <div id="status-bar" class="status-bar">Siap</div>
+    <button class="btn"           id="btn-dest1">▶  goForest(Tujuan 1)</button>
+    <button class="btn btn-dest2" id="btn-dest2" disabled>▶  goForest(Tujuan 2)</button>
+    <button class="btn btn-finish" id="btn-finish">🏁  exitFromForest() — Finish</button>
+    <button class="btn-reset"     id="btn-reset">↺  Reset</button>
+
+    <hr>
+    <h2>Jalur — goForest()</h2>
+    <div class="path-log" id="path-log">
+      <div class="no-path">Tekan goForest(Tujuan 1) untuk memulai.</div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#7dd3fc"></div>Start</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Approach</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>Yaw</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div>Target</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div>Arm Y</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fb923c"></div>Arm side</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+//  FOREST GROUPS
+// =====================================================================
+const VALID_IDS  = [1, 2, 3, 4, 6, 7, 9, 10, 11, 12];
+const GROUP_NAMES = ['TOP', 'COL0', 'COL2', 'BOT', 'COL0_BOT'];
+const GROUP_BADGE = ['badge-top', 'badge-col0', 'badge-col2', 'badge-bot', 'badge-col0'];
+const AP_LABELS   = ['[0] Kiri', '[1] Kanan', '[2] Bot-Kiri', '[3] Bot-Kanan'];
+const AP_HAS_YAW  = [true, true, true, true];
+const AP_YAW      = [-90, 90, 180, 180];
+
+const FOREST10A_AP = 0;
+const FOREST10B_AP = 3;
+
+// height_enc per forest — mirrors FOREST_WP_BLUE[] di forest.ino
+const Y_LEVEL_ENC = [0, 300, 600, 900, 1200, 1500];
+const FOREST_HEIGHT_ENC = {
+  1: 900, 2: 600, 3: 900, 4: 600, 6: 1200, 7: 900, 9: 900,
+  10: 600, 11: 900, 12: 600,
+};
+
+function forestHeightEnc(forestId, lastApCol) {
+  if (forestId === 10 && lastApCol === FOREST10B_AP) return FOREST_HEIGHT_ENC[10];
+  return FOREST_HEIGHT_ENC[forestId] ?? 600;
+}
+
+function encToLevel(enc) {
+  const i = Y_LEVEL_ENC.indexOf(enc);
+  return i >= 0 ? i : '?';
+}
+
+function pickForestArmSide(lastApCol) {
+  const proxL = document.getElementById('chk-prox-l').checked;
+  const proxR = document.getElementById('chk-prox-r').checked;
+  const isBlue = alliance === 'blue';
+  let side = 'l';
+  if (lastApCol === 0 || lastApCol === 2) {
+    if (isBlue) side = proxR ? 'l' : 'r';
+    else        side = proxL ? 'r' : 'l';
+  } else if (lastApCol === 1 || lastApCol === 3) {
+    if (isBlue) side = proxL ? 'r' : 'l';
+    else        side = proxR ? 'l' : 'r';
+  }
+  return side;
+}
+
+function appendForestArrivalStops(stops, targetId, apCol) {
+  const enc = forestHeightEnc(targetId, apCol);
+  stops.push({
+    type: 'arm_y', id: targetId, height_enc: enc,
+    lastApCol: apCol, stateAfter: apCol,
+  });
+  const side = pickForestArmSide(apCol);
+  stops.push({
+    type: 'arm_side', side,
+    id: targetId, lastApCol: apCol, stateAfter: apCol,
+  });
+  stops.push({
+    type: 'arm_deploy', side, height_enc: enc,
+    id: targetId, lastApCol: apCol, stateAfter: apCol,
+  });
+}
+
+function forestGroup(id) {
+  if (id <= 3)            return 0;
+  if (id === 4 || id === 7) return 1;
+  if (id === 6 || id === 9) return 2;
+  if (id === 10)          return 4;
+  return 3;
+}
+
+// =====================================================================
+//  ALLIANCE
+// =====================================================================
+let alliance = 'red';  // 'blue' | 'red'
+
+function setAlliance(color) {
+  alliance = color;
+  document.getElementById('btn-blue').className = 'alliance-btn' + (color === 'blue' ? ' active-blue' : '');
+  document.getElementById('btn-red').className  = 'alliance-btn' + (color === 'red'  ? ' active-red'  : '');
+  if (!animTimer) { ctx.clearRect(0,0,W,H); drawScene([],-1,0,null); }
+  else drawFrame();
+}
+
+// =====================================================================
+//  CANVAS SETUP
+// =====================================================================
+const C   = document.getElementById('sim-canvas');
+const ctx = C.getContext('2d');
+const W = C.width, H = C.height;  // 520 × 460
+
+const CELL   = 80;
+const GRID_W = 3 * CELL;
+const GRID_H = 4 * CELL;
+const GRID_X = (W - GRID_W) / 2;  // 140
+const GRID_Y = 88;
+const GRID_CX = GRID_X + GRID_W / 2;
+
+const CORR_L_X = 8;
+const CORR_R_X = GRID_X + GRID_W;
+const CORR_W   = GRID_X - CORR_L_X;
+
+// --- Positions are defined in BLUE coordinates.
+// For RED, flip Y: pos.y → H - pos.y
+
+const AP_POS_BLUE = [
+  { x: CORR_L_X + CORR_W / 2, y: GRID_Y + CELL * 1.0 },  // [0]
+  { x: CORR_R_X + CORR_W / 2, y: GRID_Y + CELL * 1.0 },  // [1]
+  { x: CORR_L_X + CORR_W / 2, y: GRID_Y + CELL * 3.0 },  // [2]
+  { x: CORR_R_X + CORR_W / 2, y: GRID_Y + CELL * 3.0 },  // [3]
+];
+
+const ZONE1_POS_BLUE = { x: W / 2, y: 46 };
+
+// Transform: flip X (col0↔col2) for BLUE alliance — forest 1↔3, 4↔6, 7↔9, 10↔12
+function tx(pos) {
+  if (alliance === 'blue') return { x: W - pos.x, y: pos.y };
+  return pos;
+}
+
+function getApPos()    { return AP_POS_BLUE.map(tx); }
+function getZone1Pos() { return tx(ZONE1_POS_BLUE); }
+
+function cellCenterBlue(id) {
+  const col = (id - 1) % 3, row = Math.floor((id - 1) / 3);
+  return { x: GRID_X + col * CELL + CELL / 2, y: GRID_Y + row * CELL + CELL / 2 };
+}
+function cellCenter(id) { return tx(cellCenterBlue(id)); }
+
+function forest10Pos(lastApCol) {
+  const base = cellCenterBlue(10);
+  const p = lastApCol === FOREST10B_AP ? { x: base.x + 22, y: base.y + 10 } : base;
+  return tx(p);
+}
+function forest10Label(lastApCol) { return lastApCol === FOREST10B_AP ? 'F10b' : 'F10a'; }
+
+// =====================================================================
+//  ROUTING (mirrors C++ computeApproachSeq)
+// =====================================================================
+function getCurrentX(lastForestId, lastApCol) {
+  if (lastForestId > 0) return cellCenterBlue(lastForestId).x;  // routing always in BLUE coords
+  if (lastApCol >= 0)   return AP_POS_BLUE[lastApCol].x;
+  return GRID_CX;
+}
+
+function getCurrentPos(lastForestId, lastApCol) {
+  if (lastForestId > 0) return cellCenter(lastForestId);
+  if (lastApCol >= 0)   return getApPos()[lastApCol];
+  return getZone1Pos();
+}
+
+function computeApproachSeq(targetId, lastForestId, lastApCol) {
+  const tg = forestGroup(targetId);
+  if (tg === 0) return [];
+  const lastGroup = lastForestId > 0 ? forestGroup(lastForestId) : -1;
+  if (lastGroup === tg) return [];
+  if (tg === 4 && (lastGroup === 1 || lastGroup === 3)) return [];
+  if (tg === 3 && lastGroup === 4)                      return [];
+  const isLD = lastGroup === 1 || lastGroup === 4;
+  const isRD = lastGroup === 2;
+  const atAP = idx => lastForestId === 0 && lastApCol === idx;
+  const srcRow = lastForestId > 0 ? Math.floor((lastForestId - 1) / 3) : -1;
+  const seq = [];
+  if (tg === 1) {
+    if (isRD) { if (srcRow <= 1) { seq.push(1); seq.push(0); } else { seq.push(3); seq.push(2); } }
+    else if (!atAP(0) && !isLD) seq.push(0);
+  } else if (tg === 2) {
+    if (isLD) { if (srcRow <= 1) { seq.push(0); seq.push(1); } else { seq.push(2); seq.push(3); } }
+    else if (!atAP(1) && !isRD) seq.push(1);
+  } else if (tg === 4) {
+    if (atAP(FOREST10A_AP)) return seq;
+    if (atAP(FOREST10B_AP)) return seq;
+    if (isRD) seq.push(FOREST10B_AP); else if (!isLD) seq.push(FOREST10A_AP);
+  } else {
+    const cx = getCurrentX(lastForestId, lastApCol);
+    if (cx < GRID_CX) {
+      if (isRD) { seq.push(1); seq.push(0); } else if (!atAP(0) && !atAP(2) && !isLD) seq.push(0);
+      if (!atAP(2)) seq.push(2);
+    } else {
+      if (isLD) { seq.push(0); seq.push(1); } else if (!atAP(1) && !atAP(3) && !isRD) seq.push(1);
+      if (!atAP(3)) seq.push(3);
+    }
+  }
+  return seq;
+}
+
+function computeExitSeq(_lastForestId, lastApCol) {
+  switch (lastApCol) {
+    case 1:  return [3, 2];
+    case 0:
+    case 3:
+    case 2:  return [2];
+    default: return [2];
+  }
+}
+
+function applyApproachYaw(ap, prevAp, nextAp, lastApCol, i, isExitFinish, targetId) {
+  let yaw = AP_YAW[ap];
+  if (isExitFinish) {
+    yaw = 180;
+  } else {
+    const alreadyHere = (i === 0 && ap === lastApCol);
+    if      (alreadyHere || ap === nextAp)              { yaw = 0;   }
+    else if (ap === 2 && nextAp === 3)                  { yaw = 180; }
+    else if (ap === 3 && nextAp === 2)                  { yaw = 180; }
+    else if (ap === 3 && nextAp === -1 && prevAp === 2) { yaw = 90;  }
+    else if (ap === 2 && nextAp === -1 && prevAp === 3) { yaw = -90; }
+    else if (ap === 3 && nextAp === -1 && prevAp !== 2
+             && targetId > 0 && forestGroup(targetId) === 0) { yaw = 0; }
+  }
+  if (alliance === 'blue' && yaw !== 180 && yaw !== -180) yaw = -yaw;
+  return yaw;
+}
+
+function buildExitFromForestStops(lastForestId, lastApCol) {
+  const apSeq = computeExitSeq(lastForestId, lastApCol);
+  const stops = [];
+  for (let i = 0; i < apSeq.length; i++) {
+    const ap     = apSeq[i];
+    const prevAp = i > 0 ? apSeq[i - 1] : -1;
+    const nextAp = i + 1 < apSeq.length ? apSeq[i + 1] : -1;
+    const isExitFinish = (ap === 2 && nextAp === -1);
+    stops.push({ type: 'approach', apIdx: ap, stateAfter: ap, exit: isExitFinish });
+    if (AP_HAS_YAW[ap]) {
+      stops.push({
+        type: 'yaw', apIdx: ap,
+        yaw_deg: applyApproachYaw(ap, prevAp, nextAp, lastApCol, i, isExitFinish, 0),
+        exit: isExitFinish,
+      });
+    }
+  }
+  return { stops, finalForestId: 0, finalApCol: 2 };
+}
+
+// Build stops with yaw sub-steps
+function buildGoForestStops(targetId, lastForestId, lastApCol) {
+  const apSeq = computeApproachSeq(targetId, lastForestId, lastApCol);
+  const stops = [];
+  let apCol = lastApCol;
+  for (let i = 0; i < apSeq.length; i++) {
+    const ap     = apSeq[i];
+    const prevAp = i > 0 ? apSeq[i - 1] : -1;
+    const nextAp = i + 1 < apSeq.length ? apSeq[i + 1] : -1;
+    stops.push({ type: 'approach', apIdx: ap, stateAfter: ap });
+    if (AP_HAS_YAW[ap]) {
+      stops.push({
+        type: 'yaw', apIdx: ap,
+        yaw_deg: applyApproachYaw(ap, prevAp, nextAp, lastApCol, i, false, targetId),
+      });
+    }
+    apCol = ap;
+  }
+  stops.push({ type: 'target', id: targetId, stateAfter: apCol, lastApCol: apCol });
+  appendForestArrivalStops(stops, targetId, apCol);
+  return { stops, finalForestId: targetId, finalApCol: apCol };
+}
+
+function stopPos(stop) {
+  const AP = getApPos();
+  if (stop.type === 'start')    return stop.pos;
+  if (stop.type === 'approach') return AP[stop.apIdx];
+  if (stop.type === 'yaw')      return AP[stop.apIdx];
+  if (stop.type === 'arm_y' || stop.type === 'arm_side' || stop.type === 'arm_deploy') {
+    if (stop.id === 10) return forest10Pos(stop.lastApCol ?? stop.stateAfter);
+    return cellCenter(stop.id);
+  }
+  if (stop.id === 10)           return forest10Pos(stop.lastApCol ?? stop.stateAfter);
+  return cellCenter(stop.id);
+}
+
+// =====================================================================
+//  ROBOT STATE DURING ANIMATION
+// =====================================================================
+
+/**
+ * Returns { pos, yaw_canvas } for the robot at animation state (step, progress).
+ * yaw_canvas: canvas drawing angle (0=right, π/2=down).
+ * firmware yaw → canvas angle:  (yaw_deg - 90) * PI/180,  then for RED flip Y → negate angle
+ */
+function firmwareYawToCanvas(yaw_deg) {
+  // yaw=0=hadap grid (bawah), yaw=-90=kiri robot, yaw=+90=kanan robot
+  // 0=bawah, 90=kiri, -90=kanan, 180=atas (arah layar)
+  return (90 + yaw_deg) * Math.PI / 180;
+}
+
+function movingAngle(from, to) {
+  return Math.atan2(to.y - from.y, to.x - from.x);
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+// Hitung sudut "saat tiba" di stop[i] — tidak tergantung stop berikutnya
+function arrivingAngle(stops, i) {
+  const s = stops[i];
+  if (s.type === 'yaw') return firmwareYawToCanvas(s.yaw_deg);
+  // Jika stop sebelumnya adalah yaw, pertahankan sudut yaw itu
+  if (i > 0 && stops[i - 1].type === 'yaw') return firmwareYawToCanvas(stops[i - 1].yaw_deg);
+  if (i > 0) return movingAngle(stopPos(stops[i - 1]), stopPos(s));
+  return firmwareYawToCanvas(0);
+}
+
+function getRobotState(stops, step, progress) {
+  if (!stops.length) return { pos: getZone1Pos(), angle: firmwareYawToCanvas(0) };
+
+  // Sudah di stop terakhir — pertahankan sudut datang
+  if (step >= stops.length - 1) {
+    const last = stops.length - 1;
+    return { pos: stopPos(stops[last]), angle: arrivingAngle(stops, last) };
+  }
+
+  const cur  = stops[step];
+  const next = stops[step + 1];
+  const t    = Math.min(progress, 1);
+
+  // t=0 artinya baru tiba / pause di stop ini — pertahankan sudut datang
+  if (t === 0) {
+    return { pos: stopPos(cur), angle: arrivingAngle(stops, step) };
+  }
+
+  if (next.type === 'yaw') {
+    // Animasi rotasi di approach point
+    const fromAngle = arrivingAngle(stops, step);
+    const toAngle   = firmwareYawToCanvas(next.yaw_deg);
+    let da = toAngle - fromAngle;
+    while (da >  Math.PI) da -= 2 * Math.PI;
+    while (da < -Math.PI) da += 2 * Math.PI;
+    return { pos: stopPos(cur), angle: fromAngle + da * t };
+  }
+
+  if (cur.type === 'yaw') {
+    // Sudah selesai rotasi — tahan yaw sampai mulai bergerak
+    return { pos: stopPos(cur), angle: firmwareYawToCanvas(cur.yaw_deg) };
+  }
+
+  const fromPos = stopPos(cur);
+  const toPos   = stopPos(next);
+  const pos = { x: lerp(fromPos.x, toPos.x, t), y: lerp(fromPos.y, toPos.y, t) };
+  // Pertahankan sudut datang selama bergerak — hanya yaw phase yang boleh muter
+  return { pos, angle: arrivingAngle(stops, step) };
+}
+
+// =====================================================================
+//  CANVAS DRAW
+// =====================================================================
+
+function drawBackground() {
+  const isBlue = alliance === 'blue';
+
+  // Corridors — posisi Y selalu sama, hanya X berubah via tx()
+  [[CORR_L_X, 'KORIDOR KIRI', -1], [CORR_R_X, 'KORIDOR KANAN', 1]].forEach(([cx, lbl, side]) => {
+    // Untuk BLUE (X-flip): kiri↔kanan secara visual, tapi kita gambar sama karena tx() sudah flip
+    const drawCx = isBlue ? W - cx - CORR_W : cx;
+    ctx.fillStyle = '#0c1825';
+    ctx.fillRect(drawCx, GRID_Y, CORR_W, GRID_H);
+    ctx.strokeStyle = '#1e3a5f'; ctx.lineWidth = 1;
+    ctx.strokeRect(drawCx, GRID_Y, CORR_W, GRID_H);
+    ctx.save();
+    ctx.fillStyle = '#1e4a6a'; ctx.font = '10px Segoe UI'; ctx.textAlign = 'center';
+    ctx.translate(side === -1 ? drawCx + 10 : drawCx + CORR_W - 10, GRID_Y + GRID_H / 2);
+    ctx.rotate(side === -1 ? -Math.PI / 2 : Math.PI / 2);
+    ctx.fillText(lbl, 0, 0);
+    ctx.restore();
+  });
+
+  // Zone 1 — selalu di atas
+  const zx = CORR_L_X, zy = 10;
+  const zw = W - CORR_L_X * 2, zh = GRID_Y - 18;
+  ctx.fillStyle = isBlue ? '#1a2540' : '#2a1a1a';
+  ctx.fillRect(zx, zy, zw, zh);
+  ctx.strokeStyle = isBlue ? '#3b82f6' : '#dc2626'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(zx, zy, zw, zh);
+  ctx.fillStyle = isBlue ? '#7dd3fc' : '#fca5a5';
+  ctx.font = 'bold 12px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText(`ZONE 1 — Start (${alliance.toUpperCase()})`, W / 2, zy + zh / 2 + 5);
+  const z1 = getZone1Pos();
+  ctx.beginPath(); ctx.arc(z1.x, z1.y, 7, 0, Math.PI * 2);
+  ctx.fillStyle = isBlue ? '#7dd3fc' : '#fca5a5'; ctx.fill();
+}
+
+const INVALID = new Set([5, 8]);
+const GROUP_COLORS_CELL = ['#1e3a5f', '#1a3a1a', '#3a1a3a', '#3a2a1a'];
+
+function drawGrid() {
+  const isBlue = alliance === 'blue';
+
+  ctx.fillStyle = '#162032';
+  ctx.fillRect(GRID_X, GRID_Y, GRID_W, GRID_H);
+
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 3; col++) {
+      const id = row * 3 + col + 1;
+      // BLUE: mirror kolom (col0↔col2) — forest 1↔3, 4↔6, dll
+      const drawCol = isBlue ? (2 - col) : col;
+      const x  = GRID_X + drawCol * CELL;
+      const y  = GRID_Y + row * CELL;
+      const inv = INVALID.has(id);
+
+      ctx.fillStyle = inv ? '#1a0a0a' : GROUP_COLORS_CELL[forestGroup(id)] || '#1e293b';
+      ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+      ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
+      ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+
+      if (inv) {
+        ctx.strokeStyle = '#7f2020'; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x + 14, y + 14); ctx.lineTo(x + CELL - 14, y + CELL - 14);
+        ctx.moveTo(x + CELL - 14, y + 14); ctx.lineTo(x + 14, y + CELL - 14);
+        ctx.stroke();
+      } else {
+        ctx.font = '18px serif'; ctx.textAlign = 'center';
+        ctx.fillText('🌲', x + CELL / 2, y + CELL / 2 + 4);
+      }
+      ctx.fillStyle = inv ? '#7f1d1d' : '#94a3b8';
+      ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center';
+      ctx.fillText(String(id), x + CELL / 2, y + CELL - 9);
+    }
+  }
+  ctx.strokeStyle = '#475569'; ctx.lineWidth = 2;
+  ctx.strokeRect(GRID_X, GRID_Y, GRID_W, GRID_H);
+}
+
+const AP_COLORS = ['#38bdf8', '#38bdf8', '#a78bfa', '#a78bfa'];
+
+function drawApproachPoints(hlAp = new Set(), hlYaw = new Set()) {
+  const AP = getApPos();
+  AP.forEach((pt, i) => {
+    const isHlAp = hlAp.has(i), isHlYaw = hlYaw.has(i);
+    const r = isHlAp || isHlYaw ? 20 : 14;
+    ctx.beginPath(); ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = (isHlAp || isHlYaw) ? AP_COLORS[i] + '30' : '#0c1825'; ctx.fill();
+    ctx.strokeStyle = isHlYaw ? '#a78bfa' : AP_COLORS[i];
+    ctx.lineWidth = (isHlAp || isHlYaw) ? 2.5 : 1.5; ctx.stroke();
+    ctx.fillStyle = (isHlAp || isHlYaw) ? AP_COLORS[i] : AP_COLORS[i] + 'aa';
+    ctx.font = `bold ${isHlAp || isHlYaw ? 12 : 10}px Segoe UI`; ctx.textAlign = 'center';
+    ctx.fillText(`[${i}]`, pt.x, pt.y + 4);
+    if (isHlYaw) {
+      ctx.fillStyle = '#a78bfa'; ctx.font = 'bold 9px Segoe UI';
+      ctx.fillText(`↺ ${AP_YAW[i]}°`, pt.x, pt.y + r + 10);
+    }
+  });
+}
+
+function drawRobot(pos, angle) {
+  const R = 13, TAIL = 8;
+  ctx.save();
+  ctx.translate(pos.x, pos.y);
+  ctx.rotate(angle);
+
+  // Glow
+  ctx.beginPath(); ctx.arc(0, 0, R + 4, 0, Math.PI * 2);
+  ctx.fillStyle = alliance === 'blue' ? '#22d3ee20' : '#ef444420'; ctx.fill();
+
+  // Body triangle (pointing right = angle 0)
+  ctx.beginPath();
+  ctx.moveTo(R, 0);
+  ctx.lineTo(-R + 2, -R * 0.6);
+  ctx.lineTo(-TAIL, 0);
+  ctx.lineTo(-R + 2,  R * 0.6);
+  ctx.closePath();
+  ctx.fillStyle = alliance === 'blue' ? '#22d3ee' : '#ef4444';
+  ctx.fill();
+
+  // Direction dot
+  ctx.beginPath(); ctx.arc(R * 0.45, 0, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+
+  ctx.restore();
+}
+
+function drawArrow(from, to, color, progress = 1) {
+  const dx = to.x - from.x, dy = to.y - from.y;
+  if (Math.sqrt(dx * dx + dy * dy) < 2) return;
+  ctx.beginPath(); ctx.setLineDash([6, 4]);
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(from.x + dx * progress, from.y + dy * progress);
+  ctx.strokeStyle = color + '99'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.setLineDash([]);
+  if (progress >= 1) {
+    const a = Math.atan2(dy, dx);
+    ctx.beginPath();
+    ctx.moveTo(to.x, to.y);
+    ctx.lineTo(to.x - 10 * Math.cos(a - 0.45), to.y - 10 * Math.sin(a - 0.45));
+    ctx.lineTo(to.x - 10 * Math.cos(a + 0.45), to.y - 10 * Math.sin(a + 0.45));
+    ctx.closePath(); ctx.fillStyle = color + 'cc'; ctx.fill();
+  }
+}
+
+function drawYawArc(pos, yaw_deg) {
+  const fromA = -Math.PI * 0.75;
+  const toA   = fromA + Math.PI * 1.2;
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, 28, fromA, toA);
+  ctx.strokeStyle = '#a78bfaaa'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.stroke();
+  ctx.setLineDash([]);
+  const ax = pos.x + 28 * Math.cos(toA), ay = pos.y + 28 * Math.sin(toA);
+  const ang = toA + Math.PI / 2;
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(ax - 7 * Math.cos(ang - 0.5), ay - 7 * Math.sin(ang - 0.5));
+  ctx.lineTo(ax - 7 * Math.cos(ang + 0.5), ay - 7 * Math.sin(ang + 0.5));
+  ctx.closePath(); ctx.fillStyle = '#a78bfa'; ctx.fill();
+  ctx.fillStyle = '#a78bfa'; ctx.font = 'bold 9px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText(`${yaw_deg}°`, pos.x, pos.y - 32);
+}
+
+function drawArmYBadge(pos, heightEnc) {
+  const lv = encToLevel(heightEnc);
+  ctx.fillStyle = '#f472b622';
+  ctx.fillRect(pos.x - 36, pos.y - 38, 72, 22);
+  ctx.strokeStyle = '#f472b6'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(pos.x - 36, pos.y - 38, 72, 22);
+  ctx.fillStyle = '#f472b6'; ctx.font = 'bold 10px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText(`↓ Y lv${lv} (${heightEnc})`, pos.x, pos.y - 23);
+}
+
+function drawArmSideBadge(pos, side) {
+  const lbl = side === 'l' ? 'ARM KIRI' : 'ARM KANAN';
+  const col = side === 'l' ? '#60a5fa' : '#f97316';
+  ctx.beginPath(); ctx.arc(pos.x, pos.y - 48, 18, 0, Math.PI * 2);
+  ctx.fillStyle = col + '33'; ctx.fill();
+  ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = col; ctx.font = 'bold 9px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText(lbl, pos.x, pos.y - 45);
+}
+
+function drawArmDeployBadge(pos, side, heightEnc) {
+  const lv = encToLevel(heightEnc);
+  const lbl = side === 'l' ? 'master Y' : 'slave2 Y';
+  const col = side === 'l' ? '#60a5fa' : '#f97316';
+  ctx.fillStyle = col + '22';
+  ctx.fillRect(pos.x - 44, pos.y - 62, 88, 20);
+  ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+  ctx.strokeRect(pos.x - 44, pos.y - 62, 88, 20);
+  ctx.fillStyle = col; ctx.font = 'bold 9px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText(`↑ ${lbl} lv${lv}`, pos.x, pos.y - 48);
+}
+
+function stopColor(stop) {
+  if (stop.type === 'target')   return '#34d399';
+  if (stop.type === 'arm_y')    return '#f472b6';
+  if (stop.type === 'arm_side')   return '#fb923c';
+  if (stop.type === 'arm_deploy') return '#22d3ee';
+  if (stop.type === 'start')    return '#7dd3fc';
+  if (stop.type === 'yaw')      return '#a78bfa';
+  return '#f59e0b';
+}
+
+function drawTargetNode(pos, label) {
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, 22, 0, Math.PI * 2);
+  ctx.fillStyle = '#34d39922'; ctx.fill();
+  ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.fillStyle = '#34d399'; ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText(label, pos.x, pos.y + 5);
+}
+
+function drawScene(stops, step, progress, robotState) {
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+  drawGrid();
+
+  if (!stops.length) { drawApproachPoints(); return; }
+
+  const hlAp = new Set(), hlYaw = new Set();
+  for (let i = 0; i <= step && i < stops.length; i++) {
+    if (stops[i].type === 'approach') hlAp.add(stops[i].apIdx);
+    if (stops[i].type === 'yaw')      hlYaw.add(stops[i].apIdx);
+  }
+  drawApproachPoints(hlAp, hlYaw);
+
+  // Completed path arrows
+  for (let i = 0; i < step && i < stops.length - 1; i++) {
+    const next = stops[i + 1];
+    if (next.type !== 'yaw') drawArrow(stopPos(stops[i]), stopPos(next), stopColor(next));
+    if (stops[i].type === 'yaw') drawYawArc(stopPos(stops[i]), stops[i].yaw_deg);
+  }
+
+  // Current animated step
+  if (step < stops.length - 1) {
+    const cur  = stops[step];
+    const next = stops[step + 1];
+    const t    = Math.min(progress, 1);
+    if (next.type !== 'yaw') drawArrow(stopPos(cur), stopPos(next), stopColor(next), t);
+    else {
+      // Yaw animation: partial arc
+      const fromA = -Math.PI * 0.75;
+      const span  = Math.PI * 1.2;
+      ctx.beginPath();
+      ctx.arc(stopPos(cur).x, stopPos(cur).y, 28, fromA, fromA + span * t);
+      ctx.strokeStyle = '#a78bfaaa'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (cur.type === 'yaw') drawYawArc(stopPos(cur), cur.yaw_deg);
+  }
+
+  // Arrived targets + forest arrival badges
+  for (let i = 1; i <= step && i < stops.length; i++) {
+    const s = stops[i];
+    if (s.type === 'target') {
+      const lbl = s.id === 10 ? forest10Label(s.lastApCol ?? s.stateAfter) : `F${s.id}`;
+      drawTargetNode(stopPos(s), lbl);
+    }
+    if (s.type === 'arm_y')    drawArmYBadge(stopPos(s), s.height_enc);
+    if (s.type === 'arm_side')   drawArmSideBadge(stopPos(s), s.side);
+    if (s.type === 'arm_deploy') drawArmDeployBadge(stopPos(s), s.side, s.height_enc);
+  }
+
+  // Robot
+  if (robotState) drawRobot(robotState.pos, robotState.angle);
+}
+
+// =====================================================================
+//  ANIMATION STATE
+// =====================================================================
+let allStops  = [];
+let dest1End  = 0;
+let animStep  = 0;
+let animProg  = 0;
+let animTimer = null;
+let dest1Done = false;
+
+function framesPerStep() { return Math.max(5, Math.round(parseInt(document.getElementById('speed').value) / 16.67)); }
+
+function drawFrame() {
+  const fps  = framesPerStep();
+  const t    = Math.min(animProg / fps, 1);
+  const rs   = getRobotState(allStops, animStep, t);
+  drawScene(allStops, animStep, t, rs);
+  updateLogHighlight(animStep);
+}
+
+function tick() {
+  animProg++;
+  if (animProg >= framesPerStep()) {
+    animProg = 0; animStep++;
+    if (!dest1Done && animStep >= dest1End) {
+      dest1Done = true;
+      const id2 = parseInt(document.getElementById('sel-dest2').value);
+      if (id2 > 0) {
+        document.getElementById('btn-dest2').disabled = false;
+        setStatus('Tujuan 1 selesai — tekan goForest(Tujuan 2)', 'done');
+      }
+      if (animStep >= allStops.length - 1) { finishAnim(); return; }
+      clearInterval(animTimer); animTimer = null;
+      updateLogHighlight(animStep, true); drawFrame(); return;
+    }
+    if (animStep >= allStops.length - 1) { finishAnim(); return; }
+  }
+  drawFrame();
+}
+
+function finishAnim() {
+  animStep = allStops.length - 1;
+  clearInterval(animTimer); animTimer = null;
+  updateLogHighlight(animStep, true); drawFrame();
+  const armStop = [...allStops].reverse().find(s => s.type === 'arm_deploy');
+  const armMsg = armStop
+    ? ` — deploy ${armStop.side === 'l' ? 'KIRI (master)' : 'KANAN (slave2)'}`
+    : '';
+  setStatus('Selesai ✓' + armMsg, 'done');
+  document.getElementById('btn-dest1').disabled = false;
+  document.getElementById('btn-finish').disabled = false;
+}
+
+function setStatus(msg, cls = '') {
+  const el = document.getElementById('status-bar');
+  el.textContent = msg;
+  el.className = 'status-bar' + (cls ? ' ' + cls : '');
+}
+
+function updateLogHighlight(step, done = false) {
+  document.querySelectorAll('.path-step').forEach((el, i) => {
+    el.classList.remove('active', 'done', 'current');
+    if (done && i <= step) el.classList.add('active', 'done');
+    else if (i < step)     el.classList.add('active', 'done');
+    else if (i === step)   el.classList.add('active', 'current');
+  });
+}
+
+// =====================================================================
+//  PATH LOG
+// =====================================================================
+function buildPathLog(stops) {
+  const log = document.getElementById('path-log');
+  log.innerHTML = '';
+  stops.forEach((s) => {
+    const div = document.createElement('div');
+    div.className = `path-step ${s.type}`;
+    let label = '', meta = '';
+    if (s.type === 'start') {
+      label = '◉ ' + s.label;
+    } else if (s.type === 'approach') {
+      label = `→ ${AP_LABELS[s.apIdx]}`;  meta = `ap[${s.apIdx}]`;
+    } else if (s.type === 'yaw') {
+      label = s.exit ? `🏁 Finish ↺ ${s.yaw_deg}° @ [2]` : `↺ Yaw ${s.yaw_deg}°`;
+      meta = s.exit ? 'exit' : 'rotate';
+    } else if (s.type === 'arm_y') {
+      label = `↓ Arm Y → lv${encToLevel(s.height_enc)} (${s.height_enc} enc)`;
+      meta = 'FOREST_ARM_Y';
+    } else if (s.type === 'arm_side') {
+      const sideLbl = s.side === 'l' ? 'KIRI (L)' : 'KANAN (R)';
+      label = `Arm side: ${sideLbl}`;
+      meta = `gForestArmSide='${s.side}'`;
+    } else if (s.type === 'arm_deploy') {
+      const who = s.side === 'l' ? 'motorYSetTarget' : 'sendSlave2Command';
+      label = `↑ Deploy ${s.side === 'l' ? 'KIRI' : 'KANAN'} → lv${encToLevel(s.height_enc)}`;
+      meta = who;
+    } else {
+      if (s.id === 10) {
+        label = `→ ${forest10Label(s.lastApCol ?? s.stateAfter)}`;
+        meta  = s.lastApCol === FOREST10B_AP ? 'ap[3]→10b' : 'ap[0]→10a';
+      } else {
+        const g = forestGroup(s.id);
+        label = `→ Forest ${s.id}<span class="group-badge ${GROUP_BADGE[g]}">${GROUP_NAMES[g]}</span>`;
+        meta  = `F${s.id}`;
+      }
+    }
+    div.innerHTML = `<div class="step-dot"></div><span>${label}</span><span class="step-meta">${meta}</span>`;
+    log.appendChild(div);
+  });
+}
+
+// =====================================================================
+//  CONTROLS
+// =====================================================================
+function populateDropdowns() {
+  VALID_IDS.forEach(id => {
+    ['sel-dest1','sel-dest2','sel-lastforest'].forEach(selId => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = `Forest ${id}  [${GROUP_NAMES[forestGroup(id)]}]`;
+      document.getElementById(selId).appendChild(opt);
+    });
+  });
+  document.getElementById('sel-dest1').value      = 4;
+  document.getElementById('sel-dest2').value      = 6;
+  document.getElementById('sel-lastforest').value = 0;
+}
+
+function getEndState() {
+  if (allStops.length === 0) {
+    return {
+      forestId: parseInt(document.getElementById('sel-lastforest').value),
+      apCol:    parseInt(document.getElementById('sel-ap').value),
+    };
+  }
+  for (let i = allStops.length - 1; i >= 0; i--) {
+    const s = allStops[i];
+    if (s.type === 'target') return { forestId: s.id, apCol: s.lastApCol ?? s.stateAfter ?? -1 };
+    if (s.type === 'arm_deploy' || s.type === 'arm_side' || s.type === 'arm_y')
+      return { forestId: s.id, apCol: s.lastApCol ?? s.stateAfter ?? -1 };
+    if (s.type === 'approach' && s.exit) return { forestId: 0, apCol: 2 };
+    if (s.type === 'yaw' && s.exit) return { forestId: 0, apCol: 2 };
+  }
+  const last = allStops[allStops.length - 1];
+  return {
+    forestId: last.type === 'target' ? last.id : 0,
+    apCol:    last.stateAfter ?? last.apCol ?? -1,
+  };
+}
+
+function runFinish() {
+  if (animTimer) return;
+  const end = getEndState();
+  if (end.forestId === 0 && end.apCol === 2) {
+    setStatus('Sudah di [2] — finish selesai', 'done');
+    return;
+  }
+  if (allStops.length > 0 && animStep < allStops.length - 1) {
+    setStatus('Tunggu animasi selesai dulu', '');
+    return;
+  }
+
+  const r = buildExitFromForestStops(end.forestId, end.apCol);
+  if (allStops.length > 0) {
+    allStops = [...allStops, ...r.stops];
+    animStep = allStops.length - r.stops.length - 1;
+  } else {
+    const initApCol    = parseInt(document.getElementById('sel-ap').value);
+    const initForestId = parseInt(document.getElementById('sel-lastforest').value);
+    const startLabel = initForestId > 0
+      ? `Forest ${initForestId} (${GROUP_NAMES[forestGroup(initForestId)]})`
+      : (initApCol >= 0 ? AP_LABELS[initApCol] : 'Zone 1');
+    allStops = [{
+      type: 'start', forestId: initForestId, apCol: initApCol,
+      label: startLabel, pos: getCurrentPos(initForestId, initApCol),
+    }, ...r.stops];
+    animStep = 0;
+  }
+
+  animProg = 0;
+  dest1End = allStops.length - 1;
+  dest1Done = true;
+  buildPathLog(allStops);
+  updateLogHighlight(animStep);
+  setStatus('exitFromForest() berjalan…', 'running');
+  document.getElementById('btn-dest1').disabled = true;
+  document.getElementById('btn-dest2').disabled = true;
+  document.getElementById('btn-finish').disabled = true;
+  drawFrame();
+  animTimer = setInterval(tick, 16);
+}
+
+function runDest1() {
+  if (animTimer) { clearInterval(animTimer); animTimer = null; }
+  const initApCol    = parseInt(document.getElementById('sel-ap').value);
+  const initForestId = parseInt(document.getElementById('sel-lastforest').value);
+  const id1 = parseInt(document.getElementById('sel-dest1').value);
+  const id2 = parseInt(document.getElementById('sel-dest2').value);
+
+  const startLabel = initForestId > 0
+    ? `Forest ${initForestId} (${GROUP_NAMES[forestGroup(initForestId)]})`
+    : (initApCol >= 0 ? AP_LABELS[initApCol] : 'Zone 1');
+  const startStop = { type:'start', forestId:initForestId, apCol:initApCol, label:startLabel, pos:getCurrentPos(initForestId,initApCol) };
+
+  const r1 = buildGoForestStops(id1, initForestId, initApCol);
+  allStops = [startStop, ...r1.stops];
+  dest1End = allStops.length - 1;
+
+  if (id2 > 0) {
+    const r2 = buildGoForestStops(id2, r1.finalForestId, r1.finalApCol);
+    allStops = [...allStops, ...r2.stops];
+  }
+
+  animStep = 0; animProg = 0; dest1Done = false;
+  document.getElementById('btn-dest1').disabled = true;
+  document.getElementById('btn-dest2').disabled = true;
+  document.getElementById('btn-finish').disabled = true;
+  buildPathLog(allStops);
+  updateLogHighlight(0);
+  setStatus('goForest(Tujuan 1) berjalan…', 'running');
+  drawFrame();
+  animTimer = setInterval(tick, 16);
+}
+
+function continueDest2() {
+  if (!dest1Done || animTimer) return;
+  document.getElementById('btn-dest2').disabled = true;
+  setStatus('goForest(Tujuan 2) berjalan…', 'running');
+  animTimer = setInterval(tick, 16);
+}
+
+function reset() {
+  if (animTimer) { clearInterval(animTimer); animTimer = null; }
+  allStops = []; animStep = 0; animProg = 0; dest1Done = false;
+  document.getElementById('btn-dest1').disabled = false;
+  document.getElementById('btn-dest2').disabled = true;
+  document.getElementById('btn-finish').disabled = false;
+  document.getElementById('path-log').innerHTML = '<div class="no-path">Tekan goForest(Tujuan 1) untuk memulai.</div>';
+  setStatus('Siap');
+  drawScene([], -1, 0, null);
+}
+
+function onProxChange() {
+  if (!animTimer && allStops.length) {
+    // Recompute arm_side + arm_deploy dengan prox baru (arm_y tidak berubah)
+    for (let i = 0; i < allStops.length; i++) {
+      const s = allStops[i];
+      if (s.type === 'arm_side' || s.type === 'arm_deploy') {
+        s.side = pickForestArmSide(s.lastApCol ?? s.stateAfter);
+      }
+    }
+    buildPathLog(allStops);
+    updateLogHighlight(animStep);
+    drawFrame();
+  } else if (!animTimer) {
+    drawScene([], -1, 0, null);
+  }
+}
+
+// =====================================================================
+//  INIT
+// =====================================================================
+populateDropdowns();
+drawScene([], -1, 0, null);
+document.getElementById('btn-dest1').addEventListener('click', runDest1);
+document.getElementById('btn-dest2').addEventListener('click', continueDest2);
+document.getElementById('btn-finish').addEventListener('click', runFinish);
+document.getElementById('btn-reset').addEventListener('click', reset);
+document.getElementById('chk-prox-l').addEventListener('change', onProxChange);
+document.getElementById('chk-prox-r').addEventListener('change', onProxChange);
+</script>
+</body>
+</html>

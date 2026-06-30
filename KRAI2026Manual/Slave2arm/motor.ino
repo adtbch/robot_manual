@@ -39,6 +39,7 @@ struct MotorRun {
 
 MotorRun gMotorXRun;
 MotorRun gMotorKRun;
+int gMotorYLastPwm = 0;
 
 int findMotorIndex(char id) {
     for (size_t i = 0; i < MOTOR_COUNT; i++) {
@@ -74,6 +75,7 @@ void pwmMotor(char motorId, int pwmValue) {
     if (idx < 0) return;
 
     pwmValue = constrain(pwmValue, PWM_MIN, PWM_MAX);
+    if (motorId == 'y') gMotorYLastPwm = pwmValue;
 
     if (pwmValue > 0) {
         digitalWrite(motors[idx].pin2, LOW);
@@ -177,6 +179,28 @@ bool motorRunIsActive(char id) {
     if (id == 'x') return gMotorXRun.active;
     if (id == 'k') return gMotorKRun.active;
     return false;
+}
+
+bool executeMotorCommand(char motorId, int pwm) {
+    if (findMotorIndex(motorId) < 0) return false;
+    pwm = constrain(pwm, PWM_MIN, PWM_MAX);
+    if (motorId == 'x' || motorId == 'k') {
+        if (pwm == 0) motorRunStop(motorId);
+        else motorRunStart(motorId, pwm);
+        return true;
+    }
+    pwmMotor(motorId, pwm);
+    return true;
+}
+
+int motorRunGetPwm(char id) {
+    if (id == 'x' && gMotorXRun.active) return gMotorXRun.pwm;
+    if (id == 'k' && gMotorKRun.active) return gMotorKRun.pwm;
+    return 0;
+}
+
+int motorYGetLastPwm() {
+    return gMotorYLastPwm;
 }
 
 void motorRunTick() {

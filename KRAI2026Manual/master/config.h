@@ -163,4 +163,7 @@ extern float gOdomY_m;
 extern float gOdomW_deg;   // heading odometri (derajat)
 extern bool  gOdomValid;
 
+extern bool    modeKinematics;   // false=goto, true=kn
+extern uint8_t zoneState;
+
 #endif // CONFIG_H

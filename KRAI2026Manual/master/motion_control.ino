@@ -60,6 +60,7 @@ float gTargetX_cm = 0.0f;
 float gTargetY_cm = 0.0f;
 int16_t gTargetSpeedRpm = SPEED_RPM_NORMAL;
 bool gMotionWaypointMode = false;
+bool modeKinematics = false;
 
 namespace {
 
@@ -136,7 +137,7 @@ void motionControlTick(const ControlPacket &pkt) {
     
     const bool linkUp = pkt.connected && espNowControlIsLinkAlive();
     
-    if (linkUp && !gMotionWaypointMode) {
+    if (linkUp && (!gMotionWaypointMode || modeKinematics)) {
         gTargetSpeedRpm = SPEED_RPM_NORMAL;
         bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
         // Jangan toggle mode saat OPTIONS+SHARE (record odom)
@@ -185,12 +186,16 @@ void motionControlTick(const ControlPacket &pkt) {
         } else if (!(pkt.buttons & BTN_R2)) {
             updateYawTargetFromStick(rawRx, yawStepMs);
         }
+        if (pkt.buttons & BTN_SQUARE) {
+            vx = 0;
+            vy = 0;
+        }
         if (vx == 0 && vy == 0) {
             gTargetSpeedRpm = 0;
             gGotoIntegrateLastMs = millis();
         }    
     } else {
-        if (!linkUp && !gMotionWaypointMode) {
+        if (!linkUp && !gMotionWaypointMode && !modeKinematics) {
             gTargetSpeedRpm = 0;
         }
         vx = 0;
@@ -204,9 +209,12 @@ void motionControlTick(const ControlPacket &pkt) {
         gTargetX_cm += (float)vx * GOTO_CM_PER_RPM_SEC * dtSec;
         gTargetY_cm += (float)vy * GOTO_CM_PER_RPM_SEC * dtSec;
     }
-
-    sendGotoCommand((int16_t)lroundf(gTargetX_cm),
-                    (int16_t)lroundf(gTargetY_cm),
-                    gYawTarget,
-                    gTargetSpeedRpm);
+    if (!modeKinematics) {
+        sendGotoCommand((int16_t)lroundf(gTargetX_cm),
+                        (int16_t)lroundf(gTargetY_cm),
+                        gYawTarget,
+                        gTargetSpeedRpm);
+    } else {
+        sendKnCommand(vx, vy, gYawTarget);
+    }
 }

@@ -89,4 +89,9 @@ void motorRunStopAll();
 bool motorRunIsActive(char id);
 void motorRunTick();
 
+// Shared motor command — serial + web API
+bool executeMotorCommand(char motorId, int pwm);
+int motorRunGetPwm(char id);
+int motorYGetLastPwm();
+
 #endif // MOTOR_H

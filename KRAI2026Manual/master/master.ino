@@ -30,6 +30,13 @@
 #include "proximity.h"
 #include "serial.h"
 #include "odom.h"
+#include "forest.h"
+
+// =====================================================================
+//  SHARED STATE DEFINITIONS (extern di config.h)
+// =====================================================================
+
+uint8_t zoneState = 1;
 
 // =====================================================================
 //  BOX STATE — tracking motor Y untuk kirim "box done" ke slave2
@@ -107,6 +114,9 @@ void loop() {
     // Encoder positioning motor X/Y
     motorXPositionTick();
     motorYPositionTick();
+
+    // Forest navigation — lanjutkan goForest/exit yang sedang berjalan
+    forestTick();
 
     // Box done — cek motor Y sampai, kirim ke slave2
     boxCheckDone();

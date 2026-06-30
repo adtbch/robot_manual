@@ -14,6 +14,7 @@
 #include "proximity.h"
 #include "serial.h"
 #include "pneumatic.h"
+#include "webconfig.h"
 
 // =====================================================================
 //  SETUP
@@ -49,6 +50,9 @@ void setup() {
     // Init pneumatic
     setupPneumatic();
     Serial.println("Pneumatic: READY");
+
+    // WiFi AP + HTTP test panel
+    setupWebServer();
 }
 
 // =====================================================================
