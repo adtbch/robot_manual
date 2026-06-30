@@ -1,18 +1,7 @@
 /*
  * =====================================================================
  * FILE    : gripper.ino
- * PERAN   : Auto gripper (non-blocking loop) + motor homing (blocking, setup saja).
- *
- * AUTO GRIPPER:
- *   Proximity → tutup (servo d) → CLOSING → servo b lurus
- *   → UP: motor Y ke level 1 → STRAIGHTEN (tunggu Segitiga)
- *
- * SETUP ZONE1 (blocking, dipanggil sekali dari setup()):
- *   Waypoint limit Y bawah → reset enc Y
- *   Waypoint limit X mundur → reset enc X
- *   Motor Y level 0, motor X target encoder 0
- *
- * setHomingAll() — servo + setMotorHoming() (serial / manual re-homing)
+ * PERAN   : Servo homing + motor homing (blocking, setup saja).
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -31,16 +20,8 @@
 constexpr int HOMING_PWM = 400;
 
 // =====================================================================
-//  STATE
+//  HOMING — blocking, dipanggil dari setup() atau serial
 // =====================================================================
-
-GripperState gGripperState = IDLE;
-
-namespace {
-
-Jeda gJeda;
-
-} // anonymous namespace
 
 void setServoHoming() {
     setServoAngle('d', 0);
@@ -70,74 +51,4 @@ void setMotorHoming() {
 void setHomingAll() {
     setMotorHoming();
     setServoHoming();
-}
-
-void setupZone1() {
-    setServoHoming();
-    // gTargetX_cm = 0.0f;
-    // gTargetY_cm = 0.0f;
-    // gTargetSpeedRpm = 70;
-    gripperMotorYSetLevel(0);
-    motorXSetTarget(200);
-}
-
-// =====================================================================
-//  GRIPPER TICK — panggil di loop(), non-blocking
-// =====================================================================
-
-void gripperZone1() {
-    switch (gGripperState) {
-
-        case IDLE:
-            if (readProximity()) {
-                setServoAngle('d', 90);
-                gJeda.reset();
-                gGripperState = CLOSING;
-            }
-            break;
-
-        case CLOSING:
-            if (gJeda.check(300)) {
-                setServoAngle('b', 100);
-                // gripperMotorYSetLevel(1);
-                gGripperState = UP;
-            }
-            break;
-
-        case UP:
-            // if (motorYAtLevel(1)) {
-                // gTargetX_cm = 0.0f;
-                // gTargetY_cm = 0.0f;
-                // gTargetSpeedRpm = 70;
-                gGripperState = STRAIGHTEN;
-            // };
-            break;
-
-        case STRAIGHTEN:
-            // if (!gMotionWaypointMode) {
-                // gripperReadytoStab();
-                // gTargetX_cm = 0.0f;
-                // gTargetY_cm = 0.0f;
-                // gTargetSpeedRpm = 70;
-            // }
-            gGripperState = READY_TO_STAB; //jangan lupa dihapus
-            break;
-        case READY_TO_STAB:
-            break;
-    }
-}
-
-void gripperReadytoStab() {
-    if (gGripperState == STRAIGHTEN) {
-        setServoAngle('b', 0);
-        gGripperState = READY_TO_STAB;
-    } else return;
-}
-
-// =====================================================================
-//  RESET
-// =====================================================================
-
-void gripperReset() {
-    gGripperState = IDLE;
 }
