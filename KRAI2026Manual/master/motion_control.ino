@@ -112,7 +112,8 @@ void motionControlTick(const ControlPacket &pkt) {
 
     if (linkUp) {
         bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
-        if (shareNow && !(gMotionPrevButtons & BTN_SHARE)) {
+        // Jangan toggle mode saat OPTIONS+SHARE (record odom)
+        if (shareNow && !(gMotionPrevButtons & BTN_SHARE) && !(pkt.buttons & BTN_OPTIONS)) {
             gInputMode = (gInputMode == MODE_ANALOG) ? MODE_DPAD : MODE_ANALOG;
         }
         if (allInvertComboHeld(pkt.buttons) && !allInvertComboHeld(gMotionPrevButtons)) {

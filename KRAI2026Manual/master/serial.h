@@ -43,5 +43,6 @@ extern HardwareSerial slave2Serial;
 void setupSerial();
 void setupSerialCommand();
 void serialCommandTick();
+void sendShowOdomCommand();
 
 #endif // SERIAL_H

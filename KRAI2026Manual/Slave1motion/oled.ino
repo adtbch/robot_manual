@@ -38,6 +38,7 @@ namespace {
 
 void drawYawMode() {
     float yawDeg = getYaw();
+    float slopeDeg = getSlopeDeg();  // roll: maju nanjak +, mundur nanjak −
 
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
@@ -78,10 +79,13 @@ void drawYawMode() {
     else if (yawDeg > -112.5f && yawDeg <= -67.5f)  display.print("WEST");
     else if (yawDeg > -67.5f && yawDeg <= -22.5f)   display.print("NW");
 
-    // Bottom bar
+    // Bottom bar — S=slope (roll), P=pitch
     display.drawFastHLine(0, 54, 128, SSD1306_WHITE);
     display.setCursor(0, 56);
-    display.print("MODE: YAW");
+    display.print("S:");
+    display.print((int)slopeDeg);
+    display.print(" P:");
+    display.print((int)getPitch());
 }
 
 // =====================================================================

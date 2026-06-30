@@ -27,6 +27,30 @@ constexpr float YAW_PID_DEFAULT_KD = 0.1f;
 
 PIDState pidStates[MOTOR_COUNT];
 PIDState pidKinematicYaw;
+float motorKg = 0.0f;
+
+// =====================================================================
+//  NVS — GRAVITY FF (Kg, shared semua motor)
+// =====================================================================
+
+void loadMotorKg() {
+    Preferences prefs;
+    prefs.begin(PID_NVS_NAMESPACE, true);
+    motorKg = prefs.getFloat("motor_kg", 0.0f);
+    prefs.end();
+    motorKg = constrain(motorKg, KG_MIN, KG_MAX);
+}
+
+void saveMotorKg() {
+    Preferences prefs;
+    prefs.begin(PID_NVS_NAMESPACE, false);
+    prefs.putFloat("motor_kg", motorKg);
+    prefs.end();
+}
+
+void setMotorKg(float kg) {
+    motorKg = constrain(kg, KG_MIN, KG_MAX);
+}
 
 // =====================================================================
 //  NVS LOAD/SAVE — MOTOR PID
@@ -97,6 +121,7 @@ void showYawPid() {
 // =====================================================================
 
 void pidControllerInit() {
+    loadMotorKg();
     for (size_t i = 0; i < MOTOR_COUNT; i++) {
         pidLoadFromNVS(i, pidStates[i].kp, pidStates[i].ki, pidStates[i].kf, pidStates[i].deadband);
         pidStates[i].kd = 0.0f; // Motor PID does not use Kd
@@ -134,7 +159,7 @@ void pidReloadFromNVS() {
 //  PID COMPUTE — Generic
 // =====================================================================
 
-int pidCompute(PIDState &pid, float target, float current, float dt) {
+int pidCompute(PIDState &pid, float target, float current, float dt, float gravOut) {
     pid.lastTarget = target;
 
     float error = target - current;
@@ -148,12 +173,12 @@ int pidCompute(PIDState &pid, float target, float current, float dt) {
         dOut = -pid.kd * (current - pid.lastError) / dt;
     }
 
-    // Feed-Forward with Deadband Compensation (Coulomb Friction)
+    // Feed-forward: Kf×RPM + Db + Kg×sin(roll) saat bergerak
     float ffOut = 0.0f;
     if (target > 0.5f) {
-        ffOut = (pid.kf * target) + pid.deadband;
+        ffOut = (pid.kf * target) + pid.deadband + gravOut;
     } else if (target < -0.5f) {
-        ffOut = (pid.kf * target) - pid.deadband;
+        ffOut = (pid.kf * target) - pid.deadband + gravOut;
     }
 
     // Integral with anti-windup (clamp + conditional integration saat output saturasi)
@@ -179,7 +204,14 @@ int pidCompute(PIDState &pid, float target, float current, float dt) {
 int pidCompute(int motorIdx, float targetRPM, float dt) {
     if (motorIdx < 0 || (size_t)motorIdx >= MOTOR_COUNT) return 0;
     float currentRPM = getEncoderVelocityRpm(motorIdx);
-    return pidCompute(pidStates[motorIdx], targetRPM, currentRPM, dt);
+
+    float gravOut = 0.0f;
+    if (motorKg > 0.0f && fabsf(targetRPM) > 0.5f) {
+        const float slopeRad = getSlopeDeg() * (PI / 180.0f);
+        gravOut = motorKg * sinf(slopeRad);
+    }
+
+    return pidCompute(pidStates[motorIdx], targetRPM, currentRPM, dt, gravOut);
 }
 
 // =====================================================================

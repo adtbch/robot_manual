@@ -21,6 +21,12 @@ void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
     Serial.printf("kn %d %d %d\n", vx, vy, yawTarget);  // debug
 }
 
+void sendShowOdomCommand() {
+    slave1Serial.printf("odom\n");
+    Serial.printf("odom\n");  // debug
+}
+
+
 // =====================================================================
 //  SLAVE2 — Arm Manipulator
 // =====================================================================

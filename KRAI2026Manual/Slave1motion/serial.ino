@@ -45,7 +45,7 @@ void printHelp(Print& out) {
     out.println("  wp cancel|status                        — batal/status waypoint");
     out.println("  tunewp <kp> [tol_pos_cm] [tol_yaw_deg] — tuning waypoint");
     out.println("  savewp                                  — simpan waypoint params ke NVS");
-    out.println("  odom                                    — tampilkan odometri");
+    out.println("  odom                                    — kirim odomToMaster ke master");
     out.println("  odomreset                               — reset odometri ke (0,0,0)");
 }
 
@@ -92,7 +92,6 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             const int bl = atoi(blStr);
             if (fromMasterUart) {
                 rpmMotor(fr, fl, br, bl);
-                if (!fromMasterUart) out.printf("RPM: FR=%d FL=%d BR=%d BL=%d\n", fr, fl, br, bl);
             } else {
                 pwmMotor(0, fr);
                 pwmMotor(1, fl);
@@ -129,9 +128,11 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             testYawMode = false;
             startWaypoint(x_cm, y_cm, yaw, speed);
             if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg speed=%.0f rpm\n", x_cm, y_cm, yaw, speed);
-            if (wpState != WaypointState::REACHED) {
+            if (getWaypointState() != WaypointState::REACHED) {
+                out.printf("WP: RUNNING\n");
                 Serial1.printf("WP: RUNNING\n");
             } else {
+                out.printf("WP: REACHED\n");
                 Serial1.printf("WP: REACHED\n");
             }
         } else {
@@ -147,7 +148,7 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             if (!fromMasterUart) out.printf("WP state: %s | target=(%.3f,%.3f)m yaw=%.1fdeg\n",
                        states[(int)getWaypointState()],
                        wpTargetX_m, wpTargetY_m, wpTargetYaw_deg);
-            if (!fromMasterUart) out.printf("Odom: x=%.3fm y=%.3fm yaw=%.1fdeg\n",
+            if (!fromMasterUart) out.printf("Odom: %.3fm %.3fm %.1fdeg\n",
                        odomX, odomY, getYaw());
         } else {
             if (!fromMasterUart) out.println("Format: wp cancel | wp status");
@@ -170,8 +171,9 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
     } else if (strcmp(token, "savewp") == 0) {
         saveWaypointPid();
     } else if (strcmp(token, "odom") == 0) {
-        if (!fromMasterUart) out.printf("Odom: x=%.3fm y=%.3fm theta=%.1fdeg | yaw=%.1fdeg\n",
-                   odomX, odomY, odomTheta, getYaw());
+        // Master poll → balas ke UART peminta (Serial1 saat dari master)
+        out.printf("odomToMaster %.3f %.3f %.1f\n", odomX, odomY, odomTheta);
+        Serial1.printf("odomToMaster %.3f %.3f %.1f\n", odomX, odomY, odomTheta);
     } else if (strcmp(token, "odomreset") == 0) {
         resetOdometry();
         if (!fromMasterUart) out.println("Odometri direset ke (0,0,0).");
@@ -238,6 +240,13 @@ void readSerialLine(Stream& port, char* buf, uint8_t& idx, Print& out, bool from
     }
 }
 
+void discardMasterUart() {
+    while (Serial1.available() > 0) {
+        Serial1.read();
+    }
+    masterBufIdx = 0;
+}
+
 }  // namespace
 
 // =====================================================================
@@ -273,5 +282,9 @@ void serialRelayTick() {
 
 void serialCommandTick() {
     readSerialLine(Serial, pcBuf, pcBufIdx, Serial, false);
-    readSerialLine(Serial1, masterBuf, masterBufIdx, Serial1, true);
+    if (isAutoTunerRunning()) {
+        discardMasterUart();  // ponytail: buang RX master — kn stream gak ganggu autotune
+    } else {
+        readSerialLine(Serial1, masterBuf, masterBufIdx, Serial1, true);
+    }
 }

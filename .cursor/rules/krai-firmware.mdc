@@ -4,6 +4,7 @@ globs: KRAI2026Manual/**/*
 alwaysApply: true
 ---
 
+
 # KRAI 2026 Firmware
 
 Board-specific docs, pin maps, and commands: `AGENTS.md`.
@@ -57,3 +58,6 @@ ledcAttach(pin, freq, res); ledcWrite(pin, duty);
 - Delete dead code; descriptive names with units (`_deg`, `_rpm`, `_ms`).
 - One responsibility per function (`pidComputeYaw` only computes yaw PID).
 - `static constexpr` for constants: `static constexpr const char* NVS_NS = "yaw_pid";`
+
+# Caveman : Full
+use caveman full /caveman full

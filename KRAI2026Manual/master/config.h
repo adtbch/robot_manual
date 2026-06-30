@@ -137,4 +137,13 @@ extern int16_t gYawTarget;
 
 extern bool gModeInvert;
 
+// =====================================================================
+//  SHARED STATE — odometri dari slave1 (UART1 response)
+// =====================================================================
+
+extern float gOdomX_m;
+extern float gOdomY_m;
+extern float gOdomW_deg;   // heading odometri (derajat)
+extern bool  gOdomValid;
+
 #endif // CONFIG_H

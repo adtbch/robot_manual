@@ -87,8 +87,8 @@ void loop() {
 
     if (isButtonLongPressed() && !isAutoTunerRunning()) {
         testYawMode = false; // Matikan mode test yaw jika menyala
-        motorStopAll();
-        Serial.println("\n[AUTOTUNE] Button Long Press -> Starting!");
+        // motorStopAll();
+        // Serial.println("\n[AUTOTUNE] Button Long Press -> Starting!");
         startAutoTuneAll();
     }
 

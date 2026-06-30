@@ -26,10 +26,11 @@ namespace AutoTunerNS {
     constexpr uint32_t KF_RUN_MS = 2000;
     constexpr float KF_MIN_RPM = 10.0f;
 
-    // Emulasi beban tanjakan saat motor diangkat: PWM yang dikurangi dari output
-    // selama window steady-state. Memaksa integral wind-up seperti kena gravitasi.
-    // ponytail: estimasi konstan ~25% PWM_MAX; sesuaikan dari selisih PWM datar vs tanjakan.
-    constexpr int LOAD_INJECT_PWM = 250;
+    // Emulasi beban tanjakan — potong PWM command (bukan feedback RPM).
+    // ponytail: LOAD_INJECT_PWM = cap; fraksi dari PWM saat ini biar gak nolkan motor di awal load.
+    constexpr int    LOAD_INJECT_PWM       = 400;
+    constexpr float  LOAD_INJECT_FRACTION  = 0.45f;
+    constexpr uint32_t LOAD_RAMP_MS        = 1500;  // naik gradual setelah 60%, integral sempat react
 
     constexpr float HIGH_OVERSHOOT_PCT = 10.0f;
     constexpr float MEDIUM_OVERSHOOT_PCT = 5.0f;
@@ -83,7 +84,46 @@ struct CycleMetrics {
     }
     float ss_variance() const { return (ss_samples > 1) ? ss_M2 / ss_samples : 0.0f; }
     float ss_error() const { return fabsf(ss_mean - AutoTunerNS::kTargetRpm); }
+    bool hasLoadWindow() const { return ss_samples >= (int)AutoTunerNS::kSteadyStateMinSamples; }
 };
+
+static CycleMetrics metrics;
+
+// Error untuk adjust: ss_error (fase beban 60%+) dominan — avg_err sendirian misleading.
+static float effectiveErr() {
+    if (metrics.hasLoadWindow()) {
+        return fmaxf(metrics.avg_err(), metrics.ss_error());
+    }
+    return metrics.avg_err();
+}
+
+static int computeLoadCut(int pwm, uint32_t elapsedMs) {
+    const uint32_t loadStartMs = (uint32_t)(AUTOTUNE_RUN_MS * AutoTunerNS::kSteadyStateStartFraction);
+    if (elapsedMs < loadStartMs || pwm == 0) return 0;
+
+    const uint32_t sinceLoadMs = elapsedMs - loadStartMs;
+    float ramp = 1.0f;
+    if (sinceLoadMs < AutoTunerNS::LOAD_RAMP_MS) {
+        ramp = (float)sinceLoadMs / (float)AutoTunerNS::LOAD_RAMP_MS;
+    }
+
+    const int pwmAbs = abs(pwm);
+    int maxCut = (int)min((float)AutoTunerNS::LOAD_INJECT_PWM,
+                          (float)pwmAbs * AutoTunerNS::LOAD_INJECT_FRACTION);
+    maxCut = (int)((float)maxCut * ramp);
+    return maxCut;
+}
+
+static int applyLoadInject(int pwm, uint32_t elapsedMs) {
+    const int loadCut = computeLoadCut(pwm, elapsedMs);
+    if (loadCut <= 0) return pwm;
+
+    int applied = pwm;
+    if (pwm > 0) applied = pwm - loadCut;
+    else if (pwm < 0) applied = pwm + loadCut;
+
+    return (int)constrain((float)applied, (float)PWM_MIN, (float)PWM_MAX);
+}
 
 enum class ATState : uint8_t {
     IDLE = 0,
@@ -120,7 +160,6 @@ static int cycleCount = 0;
 static int deadbandPwm = 0;
 static uint32_t lastDeadbandStepMs = 0;
 
-static CycleMetrics metrics;
 static Precision precision = Precision::COARSE;
 static float kpStep, kiStep;
 static int stageCount = 0;
@@ -228,9 +267,27 @@ static float calculateScore() {
 // Parameter adjustment (Only Kp and Ki, Kf is fixed open-loop)
 // ============================================================
 
+static void adjustForLoadPhase() {
+    if (!metrics.hasLoadWindow()) return;
+
+    const float ssErr = metrics.ss_error();
+    if (ssErr <= 2.0f) return;
+
+    // Beban aktif tapi RPM jauh dari target → dorong Ki (utama) + Kp (sekunder)
+    float kiBoost = kiStep * (0.8f + ssErr * 0.15f);
+    if (precision == Precision::ULTRA_FINE) kiBoost *= 1.5f;
+    curKi += kiBoost;
+
+    if (ssErr > 8.0f) {
+        curKp += kpStep * 0.4f;
+    }
+
+    Serial.printf("  [LOAD] ss_err=%.1f -> Ki+=%.3f (Ki=%.3f)\n", ssErr, kiBoost, curKi);
+}
+
 static void adjustCoarse() {
     float over = metrics.overshoot_pct();
-    float err = metrics.avg_err();
+    float err = effectiveErr();
     uint32_t rt = metrics.rise_time_ms;
 
     float stepScale = 1.0f;
@@ -259,7 +316,7 @@ static void adjustCoarse() {
 
 static void adjustFine() {
     float over = metrics.overshoot_pct();
-    float err = metrics.avg_err();
+    float err = effectiveErr();
     uint32_t rt = metrics.rise_time_ms;
 
     float stepScale = 1.0f;
@@ -279,7 +336,7 @@ static void adjustFine() {
 
 static void adjustUltraFine() {
     float over = metrics.overshoot_pct();
-    float err = metrics.avg_err();
+    float err = effectiveErr();
     uint32_t rt = metrics.rise_time_ms;
 
     float stepScale = 1.0f;
@@ -309,6 +366,8 @@ static void adjustParameters() {
         case Precision::FINE:       adjustFine();     break;
         case Precision::ULTRA_FINE: adjustUltraFine(); break;
     }
+
+    adjustForLoadPhase();
 
     curKp = constrain(curKp, KP_MIN, KP_MAX);
     curKi = constrain(curKi, KI_MIN, KI_MAX);
@@ -522,13 +581,8 @@ void autoTunerTick(bool bootPressed) {
             float rpm = getEncoderVelocityRpm(tMotorIdx);
             int pwm = pidCompute(tMotorIdx, AutoTunerNS::kTargetRpm, AutoTunerNS::kPidTickMs / 1000.0f);
 
-            // Emulasi beban tanjakan di paruh kedua (window steady-state).
-            // Loop tetap melihat RPM dari PWM terpasang -> integral dipaksa recovery.
-            int applied = pwm;
-            if (elapsed >= (uint32_t)(AUTOTUNE_RUN_MS * AutoTunerNS::kSteadyStateStartFraction)) {
-                applied = (int)constrain((float)pwm - AutoTunerNS::LOAD_INJECT_PWM,
-                                         (float)PWM_MIN, (float)PWM_MAX);
-            }
+            // Emulasi beban: ramp 60%→100%, potong PWM proporsional (cap LOAD_INJECT_PWM)
+            const int applied = applyLoadInject(pwm, elapsed);
             pwmMotor(tMotorIdx, applied);
 
             // Metrics
@@ -562,8 +616,13 @@ void autoTunerTick(bool bootPressed) {
             if (now - lastOledMs >= AutoTunerNS::kQuickLogThresholdMs) {
                 lastOledMs = now;
                 char buf1[20], buf2[20];
+                const int loadCut = computeLoadCut(pwm, elapsed);
                 snprintf(buf1, sizeof(buf1), "M%d %s %d%%", tMotorIdx, precisionName(), (int)(elapsed * 100 / AUTOTUNE_RUN_MS));
-                snprintf(buf2, sizeof(buf2), "T:%.0f C:%.0f", AutoTunerNS::kTargetRpm, rpm);
+                if (loadCut > 0) {
+                    snprintf(buf2, sizeof(buf2), "T:%.0f C:%.0f -%d", AutoTunerNS::kTargetRpm, rpm, loadCut);
+                } else {
+                    snprintf(buf2, sizeof(buf2), "T:%.0f C:%.0f", AutoTunerNS::kTargetRpm, rpm);
+                }
                 oledShowStatus(buf1, buf2);
             }
         }

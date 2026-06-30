@@ -31,11 +31,13 @@ static constexpr float KF_MIN = 0.0f;
 static constexpr float KF_MAX = 10.0f;
 static constexpr float DEADBAND_MIN = 0.0f;
 static constexpr float DEADBAND_MAX = 200.0f;
+static constexpr float KG_MIN = 0.0f;
+static constexpr float KG_MAX = 2500.0f;  // gravity FF gain (bukan PWM langsung)
 
 // =====================================================================
 //  AUTOTUNE CONFIGURATION
 // =====================================================================
-constexpr float AUTOTUNE_TARGET_RPM = 50.0f;     // target velocity saat tuning (RPM)
+constexpr float AUTOTUNE_TARGET_RPM = 75.0f;     // target velocity saat tuning (RPM)
 constexpr uint32_t AUTOTUNE_RUN_MS = 10000;      // durasi test per siklus (ms)
 constexpr uint32_t AUTOTUNE_COOLDOWN_MS = 3000;  // cooldown antar siklus (ms)
 constexpr int AUTOTUNE_MAX_CYCLES = 12;           // jumlah siklus per motor

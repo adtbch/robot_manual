@@ -36,6 +36,7 @@
 #include "limit_switch.h"
 #include "relay.h"
 #include "proximity.h"
+#include "odom.h"
 
 // =====================================================================
 //  UART SETUP
@@ -43,6 +44,11 @@
 
 HardwareSerial slave1Serial(1);
 HardwareSerial slave2Serial(2);
+
+bool  gOdomValid = false;
+float gOdomX_m   = 0.0f;
+float gOdomY_m   = 0.0f;
+float gOdomW_deg = 0.0f;
 
 void setupSerial() {
     // UART1 — ke slave1
@@ -85,8 +91,38 @@ void printHelp(Print& out) {
     out.println("  prox              baca proximity");
     out.println("  gripper <reset|homing>  reset atau homing gripper");
     out.println("  status            semua status");
+    out.println("  odom [poll]       odometri slave1 (cache / poll)");
+    out.println("  odomrec           tampilkan titik terekam");
+    out.println("  odomrec clear     hapus record odom");
     out.println("  stop              stop semua");
     out.println("  help              tampilkan ini");
+}
+
+// ── Parser respons dari slave1 (bukan command ke master) ─────────
+bool parseSlave1Response(char* line) {
+    char* token = strtok(line, " ");
+    if (token == nullptr) return false;
+
+    for (char* p = token; *p; ++p) *p = tolower(*p);
+
+    if (strcmp(token, "odomtomaster") == 0) {
+        char* xStr = strtok(nullptr, " ");
+        char* yStr = strtok(nullptr, " ");
+        char* wStr = strtok(nullptr, " ");
+        if (xStr == nullptr || yStr == nullptr || wStr == nullptr) {
+            return false;
+        }
+        gOdomX_m   = atof(xStr);
+        gOdomY_m   = atof(yStr);
+        gOdomW_deg = atof(wStr);
+        gOdomValid = true;
+        odomOnSampleReceived(gOdomX_m, gOdomY_m, gOdomW_deg);
+        Serial.printf("[Slave1] odomToMaster: x=%.3fm y=%.3fm w=%.1fdeg\n",
+                      gOdomX_m, gOdomY_m, gOdomW_deg);
+        return true;
+    }
+
+    return false;
 }
 
 // ── Parser utama — output ke Print& out ──────────────────────────
@@ -264,6 +300,38 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         out.println("Semua motor STOP, servo tengah (90)");
     }
 
+    // ── ODOM (slave1) ───────────────────────────────────────────
+    else if (strcmp(token, "odom") == 0) {
+        char* sub = strtok(nullptr, " ");
+        if (sub != nullptr) {
+            for (char* p = sub; *p; ++p) *p = tolower(*p);
+        }
+        if (sub != nullptr && strcmp(sub, "poll") == 0) {
+            sendShowOdomCommand();
+            out.println("Odom poll dikirim ke slave1");
+        } else if (gOdomValid) {
+            out.printf("Odom: x=%.3fm y=%.3fm w=%.1fdeg\n",
+                       gOdomX_m, gOdomY_m, gOdomW_deg);
+        } else {
+            sendShowOdomCommand();
+            out.println("Odom: belum ada data — poll dikirim ke slave1");
+        }
+    }
+
+    // ── ODOM RECORD ─────────────────────────────────────────────
+    else if (strcmp(token, "odomrec") == 0) {
+        char* sub = strtok(nullptr, " ");
+        if (sub != nullptr) {
+            for (char* p = sub; *p; ++p) *p = tolower(*p);
+        }
+        if (sub != nullptr && strcmp(sub, "clear") == 0) {
+            odomRecordClear();
+            out.println("OdomRecord cleared");
+        } else {
+            odomRecordPrint(out);
+        }
+    }
+
     // ── HELP ────────────────────────────────────────────────────
     else if (strcmp(token, "help") == 0) {
         printHelp(out);
@@ -308,19 +376,21 @@ void serialCommandTick() {
         }
     }
 
-    // ── Slave1 (UART1) ──────────────────────────────────────────
+    // ── Slave1 (UART1) — respons telemetry, bukan command handler ─
     while (slave1Serial.available() > 0) {
         char c = slave1Serial.read();
         if (c == '\n' || c == '\r') {
             if (slave1BufIdx > 0) {
                 slave1Buf[slave1BufIdx] = '\0';
-                parseAndExecuteCommand(slave1Buf, slave1Serial);
+                if (!parseSlave1Response(slave1Buf)) {
+                    Serial.printf("[Slave1] ? %s\n", slave1Buf);
+                }
                 slave1BufIdx = 0;
             }
         } else if (slave1BufIdx < SERIAL_CMD_BUF_SIZE - 1) {
             slave1Buf[slave1BufIdx++] = c;
         } else {
-            slave1Serial.println("Error: command terlalu panjang");
+            Serial.println("[Slave1] Error: line terlalu panjang");
             slave1BufIdx = 0;
         }
     }

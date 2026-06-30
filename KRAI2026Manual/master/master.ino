@@ -29,6 +29,7 @@
 #include "relay.h"
 #include "proximity.h"
 #include "serial.h"
+#include "odom.h"
 
 // =====================================================================
 //  BOX STATE — tracking motor Y untuk kirim "box done" ke slave2
@@ -99,6 +100,7 @@ void loop() {
     espNowControlReadPacket(gLastRxPacket);
     gripperControlTick(gLastRxPacket);
     motionControlTick(gLastRxPacket);
+    odomRecordTick(gLastRxPacket);
 
     // Encoder positioning motor X/Y
     motorXPositionTick();

@@ -258,6 +258,26 @@ float getYaw() {
     return yaw;
 }
 
+float getYawError(float target_deg) {
+    return normalizeAngle(target_deg - getYaw(), -180.0f, 180.0f);
+}
+
+float getPitch() {
+    float p = ypr[1] * (180.0f / M_PI);
+    if (isnan(p) || isinf(p)) return 0.0f;
+    return p;
+}
+
+float getRoll() {
+    float r = ypr[2] * (180.0f / M_PI);
+    if (isnan(r) || isinf(r)) return 0.0f;
+    return r;
+}
+
+float getSlopeDeg() {
+    return getRoll();
+}
+
 void setYawReference(float targetYaw) {
     yawOffset = normalizeAngle(yaw + yawOffset - targetYaw, -180.0f, 180.0f);
     yaw = targetYaw;

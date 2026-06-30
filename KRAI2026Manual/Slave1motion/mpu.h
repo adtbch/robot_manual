@@ -29,6 +29,10 @@ constexpr uint8_t MPU_INTERRUPT_PIN = 46;
 bool setupMPU();
 void updateYaw();
 float getYaw();
+float getYawError(float target_deg);
+float getPitch();   // derajat — tilt samping (mount ini, bukan tanjakan)
+float getRoll();    // derajat — tanjakan maju/mundur: maju nanjak +, mundur nanjak −
+float getSlopeDeg(); // alias roll — untuk gravity FF
 void calibrateGyro();
 void calibrateGyroHot();
 void calibClearNVS();
