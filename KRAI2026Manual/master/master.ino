@@ -77,6 +77,8 @@ void setup() {
     setupSerial();
     // Init serial command handler
     setupSerialCommand();
+    // Init alliance color (BOOT button + RGB LED + NVS)
+    setupAlliance();
 
     // setHomingAll();
     Serial.println("Setup zone1: limit Y/X + motor Y lv0 + motor X enc0");
@@ -110,4 +112,10 @@ void loop() {
 
     // Arm box — auto pneumatic + motor dari proximity
     armBoxTick();
+
+    // Alliance color — BOOT button toggle
+    allianceTick();
+
+    // Flash lamp — auto-off
+    flashTick();
 }

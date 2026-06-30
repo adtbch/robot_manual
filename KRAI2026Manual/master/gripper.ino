@@ -74,7 +74,9 @@ void setHomingAll() {
 
 void setupZone1() {
     setServoHoming();
-    // WAYPOINT: ready to setup zone1
+    // gTargetX_cm = 0.0f;
+    // gTargetY_cm = 0.0f;
+    // gTargetSpeedRpm = 70;
     gripperMotorYSetLevel(0);
     motorXSetTarget(200);
 }
@@ -97,25 +99,29 @@ void gripperZone1() {
         case CLOSING:
             if (gJeda.check(300)) {
                 setServoAngle('b', 100);
-                gripperMotorYSetLevel(1);
+                // gripperMotorYSetLevel(1);
                 gGripperState = UP;
             }
             break;
 
         case UP:
-            if (motorYAtLevel(1)) {
-                // WAYPOINT: ready to setup zone1
+            // if (motorYAtLevel(1)) {
+                // gTargetX_cm = 0.0f;
+                // gTargetY_cm = 0.0f;
+                // gTargetSpeedRpm = 70;
                 gGripperState = STRAIGHTEN;
-            };
+            // };
             break;
 
         case STRAIGHTEN:
-            // Cek WAYPOINT
-            gripperReadytoStab();
-            gYawTarget = 90;
-            // WAYPOINT menuju ke arah stab
+            // if (!gMotionWaypointMode) {
+                // gripperReadytoStab();
+                // gTargetX_cm = 0.0f;
+                // gTargetY_cm = 0.0f;
+                // gTargetSpeedRpm = 70;
+            // }
+            gGripperState = READY_TO_STAB; //jangan lupa dihapus
             break;
-        
         case READY_TO_STAB:
             break;
     }

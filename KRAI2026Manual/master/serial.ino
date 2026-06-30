@@ -15,7 +15,7 @@
  *   servo1 <angle>      - Set servo 1 sudut (0-180)
  *   servo2 <angle>      - Set servo 2 sudut (0-180)
  *   servo3 <angle>      - Set servo 3 sudut (0-180)
- *   relay <on|off|t>    - Relay on / off / toggle
+ *   flash             flash lamp fire
  *   enc                 - Baca semua encoder
  *   encreset            - Reset semua encoder
  *   limit               - Baca semua limit switch
@@ -79,7 +79,7 @@ void printHelp(Print& out) {
     out.println("  motortarget <x|y> <enc>  set encoder target (alias: motorpid)");
     out.println("  motortargetstop <x|y>    stop positioning (alias: motorpidstop)");
     out.println("  servo <id> <angle> (contoh: servo d 90)");
-    out.println("  relay <on|off|t>  on/off/toggle");
+    out.println("  flash            flash lamp fire");
     out.println("  enc               baca encoder");
     out.println("  encreset          reset encoder");
     out.println("  limit             baca limit switch");
@@ -189,26 +189,10 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         }
     }
 
-    // ── RELAY ───────────────────────────────────────────────────
-    else if (strcmp(token, "relay") == 0) {
-        char* val = strtok(nullptr, " ");
-        if (val != nullptr) {
-            for (char* p = val; *p; ++p) *p = tolower(*p);
-            if (strcmp(val, "on") == 0) {
-                relayOn();
-                out.println("Relay: ON");
-            } else if (strcmp(val, "off") == 0) {
-                relayOff();
-                out.println("Relay: OFF");
-            } else if (strcmp(val, "t") == 0 || strcmp(val, "toggle") == 0) {
-                relayToggle();
-                out.printf("Relay: %s\n", relayState() ? "ON" : "OFF");
-            } else {
-                out.println("Usage: relay <on|off|t>");
-            }
-        } else {
-            out.printf("Relay sekarang: %s\n", relayState() ? "ON" : "OFF");
-        }
+    // ── FLASH ───────────────────────────────────────────────────
+    else if (strcmp(token, "flash") == 0) {
+        flashFire();
+        out.println("Flash: FIRED");
     }
 
     // ── ENC ─────────────────────────────────────────────────────
@@ -257,7 +241,6 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
     // ── STATUS ──────────────────────────────────────────────────
     else if (strcmp(token, "status") == 0) {
         out.println("=== STATUS ===");
-        out.printf("  Relay   : %s\n", relayState() ? "ON" : "OFF");
         out.printf("  Prox    : %s\n", readProximity() ? "DETECTED" : "clear");
         out.printf("  EncX    : %ld\n", getEncoderCount('x'));
         out.printf("  EncY    : %ld\n", getEncoderCount('y'));
@@ -327,7 +310,9 @@ void serialCommandTick() {
         if (c == '\n' || c == '\r') {
             if (slave1BufIdx > 0) {
                 slave1Buf[slave1BufIdx] = '\0';
-                parseAndExecuteCommand(slave1Buf, slave1Serial);
+                if (!parseSlave1Status(slave1Buf)) {
+                    parseAndExecuteCommand(slave1Buf, slave1Serial);
+                }
                 slave1BufIdx = 0;
             }
         } else if (slave1BufIdx < SERIAL_CMD_BUF_SIZE - 1) {

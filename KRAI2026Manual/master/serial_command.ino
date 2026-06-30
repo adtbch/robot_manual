@@ -118,6 +118,23 @@ bool parseSlave2Sensor(char* cmd) {
 }
 
 // =====================================================================
+//  SLAVE1 — Waypoint status
+// =====================================================================
+
+// Return true jika line sudah dihandle (jangan teruskan ke command handler).
+bool parseSlave1Status(char* line) {
+    if (strncmp(line, "WP: REACHED", 11) == 0) {
+        gMotionWaypointMode = false;
+        return true;
+    }
+    if (strncmp(line, "WP: RUNNING", 11) == 0) {
+        gMotionWaypointMode = true;
+        return true;
+    }
+    return false;
+}
+
+// =====================================================================
 //  SLAVE1 — Motion (Mecanum)
 // =====================================================================
 
@@ -127,6 +144,7 @@ void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
 
 void sendGotoCommand(int16_t x_cm, int16_t y_cm, int16_t yaw_deg, int16_t speedRpm) {
     slave1Serial.printf("goto %d %d %d %d\n", x_cm, y_cm, yaw_deg, speedRpm);
+    Serial.printf("[Master] goto: x=%dcm y=%dcm yaw=%ddeg speed=%drpm\n", x_cm, y_cm, yaw_deg, speedRpm);
 }
 
 // =====================================================================

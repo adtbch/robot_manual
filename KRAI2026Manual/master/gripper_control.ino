@@ -95,11 +95,11 @@ int8_t readInvertedAxisX(const ControlPacket &pkt) {
 }
 
 int16_t applyDeadzoneY(int16_t axis) {
-    return (abs(axis) < AXIS_DEADZONE) ? 0 : axis;
+    return (abs(axis) < 120) ? 0 : axis;
 }
 
 int8_t applyDeadzoneX(int8_t axis) {
-    return (abs(axis) < AXIS_DEADZONE) ? 0 : axis;
+    return (abs(axis) < 120) ? 0 : axis;
 }
 
 // ── Button helpers ─────────────────────────────────────────────────
@@ -231,11 +231,11 @@ void handleGripperMotors(const ControlPacket &pkt) {
 void handleArmBoxYEnc(const ControlPacket &pkt) {
     if (!(pkt.buttons & BTN_R2)) return;
 
-    const int16_t ry = readGripperStickRy(pkt);
+    const int16_t ry = pkt.ry;
     if (abs(ry) <= AXIS_DEADZONE) return;
     if (!gJedaArmBoxYEnc.check(ARMBOX_Y_ENC_INTERVAL_MS)) return;
 
-    const int dir = (ry > 0) ? +1 : -1;  // stick atas = naik (setelah negasi int16)
+    const int dir = (ry < 0) ? +1 : -1;  // stick atas = naik
     const long step = pickSpeedStep(pkt.buttons,
         MOTOR_Y_STEP_NORMAL, MOTOR_Y_STEP_SLOW, MOTOR_Y_STEP_FAST);
     long newTarget = slave2EncY() + dir * step;
@@ -246,6 +246,16 @@ void handleArmBoxYEnc(const ControlPacket &pkt) {
 
     newTarget = constrain(newTarget, MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
     sendSlave2Command("motortarget %ld", newTarget);
+}
+
+// ── R2 + L2 analog max-5 → flash lamp ────────────────────────────
+
+constexpr uint8_t TRIGGER_MAX_THRESHOLD = 250;  // 255 - 5
+
+void handleFlashTrigger(const ControlPacket &pkt) {
+    if (pkt.l2Value >= TRIGGER_MAX_THRESHOLD && pkt.r2Value >= TRIGGER_MAX_THRESHOLD) {
+        flashFire();
+    }
 }
 
 } // anonymous namespace
@@ -274,5 +284,6 @@ void gripperControlTick(const ControlPacket &pkt) {
     handleManualServoB(pkt);
     handleGripperMotors(pkt);
     handleArmBoxYEnc(pkt);
+    handleFlashTrigger(pkt);
     gPrevButtons = pkt.buttons;
 }

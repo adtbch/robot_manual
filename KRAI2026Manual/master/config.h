@@ -138,6 +138,13 @@ extern int16_t gYawTarget;
 extern bool gModeInvert;
 
 // =====================================================================
+//  SHARED STATE — AllianceColor (toggle via BOOT button, NVS-stored)
+// =====================================================================
+
+enum class AllianceColor : uint8_t { BLUE, RED };
+extern AllianceColor gAllianceColor;
+
+// =====================================================================
 //  SHARED STATE — goto target (motion teleop + forest waypoint)
 // =====================================================================
 

@@ -43,6 +43,9 @@ void setupSerial();
 void setupSerialCommand();
 void serialCommandTick();
 
+// serial_command.ino — status dari slave1
+bool parseSlave1Status(char* line);
+
 // serial_command.ino — sensor data dari slave2
 bool parseSlave2Sensor(char* cmd);
 bool slave2ProxR();

@@ -78,7 +78,7 @@ void armBoxTick() {
         case ARMBOX_WAIT:
             if (!jedaArmBoxR.check(300)) break;
             sendSlave2Command("motortarget %ld", MOTOR_Y_LEVEL_4);
-            sendSlave2Command("motor x -255");
+            armBoxFBbySpeed('r', -255);
             gArmBoxR = ARMBOX_GRAB;
             break;
 
@@ -99,7 +99,7 @@ void armBoxTick() {
         case ARMBOX_WAIT:
             if (!jedaArmBoxL.check(300)) break;
             motorYSetTarget(MOTOR_Y_LEVEL_4);
-            sendSlave2Command("motor k -255");
+            armBoxFBbySpeed('l', -255);
             gArmBoxL = ARMBOX_GRAB;
             break;
 
@@ -162,5 +162,17 @@ void armBoxFBToggle(char side) {
             readLimitSwitch(LIMIT_ARMBOX_BELAKANG),
             gMotorKRunSign);
         sendSlave2Command("motor k %ld", (long)sign * MOTOR_SPEED);
+    }
+}
+void armBoxFBbySpeed(char side, int8_t speed) {
+    if (side == 'r') {
+        const int8_t sign = pickMotorRunSign(slave2LimitDepan(), slave2LimitBelakang(), gMotorXRunSign);
+        sendSlave2Command("motor x %ld", (long)sign * speed);
+    } else if (side == 'l') {
+        const int8_t sign = pickMotorRunSign(
+            readLimitSwitch(LIMIT_ARMBOX_DEPAN),
+            readLimitSwitch(LIMIT_ARMBOX_BELAKANG),
+            gMotorKRunSign);
+        sendSlave2Command("motor k %ld", (long)sign * speed);
     }
 }
