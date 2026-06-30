@@ -223,11 +223,10 @@ void handleManualServoB(const ControlPacket &pkt) {
     setServoBAngle(gServoBAngle + dir * step);
 }
 
-
 void handleGripperMotors(const ControlPacket &pkt) { 
     if (isR2Held(pkt.buttons)) {
-        driveMotorY(applyDeadzoneY(readGripperStickRy(pkt)), pkt.buttons);
-        driveMotorX(applyDeadzoneX(pkt.rx), pkt.buttons);
+        driveMotorY(applyDeadzoneY(readInvertedAxisY(pkt)), pkt.buttons);
+        driveMotorX(applyDeadzoneX(readInvertedAxisX(pkt)), pkt.buttons);
     }
 }
 
@@ -236,17 +235,11 @@ void handleGripperMotors(const ControlPacket &pkt) {
 void handleArmBoxYEnc(const ControlPacket &pkt) {
     if (!(pkt.buttons & BTN_R2)) return;
 
-    int16_t ly = 0;
-    if (gInputMode == MODE_DPAD) {
-        ly = -(int16_t)pkt.ly;
-    } else {
-        if (pkt.buttons & BTN_UP)   ly =  AXIS_MAX;
-        if (pkt.buttons & BTN_DOWN) ly = -AXIS_MAX;
-    }
-    if (abs(ly) <= AXIS_DEADZONE) return;
+    const int16_t ry = pkt.ry;
+    if (abs(ry) <= AXIS_DEADZONE) return;
     if (!gJedaArmBoxYEnc.check(ARMBOX_Y_ENC_INTERVAL_MS)) return;
 
-    const int dir = (ly > 0) ? +1 : -1;  // stick atas = naik
+    const int dir = (ry < 0) ? +1 : -1;  // stick atas = naik
     const long step = pickSpeedStep(pkt.buttons,
         MOTOR_Y_STEP_NORMAL, MOTOR_Y_STEP_SLOW, MOTOR_Y_STEP_FAST);
     long newTarget = slave2EncY() + dir * step;
