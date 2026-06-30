@@ -127,6 +127,9 @@ void loop() {
     // Arm box — auto pneumatic + motor dari proximity
     armBoxTick();
 
+    // Motor K limit switch safety
+    motorKLimitTick();
+
     // Alliance color — BOOT button toggle
     allianceTick();
 

@@ -93,4 +93,10 @@ bool motorYIsActive();
 void motorYPositionTick();
 bool motorYAtLevel(uint8_t level);
 
+// =====================================================================
+//  MOTOR K LIMIT — safety check via slave2
+// =====================================================================
+void motorKSetDirection(int direction);
+void motorKLimitTick();
+
 #endif // MOTOR_H

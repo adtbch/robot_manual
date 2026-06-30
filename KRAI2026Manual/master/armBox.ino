@@ -52,6 +52,7 @@ void armBoxFBToggle(char side) {
             readLimitSwitch(LIMIT_ARMBOX_BELAKANG),
             gMotorKRunSign);
         sendSlave2Command("motor k %ld", (long)sign * 255);
+        motorKSetDirection(sign);
     }
 }
 
@@ -65,5 +66,6 @@ void armBoxFBbySpeed(char side, int8_t speed) {
             readLimitSwitch(LIMIT_ARMBOX_BELAKANG),
             gMotorKRunSign);
         sendSlave2Command("motor k %ld", (long)sign * speed);
+        motorKSetDirection(sign);
     }
 }

@@ -12,6 +12,8 @@
 
 #include "motor.h"
 #include "encoder.h"
+#include "limit_switch.h"
+#include "serial.h"
 #include <Preferences.h>
 
 // =====================================================================
@@ -255,4 +257,26 @@ bool motorYAtLevel(uint8_t level) {
     const long current = getEncoderCount('y');
     const long target = gMotorYLevelEnc[level];
     return abs(current - target) <= MOTOR_Y_POSITION_TOLERANCE;
+}
+
+// =====================================================================
+//  MOTOR K LIMIT — safety: stop via slave2 kalau kena limit switch
+// =====================================================================
+
+namespace {
+int gMotorKDirection = 0;  // +1=maju, -1=mundur, 0=stop
+} // anonymous namespace
+
+void motorKSetDirection(int direction) {
+    gMotorKDirection = direction;
+}
+
+void motorKLimitTick() {
+    if (gMotorKDirection < 0 && readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
+        sendSlave2Command("motor k 0");
+        gMotorKDirection = 0;
+    } else if (gMotorKDirection > 0 && readLimitSwitch(LIMIT_ARMBOX_BELAKANG)) {
+        sendSlave2Command("motor k 0");
+        gMotorKDirection = 0;
+    }
 }
