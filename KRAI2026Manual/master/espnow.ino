@@ -197,6 +197,9 @@ bool fetchPacket(ControlPacket &outPacket) {
         } else {
             gEspNow.stats.rejectedSequence++;
         }
+
+        // Selalu forward connected — stale connected bikin linkUp salah
+        outPacket.connected = gEspNow.latestPacket.connected;
         gEspNow.packetAvailable = false;
     }
     portEXIT_CRITICAL(&espNowPacketMux);

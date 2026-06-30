@@ -78,8 +78,10 @@ void setup() {
     setupSerial();
     // Init serial command handler
     setupSerialCommand();
+    // Init alliance color (BOOT button + RGB LED + NVS)
+    setupAlliance();
 
-    setHomingAll();
+    // setHomingAll();
     Serial.println("Setup zone1: limit Y/X + motor Y lv0 + motor X enc0");
 }
 
@@ -100,12 +102,21 @@ void loop() {
     espNowControlReadPacket(gLastRxPacket);
     gripperControlTick(gLastRxPacket);
     motionControlTick(gLastRxPacket);
+    armBoxControlTick(gLastRxPacket);
     odomRecordTick(gLastRxPacket);
-
     // Encoder positioning motor X/Y
     motorXPositionTick();
     motorYPositionTick();
 
     // Box done — cek motor Y sampai, kirim ke slave2
     boxCheckDone();
+
+    // Arm box — auto pneumatic + motor dari proximity
+    armBoxTick();
+
+    // Alliance color — BOOT button toggle
+    allianceTick();
+
+    // Flash lamp — auto-off
+    flashTick();
 }

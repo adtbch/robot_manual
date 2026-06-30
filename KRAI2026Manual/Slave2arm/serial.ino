@@ -59,10 +59,14 @@ uint8_t masterBufIdx = 0;
 // ── Help ─────────────────────────────────────────────────────────
 void printHelp(Print& out) {
     out.println("--- Daftar Command ---");
-    out.println("  motor <id> <pwm>   (contoh: motor 1 500)");
+    out.println("  motor <id> <pwm>   (x=run smp limit, k=run trus, y=pwm)");
     out.println("  motorstop          stop semua motor");
-    out.println("  pne <id> <on|off|t>(contoh: pne 2 on)");
+    out.println("  motorrunstop       stop motor X/K run");
+    out.println("  motortarget <enc>  set encoder target motor Y (alias: motorpid)");
+    out.println("  motortargetstop    stop motor Y (alias: motorpidstop)");
+    out.println("  pne <r|l> <on|off|t>(contoh: pne r on)");
     out.println("  pneall             semua pneumatic OFF");
+    out.println("  prox               baca proximity R/L");
     out.println("  enc                baca encoder");
     out.println("  encreset           reset encoder");
     out.println("  limit              baca limit switch");
@@ -86,10 +90,22 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         char* val = strtok(nullptr, " ");
         if (id != nullptr && val != nullptr) {
             int pwm = constrain(atoi(val), -PWM_MAX, PWM_MAX);
-            pwmMotor(id[0], pwm);
-            out.printf("Motor '%c' PWM: %d\n", id[0], pwm);
+            char motorId = id[0];
+            // Motor X/K → continuous run (stop di limit / dari master)
+            if (motorId == 'x' || motorId == 'k') {
+                if (pwm == 0) {
+                    motorRunStop(motorId);
+                    out.printf("Motor '%c' STOP\n", motorId);
+                } else {
+                    motorRunStart(motorId, pwm);
+                    out.printf("Motor '%c' RUN: %d\n", motorId, pwm);
+                }
+            } else {
+                pwmMotor(motorId, pwm);
+                out.printf("Motor '%c' PWM: %d\n", motorId, pwm);
+            }
         } else {
-            out.println("Usage: motor <id> <pwm>  (contoh: motor 1 500)");
+            out.println("Usage: motor <id> <pwm>  (x/k=run smp limit, y=pwm)");
         }
         return;
     }
@@ -98,6 +114,32 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
     if (strcmp(token, "motorstop") == 0) {
         motorStopAll();
         out.println("Semua motor STOP");
+        return;
+    }
+
+    // ── MOTOR RUN STOP (x/k) ────────────────────────────────────
+    if (strcmp(token, "motorrunstop") == 0) {
+        motorRunStopAll();
+        out.println("Motor X/K STOP");
+        return;
+    }
+
+    // ── MOTOR TARGET (bang-bang encoder Y) ──────────────────────
+    if (strcmp(token, "motortarget") == 0 || strcmp(token, "motorpid") == 0) {
+        char* val = strtok(nullptr, " ");
+        if (val != nullptr) {
+            long target = atol(val);
+            motorYSetTarget(target);
+            out.printf("Motor Y target: %ld\n", target);
+        } else {
+            out.println("Usage: motortarget <encoder>  (contoh: motortarget 500)");
+        }
+        return;
+    }
+
+    if (strcmp(token, "motortargetstop") == 0 || strcmp(token, "motorpidstop") == 0) {
+        motorYStop();
+        out.println("Motor Y STOP");
         return;
     }
 
@@ -118,10 +160,10 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
                 out.printf("Pneumatic '%c': %s\n", id[0],
                            pneumaticState(id[0]) ? "ON" : "OFF");
             } else {
-                out.println("Usage: pne <id> <on|off|t>  (contoh: pne 2 on)");
+                out.println("Usage: pne <r|l> <on|off|t>  (contoh: pne r on)");
             }
         } else {
-            out.println("Usage: pne <id> <on|off|t>  (contoh: pne 2 on)");
+            out.println("Usage: pne <r|l> <on|off|t>  (contoh: pne r on)");
         }
         return;
     }
@@ -152,40 +194,34 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
 
     // ── LIMIT ───────────────────────────────────────────────────
     if (strcmp(token, "limit") == 0) {
-        for (size_t i = 0; i < LIMIT_COUNT; i++) {
-            out.printf("  Limit%zu: %s\n", i + 1,
-                       readLimitSwitch(i) ? "TRIGGERED" : "clear");
-        }
+        out.printf("  ArmBox_Depan   : %s\n", readLimitSwitch(LIMIT_ARMBOX_DEPAN)    ? "TRIGGERED" : "clear");
+        out.printf("  ArmBox_Belakang: %s\n", readLimitSwitch(LIMIT_ARMBOX_BELAKANG) ? "TRIGGERED" : "clear");
+        out.printf("  ArmBox_Turun   : %s\n", readLimitSwitch(LIMIT_ARMBOX_TURUN)    ? "TRIGGERED" : "clear");
         return;
     }
 
     // ── PROX ────────────────────────────────────────────────────
     if (strcmp(token, "prox") == 0) {
-        for (size_t i = 0; i < PROXIMITY_COUNT; i++) {
-            out.printf("  Prox%zu: %s\n", i + 1,
-                       readProximity(i) ? "DETECTED" : "clear");
-        }
+        out.printf("  ProxR: %s\n", readProximity('r') ? "DETECTED" : "clear");
+        out.printf("  ProxL: %s\n", readProximity('l') ? "DETECTED" : "clear");
         return;
     }
 
     // ── STATUS ──────────────────────────────────────────────────
     if (strcmp(token, "status") == 0) {
         out.println("=== STATUS ===");
-        for (size_t i = 0; i < ENCODER_COUNT; i++) {
-            out.printf("  Enc%zu    : %ld\n", i + 1, getEncoderCount(i));
-        }
-        for (size_t i = 0; i < LIMIT_COUNT; i++) {
-            out.printf("  Lim%zu    : %s\n", i + 1,
-                       readLimitSwitch(i) ? "TRIGGERED" : "clear");
-        }
-        for (size_t i = 0; i < PROXIMITY_COUNT; i++) {
-            out.printf("  Prox%zu   : %s\n", i + 1,
-                       readProximity(i) ? "DETECTED" : "clear");
-        }
-        for (size_t i = 0; i < PNEUMATIC_COUNT; i++) {
-            out.printf("  Pne%zu    : %s\n", i + 1,
-                       pneumaticState(i) ? "ON" : "OFF");
-        }
+        out.printf("  EncXKanan  : %ld\n", getEncoderCount('x'));
+        out.printf("  EncYKanan  : %ld (target: %ld, %s)\n",
+                   getEncoderCount('y'), motorYGetTarget(),
+                   motorYIsActive() ? "ACTIVE" : "idle");
+        out.printf("  EncXKiri   : %ld\n", getEncoderCount('k'));
+        out.printf("  ArmBox_Depan   : %s\n", readLimitSwitch(LIMIT_ARMBOX_DEPAN)    ? "TRIGGERED" : "clear");
+        out.printf("  ArmBox_Belakang: %s\n", readLimitSwitch(LIMIT_ARMBOX_BELAKANG) ? "TRIGGERED" : "clear");
+        out.printf("  ArmBox_Turun   : %s\n", readLimitSwitch(LIMIT_ARMBOX_TURUN)    ? "TRIGGERED" : "clear");
+        out.printf("  ProxR     : %s\n", readProximity('r') ? "DETECTED" : "clear");
+        out.printf("  ProxL     : %s\n", readProximity('l') ? "DETECTED" : "clear");
+        out.printf("  PneR      : %s\n", pneumaticState('r') ? "ON" : "OFF");
+        out.printf("  PneL      : %s\n", pneumaticState('l') ? "ON" : "OFF");
         out.println("==============");
         return;
     }

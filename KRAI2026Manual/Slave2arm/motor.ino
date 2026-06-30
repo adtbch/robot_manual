@@ -8,6 +8,8 @@
  */
 
 #include "motor.h"
+#include "encoder.h"
+#include "limit_switch.h"
 
 // =====================================================================
 //  STATE
@@ -16,13 +18,28 @@
 namespace {
 
 MotorConfig motors[MOTOR_COUNT] = {
-    {'1', MOTOR1_PIN_1, MOTOR1_PIN_2},
-    {'2', MOTOR2_PIN_1, MOTOR2_PIN_2},
-    {'3', MOTOR3_PIN_1, MOTOR3_PIN_2},
-    {'4', MOTOR4_PIN_1, MOTOR4_PIN_2},
+    {'x', MOTOR_XARM_KANAN_PIN1, MOTOR_XARM_KANAN_PIN2},  // arm kanan X
+    {'y', MOTOR_YARM_KANAN_PIN1, MOTOR_YARM_KANAN_PIN2},  // arm kanan Y
+    {'k', MOTOR_XARM_KIRI_PIN1,  MOTOR_XARM_KIRI_PIN2},   // arm kiri X
+    // ponytail: 4th motor deadcode dulu
 };
 
-// Cari index berdasarkan id. Return -1 jika tidak ditemukan.
+struct MotorTarget {
+    bool active = false;
+    long target = 0;
+};
+
+MotorTarget gMotorY;
+
+// Motor X/K — continuous run
+struct MotorRun {
+    bool active = false;
+    int  pwm    = 0;
+};
+
+MotorRun gMotorXRun;
+MotorRun gMotorKRun;
+
 int findMotorIndex(char id) {
     for (size_t i = 0; i < MOTOR_COUNT; i++) {
         if (motors[i].id == id) return (int)i;
@@ -73,5 +90,109 @@ void pwmMotor(char motorId, int pwmValue) {
 void motorStopAll() {
     for (size_t i = 0; i < MOTOR_COUNT; i++) {
         pwmMotor(motors[i].id, 0);
+    }
+    gMotorY.active = false;
+    gMotorXRun.active = false;
+    gMotorKRun.active = false;
+}
+
+// =====================================================================
+//  MOTOR Y — encoder positioning (bang-bang)
+// =====================================================================
+
+void motorYSetTarget(long targetEncoder) {
+    gMotorY.target = constrain(targetEncoder, MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
+    gMotorY.active = true;
+}
+
+void motorYAdjustTarget(long deltaPulse) {
+    if (!gMotorY.active) {
+        gMotorY.target = getEncoderCount('y');
+        gMotorY.active = true;
+    }
+    gMotorY.target = constrain(gMotorY.target + deltaPulse, MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
+}
+
+long motorYGetTarget() {
+    return gMotorY.target;
+}
+
+void motorYStop() {
+    gMotorY.active = false;
+    pwmMotor('y', 0);
+}
+
+bool motorYIsActive() {
+    return gMotorY.active;
+}
+
+void motorYPositionTick() {
+    if (!gMotorY.active) return;
+
+    const long current = getEncoderCount('y');
+    const long error = gMotorY.target - current;
+
+    if (abs(error) <= MOTOR_Y_TOLERANCE) {
+        pwmMotor('y', 0);
+        return;
+    }
+
+    if (error > 0) {
+        pwmMotor('y', MOTOR_Y_MOVE_PWM);
+    } else {
+        pwmMotor('y', -MOTOR_Y_MOVE_PWM);
+    }
+}
+
+// =====================================================================
+//  MOTOR X — continuous run with limit switch
+// =====================================================================
+
+void motorRunStart(char id, int pwm) {
+    if (id == 'x') {
+        gMotorXRun.active = true;
+        gMotorXRun.pwm = constrain(pwm, PWM_MIN, PWM_MAX);
+    } else if (id == 'k') {
+        gMotorKRun.active = true;
+        gMotorKRun.pwm = constrain(pwm, PWM_MIN, PWM_MAX);
+    }
+}
+
+void motorRunStop(char id) {
+    if (id == 'x') {
+        gMotorXRun.active = false;
+        pwmMotor('x', 0);
+    } else if (id == 'k') {
+        gMotorKRun.active = false;
+        pwmMotor('k', 0);
+    }
+}
+
+void motorRunStopAll() {
+    motorRunStop('x');
+    motorRunStop('k');
+}
+
+bool motorRunIsActive(char id) {
+    if (id == 'x') return gMotorXRun.active;
+    if (id == 'k') return gMotorKRun.active;
+    return false;
+}
+
+void motorRunTick() {
+    // Motor X — limit switch lokal (cek sesuai arah gerak)
+    if (gMotorXRun.active) {
+        if (gMotorXRun.pwm > 0 && readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
+            motorRunStop('x');
+        } else if (gMotorXRun.pwm < 0 && readLimitSwitch(LIMIT_ARMBOX_BELAKANG)) {
+            motorRunStop('x');
+        } else {
+            pwmMotor('x', gMotorXRun.pwm);
+        }
+    }
+
+    // Motor K — jalan terus (master kirim motor k 0 utk stop)
+    if (gMotorKRun.active) {
+        pwmMotor('k', gMotorKRun.pwm);
     }
 }

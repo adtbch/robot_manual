@@ -34,7 +34,7 @@ constexpr uint8_t espNowAllowedTransmitterApMac[6]  = {0x94, 0xA9, 0x90, 0xD3, 0
 
 constexpr uint8_t  espNowChannel          = 1;
 constexpr uint16_t ESPNOW_PACKET_MAGIC    = 0xA5B4;
-constexpr unsigned long espNowLinkAliveMs = 2000;
+constexpr unsigned long espNowLinkAliveMs = 500;  // ponytail: 2000→500, connected forward sudah instan
 constexpr unsigned long espNowStatsIntervalMs = 1000;
 
 // =====================================================================

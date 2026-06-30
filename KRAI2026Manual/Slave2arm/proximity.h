@@ -15,8 +15,8 @@
 // =====================================================================
 //  PIN PROXIMITY — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t PROXIMITY_1_PIN = 15;
-constexpr uint8_t PROXIMITY_2_PIN = 16;
+constexpr uint8_t PROXIMITY_R_PIN = 15;
+constexpr uint8_t PROXIMITY_L_PIN = 16;
 
 // =====================================================================
 //  JUMLAH PROXIMITY
@@ -27,6 +27,6 @@ constexpr size_t PROXIMITY_COUNT = 2;
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupProximity();
-bool readProximity(char index);
+bool readProximity(char index);  // 'r' atau 'l'
 
 #endif // PROXIMITY_H

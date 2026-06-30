@@ -56,6 +56,12 @@ void setup() {
 // =====================================================================
 
 void loop() {
-    // Serial command handler (USB Serial Monitor)
+    // Serial command handler
     serialCommandTick();
+
+    // Motor X/K — continuous run with limit switch
+    motorRunTick();
+
+    // Motor Y — encoder positioning
+    motorYPositionTick();
 }

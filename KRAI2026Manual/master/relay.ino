@@ -1,7 +1,8 @@
 /*
  * =====================================================================
  * FILE    : relay.ino
- * PERAN   : Control relay via digital output.
+ * PERAN   : Flash lamp — HIGH sebentar, LOW lagi.
+ *           Triggered via flashFire(), auto-off via flashTick().
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -10,13 +11,18 @@
 #include "relay.h"
 
 // =====================================================================
+//  CONFIG
+// =====================================================================
+
+constexpr uint32_t FLASH_DURATION_MS = 50;
+
+// =====================================================================
 //  STATE
 // =====================================================================
 
 namespace {
-
-bool relayActive = false;
-
+bool     gFlashOn = false;
+uint32_t gFlashStartMs = 0;
 } // anonymous namespace
 
 // =====================================================================
@@ -24,32 +30,25 @@ bool relayActive = false;
 // =====================================================================
 
 void setupRelay() {
-    pinMode(RELAY_1_PIN, OUTPUT);
-    digitalWrite(RELAY_1_PIN, LOW);  // default OFF
+    pinMode(FLASH_PIN, OUTPUT);
+    digitalWrite(FLASH_PIN, LOW);
 }
 
 // =====================================================================
 //  CONTROL
 // =====================================================================
 
-void relayOn() {
-    digitalWrite(RELAY_1_PIN, HIGH);
-    relayActive = true;
+void flashFire() {
+    if (gFlashOn) return;  // sudah nyala, skip
+    digitalWrite(FLASH_PIN, HIGH);
+    gFlashOn = true;
+    gFlashStartMs = millis();
 }
 
-void relayOff() {
-    digitalWrite(RELAY_1_PIN, LOW);
-    relayActive = false;
-}
-
-void relayToggle() {
-    if (relayActive) {
-        relayOff();
-    } else {
-        relayOn();
+void flashTick() {
+    if (!gFlashOn) return;
+    if (millis() - gFlashStartMs >= FLASH_DURATION_MS) {
+        digitalWrite(FLASH_PIN, LOW);
+        gFlashOn = false;
     }
-}
-
-bool relayState() {
-    return relayActive;
 }

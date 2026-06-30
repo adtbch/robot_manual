@@ -25,26 +25,26 @@ struct MotorConfig {
 // =====================================================================
 //  PIN MOTOR — berdasarkan schematic KRAI 2026
 // =====================================================================
-// Motor1
-constexpr uint8_t MOTOR1_PIN_1 = 4;
-constexpr uint8_t MOTOR1_PIN_2 = 7;
+// MotorXArmKanan (axis X arm kanan)
+constexpr uint8_t MOTOR_XARM_KANAN_PIN1 = 4;
+constexpr uint8_t MOTOR_XARM_KANAN_PIN2 = 7;
 
-// Motor2
-constexpr uint8_t MOTOR2_PIN_1 = 6;
-constexpr uint8_t MOTOR2_PIN_2 = 5;
+// MotorYArmKanan (axis Y arm kanan)
+constexpr uint8_t MOTOR_YARM_KANAN_PIN1 = 6;
+constexpr uint8_t MOTOR_YARM_KANAN_PIN2 = 5;
 
-// Motor3
-constexpr uint8_t MOTOR3_PIN_1 = 17;
-constexpr uint8_t MOTOR3_PIN_2 = 18;
+// MotorXArmKiri (axis X arm kiri)
+constexpr uint8_t MOTOR_XARM_KIRI_PIN1 = 17;
+constexpr uint8_t MOTOR_XARM_KIRI_PIN2 = 18;
 
-// Motor4
-constexpr uint8_t MOTOR4_PIN_1 = 8;
-constexpr uint8_t MOTOR4_PIN_2 = 3;
+// Motor4 — ponytail: deadcode, belum dipakai
+// constexpr uint8_t MOTOR4_UNUSED_PIN1 = 8;
+// constexpr uint8_t MOTOR4_UNUSED_PIN2 = 3;
 
 // =====================================================================
 //  JUMLAH MOTOR
 // =====================================================================
-constexpr size_t MOTOR_COUNT = 4;
+constexpr size_t MOTOR_COUNT = 3;  // ponytail: 4th motor deadcode dulu
 
 // =====================================================================
 //  PWM CONFIGURATION
@@ -55,10 +55,38 @@ constexpr int PWM_FREQUENCY  = 20000;   // Hz
 constexpr int PWM_RESOLUTION = 10;      // bit (2^10 = 1024)
 
 // =====================================================================
+//  MOTOR Y — encoder position (bang-bang, tanpa PID)
+// =====================================================================
+constexpr int  MOTOR_Y_MOVE_PWM = 400;
+constexpr long MOTOR_Y_ENC_MIN  = 0;
+constexpr long MOTOR_Y_ENC_MAX  = 5000;
+constexpr long MOTOR_Y_TOLERANCE = 5;
+
+// =====================================================================
+//  MOTOR X/K — continuous run with limit switch stop
+// =====================================================================
+constexpr int MOTOR_XK_MOVE_PWM = 400;
+
+// =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void SetupMotors();
 void pwmMotor(char motorId, int pwmValue);
 void motorStopAll();
+
+// Motor Y — encoder positioning
+void motorYSetTarget(long targetEncoder);
+void motorYAdjustTarget(long deltaPulse);
+long motorYGetTarget();
+void motorYStop();
+bool motorYIsActive();
+void motorYPositionTick();
+
+// Motor X — continuous run with limit switch
+void motorRunStart(char id, int pwm);
+void motorRunStop(char id);
+void motorRunStopAll();
+bool motorRunIsActive(char id);
+void motorRunTick();
 
 #endif // MOTOR_H

@@ -4,14 +4,15 @@
  * PERAN   : Mapping tombol controller → aksi gripper + motor X/Y.
  *
  * BUTTON MAPPING:
- *   Segitiga      → masuk mode siap stab (READY_TO_STAB)
+ *   R2 hold       → masuk mode gripper jog (motor X/Y manual)
+ *   Segitiga hold (READY_TO_STAB) → servo B manual
  *   Segitiga + L2 → setServoHoming + motor Y ke level 0
  *
  * INPUT (berlawanan motion control — lihat motion_control.ino):
  *   Motor Y (tanpa Segitiga)     → jog encoder step (manual)
- *   Motor X (tahan Segitiga)     → jog encoder step
+ *   Motor X (tahan R2)          → jog encoder step
  *   Level Y (0–5)                → gripperMotorYSetLevel() / auto gripper
- *   Servo B (READY_TO_STAB + R2 hold) → axis vertikal
+ *   Servo B (READY_TO_STAB + Segitiga hold) → axis vertikal
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -48,6 +49,10 @@ constexpr int ARM_STEP_SLOW   = 5;
 constexpr int ARM_STEP_NORMAL = 10;
 constexpr int ARM_STEP_FAST   = 20;
 
+constexpr uint32_t ARMBOX_Y_ENC_INTERVAL_MS = 100;
+constexpr long ARMBOX_Y_ENC_MIN = 0;
+constexpr long ARMBOX_Y_ENC_MAX = 5000;
+
 // =====================================================================
 //  STATE
 // =====================================================================
@@ -59,15 +64,24 @@ namespace {
 uint32_t gPrevButtons = 0;
 int gServoBAngle = 70;
 Jeda gJedaMotorYStep;
-Jeda gJedaMotorYLevel;  // ponytail: untuk driveMotorYByLevel (belum dipakai)
+Jeda gJedaMotorYLevel;
 Jeda gJedaMotorXStep;
+Jeda gJedaArmBoxYEnc;
 
 // ── Input helpers (inverted vs motion_control.ino) ─────────────────
 // ly: int16_t + negasi — aman untuk ly=-128 (-(-128) = +128)
 // lx: int8_t cukup (tidak di-negate)
 
+int16_t readGripperStickLy(const ControlPacket &pkt) {
+    return -(int16_t)pkt.ly;
+}
+
+int16_t readGripperStickRy(const ControlPacket &pkt) {
+    return -(int16_t)pkt.ry;
+}
+
 int16_t readInvertedAxisY(const ControlPacket &pkt) {
-    if (gInputMode == MODE_DPAD) return -(int16_t)pkt.ly;
+    if (gInputMode == MODE_DPAD) return readGripperStickLy(pkt);
     if (pkt.buttons & BTN_UP)    return AXIS_MAX;
     if (pkt.buttons & BTN_DOWN)  return -AXIS_MAX;
     return 0;
@@ -81,11 +95,11 @@ int8_t readInvertedAxisX(const ControlPacket &pkt) {
 }
 
 int16_t applyDeadzoneY(int16_t axis) {
-    return (abs(axis) < AXIS_DEADZONE) ? 0 : axis;
+    return (abs(axis) < 120) ? 0 : axis;
 }
 
 int8_t applyDeadzoneX(int8_t axis) {
-    return (abs(axis) < AXIS_DEADZONE) ? 0 : axis;
+    return (abs(axis) < 120) ? 0 : axis;
 }
 
 // ── Button helpers ─────────────────────────────────────────────────
@@ -94,8 +108,8 @@ bool isPressed(uint32_t buttons, uint32_t mask) {
     return (buttons & mask) && !(gPrevButtons & mask);
 }
 
-bool isTriangleHeld(uint32_t buttons) {
-    return (buttons & BTN_TRIANGLE) && !(buttons & BTN_L2);
+bool isR2Held(uint32_t buttons) {
+    return (buttons & BTN_R2) && !(buttons & BTN_L2);
 }
 
 bool isComboEdge(uint32_t now, uint32_t prev, uint32_t a, uint32_t b) {
@@ -176,7 +190,7 @@ void driveMotorX(int8_t lx, uint32_t buttons) {
 
 int servoBMoveDir(const ControlPacket &pkt) {
     if (gInputMode == MODE_DPAD) {
-        const int16_t ly = -(int16_t)pkt.ly;
+        const int16_t ly = readGripperStickLy(pkt);
         if (ly >  AXIS_DEADZONE) return +1;
         if (ly < -AXIS_DEADZONE) return -1;
         return 0;
@@ -196,7 +210,7 @@ void handleGripperButtons(const ControlPacket &pkt) {
 }
 
 void handleManualServoB(const ControlPacket &pkt) {
-    if (gGripperState != READY_TO_STAB || !(pkt.buttons & BTN_R2)) return;
+    if (gGripperState != READY_TO_STAB || !(pkt.buttons & BTN_TRIANGLE)) return;
 
     const int dir = servoBMoveDir(pkt);
     if (dir == 0) return;
@@ -206,9 +220,41 @@ void handleManualServoB(const ControlPacket &pkt) {
 }
 
 void handleGripperMotors(const ControlPacket &pkt) { 
-    if (isTriangleHeld(pkt.buttons)) {
+    if (isR2Held(pkt.buttons)) {
         driveMotorY(applyDeadzoneY(readInvertedAxisY(pkt)), pkt.buttons);
         driveMotorX(applyDeadzoneX(readInvertedAxisX(pkt)), pkt.buttons);
+    }
+}
+
+// ── R2 hold + analog kanan → armbox motor Y jog manual (slave2) ──
+
+void handleArmBoxYEnc(const ControlPacket &pkt) {
+    if (!(pkt.buttons & BTN_R2)) return;
+
+    const int16_t ry = pkt.ry;
+    if (abs(ry) <= AXIS_DEADZONE) return;
+    if (!gJedaArmBoxYEnc.check(ARMBOX_Y_ENC_INTERVAL_MS)) return;
+
+    const int dir = (ry < 0) ? +1 : -1;  // stick atas = naik
+    const long step = pickSpeedStep(pkt.buttons,
+        MOTOR_Y_STEP_NORMAL, MOTOR_Y_STEP_SLOW, MOTOR_Y_STEP_FAST);
+    long newTarget = slave2EncY() + dir * step;
+
+    // limit switch protection — slave2arm gak punya
+    if (newTarget <= MOTOR_Y_ENC_MIN && slave2LimitTurun()) return;
+    if (newTarget >= MOTOR_Y_ENC_MAX) return;
+
+    newTarget = constrain(newTarget, MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
+    sendSlave2Command("motortarget %ld", newTarget);
+}
+
+// ── R2 + L2 analog max-5 → flash lamp ────────────────────────────
+
+constexpr uint8_t TRIGGER_MAX_THRESHOLD = 250;  // 255 - 5
+
+void handleFlashTrigger(const ControlPacket &pkt) {
+    if (pkt.l2Value >= TRIGGER_MAX_THRESHOLD && pkt.r2Value >= TRIGGER_MAX_THRESHOLD) {
+        flashFire();
     }
 }
 
@@ -237,5 +283,7 @@ void gripperControlTick(const ControlPacket &pkt) {
     handleGripperButtons(pkt);
     handleManualServoB(pkt);
     handleGripperMotors(pkt);
+    handleArmBoxYEnc(pkt);
+    handleFlashTrigger(pkt);
     gPrevButtons = pkt.buttons;
 }

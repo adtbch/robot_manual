@@ -15,9 +15,14 @@
 
 namespace {
 
-constexpr uint8_t proximityPins[PROXIMITY_COUNT] = {
-    PROXIMITY_1_PIN,
-    PROXIMITY_2_PIN
+struct ProximityConfig {
+    char id;
+    uint8_t pin;
+};
+
+constexpr ProximityConfig proximitySensors[PROXIMITY_COUNT] = {
+    {'r', PROXIMITY_R_PIN},
+    {'l', PROXIMITY_L_PIN},
 };
 
 } // anonymous namespace
@@ -28,7 +33,7 @@ constexpr uint8_t proximityPins[PROXIMITY_COUNT] = {
 
 void setupProximity() {
     for (size_t i = 0; i < PROXIMITY_COUNT; i++) {
-        pinMode(proximityPins[i], INPUT_PULLUP);
+        pinMode(proximitySensors[i].pin, INPUT_PULLUP);
     }
 }
 
@@ -37,8 +42,10 @@ void setupProximity() {
 // =====================================================================
 
 bool readProximity(char index) {
-    if (index >= PROXIMITY_COUNT) {
-        return false;
+    for (size_t i = 0; i < PROXIMITY_COUNT; i++) {
+        if (proximitySensors[i].id == index) {
+            return (digitalRead(proximitySensors[i].pin) == LOW);  // active LOW
+        }
     }
-    return (digitalRead(proximityPins[index]) == LOW);  // active LOW
+    return false;
 }

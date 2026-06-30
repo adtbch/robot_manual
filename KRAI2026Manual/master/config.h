@@ -138,6 +138,23 @@ extern int16_t gYawTarget;
 extern bool gModeInvert;
 
 // =====================================================================
+//  SHARED STATE — AllianceColor (toggle via BOOT button, NVS-stored)
+// =====================================================================
+
+enum class AllianceColor : uint8_t { BLUE, RED };
+extern AllianceColor gAllianceColor;
+
+// =====================================================================
+//  SHARED STATE — goto target (motion teleop + forest waypoint)
+// =====================================================================
+
+extern float   gTargetX_cm;
+extern float   gTargetY_cm;
+extern int16_t gTargetSpeedRpm;
+extern bool    gMotionWaypointMode;  // true = forest set target, stick diblock
+
+
+// =====================================================================
 //  SHARED STATE — odometri dari slave1 (UART1 response)
 // =====================================================================
 

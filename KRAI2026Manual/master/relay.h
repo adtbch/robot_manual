@@ -1,7 +1,8 @@
 /*
  * =====================================================================
  * FILE    : relay.h
- * PERAN   : Konfigurasi modul relay (pin, state).
+ * PERAN   : Konfigurasi flash lamp (pin, state).
+ *           HIGH sebentar → LOW — sebagai flash indicator.
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -13,17 +14,15 @@
 #include "config.h"
 
 // =====================================================================
-//  PIN RELAY — berdasarkan schematic KRAI 2026
+//  PIN FLASH — pin sama dengan relay lama (pin 5)
 // =====================================================================
-constexpr uint8_t RELAY_1_PIN = 5;
+constexpr uint8_t FLASH_PIN = 5;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupRelay();
-void relayOn();
-void relayOff();
-void relayToggle();
-bool relayState();
+void flashFire();
+void flashTick();
 
 #endif // RELAY_H

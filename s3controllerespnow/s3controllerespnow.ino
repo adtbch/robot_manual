@@ -77,6 +77,15 @@ void loop() {
     // Proses event USB Host (enumerate, data, disconnect)
     usb.task();
 
+    // Disconnect → kirim stop packet lalu restart
+    if (usb.needsRestart) {
+        ControlPacket stopPaket = {};
+        buat_paket_stop(stopPaket);
+        kirim_via_espnow(stopPaket);
+        Serial.println("Disconnected. Waiting...");
+        ESP.restart();
+    }
+
     // Kirim paket pada interval yang teratur
     static uint32_t waktu_kirim_terakhir = 0;
     const uint32_t sekarang = millis();
