@@ -167,9 +167,9 @@ void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
     slave1Serial.printf("kn %d %d %d\n", vx, vy, yawTarget);
 }
 
-void sendGotoCommand(int16_t x_cm, int16_t y_cm, int16_t yaw_deg, int16_t speedRpm) {
+void sendGotoCommand(int16_t x_cm, int16_t y_cm, int16_t yaw_deg) {
     // sendBinaryMotionCmd(1, x_cm, y_cm, yaw_deg, speedRpm);
-    slave1Serial.printf("goto %d %d %d %d\n", x_cm, y_cm, yaw_deg, speedRpm);
+    slave1Serial.printf("goto %d %d %d\n", x_cm, y_cm, yaw_deg);
 }
 
 void sendShowOdomCommand() {

@@ -348,8 +348,7 @@ bool forestNavigate() {
                 sendGotoCommand(
                     (int16_t)lroundf(sApX),
                     (int16_t)lroundf(gAllianceColor == AllianceColor::BLUE ? -sApY : sApY),
-                    sApYaw,
-                    0
+                    sApYaw
                 );
                 gMotionWaypointMode = true;
                 sPhase = ForestPhase::APPROACH_YAW;

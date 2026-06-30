@@ -40,13 +40,16 @@ constexpr int16_t JOYSTICK_DEADZONE = 20;
 constexpr int16_t JOYSTICK_MAX      = 127;
 
 constexpr int16_t SPEED_RPM_NORMAL = 75;
-constexpr int16_t SPEED_RPM_SLOW   = 25;
-constexpr int16_t SPEED_RPM_FAST   = 150;
 
 constexpr int16_t YAW_STICK_THRESHOLD = 30;
 constexpr uint32_t YAW_STEP_INTERVAL_NORMAL_MS = 50;
 constexpr uint32_t YAW_STEP_INTERVAL_SLOW_MS   = 150;
 constexpr uint32_t YAW_STEP_INTERVAL_FAST_MS   = 25;
+
+// Interval kirim command ke slave1
+constexpr uint32_t SEND_INTERVAL_NORMAL_MS = 20;
+constexpr uint32_t SEND_INTERVAL_SLOW_MS   = 100;
+constexpr uint32_t SEND_INTERVAL_FAST_MS   = 5;
 // ponytail: cm per RPM per detik — tune di lapangan (odom vs stick)
 constexpr float GOTO_CM_PER_RPM_SEC = 0.85f;
 
@@ -67,6 +70,7 @@ namespace {
 
 uint32_t gMotionPrevButtons = 0;
 Jeda gJedaYawStep;
+Jeda gJedaSend;
 uint32_t gGotoIntegrateLastMs = 0;
 
 constexpr uint32_t BTN_INVERT_COMBO = BTN_L1 | BTN_R1 | BTN_L2 | BTN_R2;
@@ -170,12 +174,13 @@ void motionControlTick(const ControlPacket &pkt) {
         }
 
         uint32_t yawStepMs = YAW_STEP_INTERVAL_NORMAL_MS;
+        uint32_t sendIntervalMs = SEND_INTERVAL_NORMAL_MS;
         if (pkt.buttons & BTN_R1) {
-            gTargetSpeedRpm = SPEED_RPM_FAST;
             yawStepMs = YAW_STEP_INTERVAL_FAST_MS;
+            sendIntervalMs = SEND_INTERVAL_FAST_MS;
         } else if (pkt.buttons & BTN_L1) {
-            gTargetSpeedRpm = SPEED_RPM_SLOW;
             yawStepMs = YAW_STEP_INTERVAL_SLOW_MS;
+            sendIntervalMs = SEND_INTERVAL_SLOW_MS;
         }
 
         vx = mapJoystickToRpm(ly, gTargetSpeedRpm);
@@ -194,13 +199,14 @@ void motionControlTick(const ControlPacket &pkt) {
             vy = 0;
         }
         if (vx == 0 && vy == 0) {
-            gTargetSpeedRpm = 0;
             gGotoIntegrateLastMs = millis();
-        }    
-    } else {
-        if (!linkUp && !gMotionWaypointMode && !modeKinematics) {
-            gTargetSpeedRpm = 0;
         }
+        // Throttle kirim command
+        if (!gJedaSend.check(sendIntervalMs)) {
+            vx = 0;
+            vy = 0;
+        }
+    } else {
         vx = 0;
         vy = 0;
         gGotoIntegrateLastMs = millis();
@@ -215,8 +221,7 @@ void motionControlTick(const ControlPacket &pkt) {
     if (!modeKinematics) {
         sendGotoCommand((int16_t)lroundf(gTargetX_cm),
                         (int16_t)lroundf(gTargetY_cm),
-                        gYawTarget,
-                        gTargetSpeedRpm);
+                        gYawTarget);
     } else {
         sendKnCommand(vx, vy, gYawTarget);
     }
