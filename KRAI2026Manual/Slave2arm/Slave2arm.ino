@@ -61,6 +61,9 @@ void setup() {
 // =====================================================================
 
 void loop() {
+    // UART TX ke master — harus dari core 1 sebelum baca respons
+    masterUartProxyTick();
+
     // Serial command handler
     serialCommandTick();
 

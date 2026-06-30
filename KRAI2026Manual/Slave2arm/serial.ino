@@ -44,6 +44,39 @@ void setupSerial() {
 }
 
 // =====================================================================
+//  UART TX PROXY — web task core 0 queue, loop() core 1 kirim
+// =====================================================================
+
+namespace {
+
+char     gMasterUartPendingLine[80];
+volatile bool gMasterUartPending = false;
+
+bool waitMasterUartSent(uint32_t timeoutMs) {
+    const uint32_t t0 = millis();
+    while (gMasterUartPending && (millis() - t0 < timeoutMs)) {
+        vTaskDelay(1);
+    }
+    return !gMasterUartPending;
+}
+
+} // anonymous namespace
+
+void masterUartProxyTick() {
+    if (!gMasterUartPending) return;
+    masterSerial.println(gMasterUartPendingLine);
+    masterSerial.flush();
+    gMasterUartPending = false;
+}
+
+void masterUartSendLine(const char* line) {
+    strncpy(gMasterUartPendingLine, line, sizeof(gMasterUartPendingLine) - 1);
+    gMasterUartPendingLine[sizeof(gMasterUartPendingLine) - 1] = '\0';
+    gMasterUartPending = true;
+    waitMasterUartSent(50);
+}
+
+// =====================================================================
 //  SERIAL COMMAND HANDLER — unified PC & master
 // =====================================================================
 

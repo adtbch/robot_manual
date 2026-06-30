@@ -37,6 +37,10 @@ void setupSerial();
 void setupSerialCommand();
 void serialCommandTick();
 
+// ponytail: UART TX ke master hanya dari loop() core 1 — web task core 0 queue di sini
+void masterUartProxyTick();
+void masterUartSendLine(const char* line);
+
 // serial_command.ino — kirim data ke master
 void sendProximityStatus(char side, bool detected);
 void sendLimitStatus(const char* name, bool triggered);

@@ -95,8 +95,8 @@ KRAI2026Manual/master/
      PC Monitor       UART1 → slave1    UART2 → slave2
 ```
 
-- **`HardwareSerial slave1Serial(1)`** — RX=45, TX=48 → slave1
-- **`HardwareSerial slave2Serial(2)`** — RX=47, TX=21 → slave2
+- **`HardwareSerial slave1Serial(1)`** — RX=47, TX=21 → slave1
+- **`HardwareSerial slave2Serial(2)`** — RX=45, TX=48 → slave2
 - **3 buffer terpisah** — PC, slave1, slave2 tidak saling ganggu
 - **Response balik ke sumber** — `parseAndExecuteCommand(cmd, Print& out)` tulis ke `out`
 - **Command sama** dari mana pun — `motor x 500`, `servo d 90`, `gripper reset`, `status`, dll

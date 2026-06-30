@@ -9,6 +9,8 @@
 
 #include "motor_y_level_proxy.h"
 #include "serial.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace {
 
@@ -26,15 +28,16 @@ void motorYLevelSetAck(const char* msg) {
 void sendMotorLevelLine(const char* line) {
     gMotorYLevelQueryReady = false;
     motorYLevelSetAck("idle");
-    masterSerial.println(line);
+    masterUartSendLine(line);
 }
 
-// ponytail: spin tunggu ack — serialCommandTick di loop() core lain yang baca UART
+// ponytail: spin tunggu ack — serialCommandTick di loop() core 1 yang baca UART
 bool waitMotorLevelAck(uint32_t timeoutMs) {
     const uint32_t t0 = millis();
     while (millis() - t0 < timeoutMs) {
         if (gMotorYLevelQueryReady) return true;
         if (strcmp(gMotorYLevelLastAck, "idle") != 0) return true;
+        vTaskDelay(1);
     }
     return gMotorYLevelQueryReady || strcmp(gMotorYLevelLastAck, "idle") != 0;
 }

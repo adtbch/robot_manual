@@ -21,7 +21,7 @@
 constexpr uint8_t SLAVE1_RX = 47;
 constexpr uint8_t SLAVE1_TX = 21;
 
-// UART2 — komunikasi ke slave2
+// UART2 — komunikasi ke slave2arm
 constexpr uint8_t SLAVE2_RX = 45;
 constexpr uint8_t SLAVE2_TX = 48;
 

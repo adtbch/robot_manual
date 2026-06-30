@@ -77,6 +77,14 @@ uint8_t slave1BufIdx = 0;
 char slave2Buf[SERIAL_CMD_BUF_SIZE];
 uint8_t slave2BufIdx = 0;
 
+// Sensor lines saja — jangan strtok dulu command forest/motorlevel dll.
+bool isSlave2SensorLine(const char* line) {
+    return strncmp(line, "prox ", 5) == 0
+        || strncmp(line, "limit ", 6) == 0
+        || strncmp(line, "enc ", 4) == 0
+        || strncmp(line, "pne ", 4) == 0;
+}
+
 // ── Help ─────────────────────────────────────────────────────────
 void printHelp(Print& out) {
     out.println("--- Daftar Command ---");
@@ -502,7 +510,7 @@ void serialCommandTick() {
         if (c == '\n' || c == '\r') {
             if (slave1BufIdx > 0) {
                 slave1Buf[slave1BufIdx] = '\0';
-                if (!parseSlave1Status(slave1Buf)) {
+                if (!parseSlave1Response(slave1Buf) && !parseSlave1Status(slave1Buf)) {
                     parseAndExecuteCommand(slave1Buf, slave1Serial);
                 }
                 slave1BufIdx = 0;
@@ -521,9 +529,9 @@ void serialCommandTick() {
         if (c == '\n' || c == '\r') {
             if (slave2BufIdx > 0) {
                 slave2Buf[slave2BufIdx] = '\0';
-                // Sensor data (prox/enc/limit/pne) → update state
-                if (!parseSlave2Sensor(slave2Buf)) {
-                    // Bukan sensor → command biasa
+                if (isSlave2SensorLine(slave2Buf)) {
+                    parseSlave2Sensor(slave2Buf);
+                } else {
                     parseAndExecuteCommand(slave2Buf, slave2Serial);
                 }
                 slave2BufIdx = 0;

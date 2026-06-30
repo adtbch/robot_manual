@@ -8,6 +8,8 @@
 
 #include "forest_config.h"
 #include "serial.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace {
 
@@ -27,16 +29,17 @@ void forestSetAck(const char* msg) {
 void sendForestLine(const char* line) {
     gForestQueryReady = false;
     forestSetAck("idle");
-    masterSerial.println(line);
-    Serial.println(line);
+    masterUartSendLine(line);
+    Serial.printf("[Forest TX] %s\n", line);
 }
 
-// ponytail: spin tunggu ack — serialCommandTick di loop() core lain yang baca UART
+// ponytail: spin tunggu ack — serialCommandTick di loop() core 1 yang baca UART
 bool waitForestAck(uint32_t timeoutMs) {
     const uint32_t t0 = millis();
     while (millis() - t0 < timeoutMs) {
         if (gForestQueryReady) return true;
         if (strcmp(gForestLastAck, "idle") != 0) return true;
+        vTaskDelay(1);
     }
     return gForestQueryReady || strcmp(gForestLastAck, "idle") != 0;
 }
