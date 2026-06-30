@@ -53,21 +53,17 @@ constexpr long MOTOR_Y_ENC_MAX = 2500;
 
 // Capit senjata — level naik/turun Y (0 = bawah/homing, 5 = paling atas)
 constexpr uint8_t MOTOR_Y_LEVEL_MAX = 5;
-constexpr long MOTOR_Y_LEVEL_0 = 0;
-constexpr long MOTOR_Y_LEVEL_1 = 300;
-constexpr long MOTOR_Y_LEVEL_2 = 600;
-constexpr long MOTOR_Y_LEVEL_3 = 900;
-constexpr long MOTOR_Y_LEVEL_4 = 1200;
-constexpr long MOTOR_Y_LEVEL_5 = 1500;
+constexpr long MOTOR_Y_LEVEL_DEFAULT[6] = {0, 300, 600, 900, 1200, 1500};
 
-constexpr long MOTOR_Y_LEVEL_ENC[6] = {
-    MOTOR_Y_LEVEL_0,
-    MOTOR_Y_LEVEL_1,
-    MOTOR_Y_LEVEL_2,
-    MOTOR_Y_LEVEL_3,
-    MOTOR_Y_LEVEL_4,
-    MOTOR_Y_LEVEL_5,
-};
+extern long gMotorYLevelEnc[6];
+
+void initMotorYLevels();
+bool motorYLevelSave(const long levels[6]);
+
+inline long motorYLevelEnc(uint8_t level) {
+    if (level > MOTOR_Y_LEVEL_MAX) return gMotorYLevelEnc[MOTOR_Y_LEVEL_MAX];
+    return gMotorYLevelEnc[level];
+}
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS

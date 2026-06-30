@@ -37,6 +37,7 @@
 #include "relay.h"
 #include "proximity.h"
 #include "odom.h"
+#include "forest.h"
 
 // =====================================================================
 //  UART SETUP
@@ -82,6 +83,8 @@ void printHelp(Print& out) {
     out.println("  motor <id> <pwm>  (contoh: motor x 500)");
     out.println("  motorstop        stop semua motor");
     out.println("  motorlevel <0-5> motor Y ke level preset");
+    out.println("  motorlevel cfg <v0>..<v5>  set 6 level encoder (Preferences)");
+    out.println("  motorlevel get           baca 6 level dari master");
     out.println("  motortarget <x|y> <enc>  set encoder target (alias: motorpid)");
     out.println("  motortargetstop <x|y>    stop positioning (alias: motorpidstop)");
     out.println("  servo <id> <angle> (contoh: servo d 90)");
@@ -95,6 +98,12 @@ void printHelp(Print& out) {
     out.println("  odom [poll]       odometri slave1 (cache / poll)");
     out.println("  odomrec           tampilkan titik terekam");
     out.println("  odomrec clear     hapus record odom");
+    out.println("  odomgoto <1-4>    gerak ke titik odom terekam");
+    out.println("  forest cfg <d1> <d2>  set tujuan forest 1/2");
+    out.println("  forest get            baca dest1 dest2 dari NVS");
+    out.println("  forest goto <1|2>     jalankan tujuan");
+    out.println("  forest exit           keluar forest");
+    out.println("  forest cancel         batalkan forest");
     out.println("  stop              stop semua");
     out.println("  help              tampilkan ini");
 }
@@ -137,22 +146,50 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
     // ── BOX — dari slave2arm (proximity detect) ─────────────────
     if (strcmp(token, "boxr") == 0 || strcmp(token, "boxl") == 0) {
         char side = token[3];  // 'r' atau 'l'
-        motorYSetTarget(MOTOR_Y_LEVEL_1);  // naik ke level 1
+        motorYSetTarget(gMotorYLevelEnc[1]);
         boxSetPending(side);
         out.printf("Box %c: motor Y naik ke level 1\n", side);
         return;
     }
 
-    // ── MOTORLEVEL <0-5> — motor Y ke level preset ──────────────
+    // ── MOTORLEVEL — motor Y level preset / cfg / get ───────────
     if (strcmp(token, "motorlevel") == 0) {
-        char* val = strtok(nullptr, " ");
-        if (val != nullptr) {
-            int level = constrain(atoi(val), 0, MOTOR_Y_LEVEL_MAX);
-            motorYSetTarget(MOTOR_Y_LEVEL_ENC[level]);
-            out.printf("Motor Y level: %d (enc %ld)\n", level, MOTOR_Y_LEVEL_ENC[level]);
-        } else {
-            out.println("Usage: motorlevel <0-5>");
+        char* sub = strtok(nullptr, " ");
+        if (sub == nullptr) {
+            out.println("Usage: motorlevel <0-5> | cfg <v0>..<v5> | get");
+            return;
         }
+        for (char* p = sub; *p; ++p) *p = tolower(*p);
+
+        if (strcmp(sub, "cfg") == 0) {
+            long levels[6];
+            for (int i = 0; i < 6; i++) {
+                char* v = strtok(nullptr, " ");
+                if (v == nullptr) {
+                    out.println("motorlevel err usage");
+                    return;
+                }
+                levels[i] = atol(v);
+            }
+            if (motorYLevelSave(levels)) {
+                out.println("motorlevel ok");
+            } else {
+                out.println("motorlevel err invalid");
+            }
+            return;
+        }
+
+        if (strcmp(sub, "get") == 0) {
+            out.printf("motorlevel lvl %ld %ld %ld %ld %ld %ld\n",
+                       gMotorYLevelEnc[0], gMotorYLevelEnc[1], gMotorYLevelEnc[2],
+                       gMotorYLevelEnc[3], gMotorYLevelEnc[4], gMotorYLevelEnc[5]);
+            return;
+        }
+
+        const int level = constrain(atoi(sub), 0, MOTOR_Y_LEVEL_MAX);
+        motorYSetTarget(gMotorYLevelEnc[level]);
+        out.printf("Motor Y level: %d (enc %ld)\n", level, gMotorYLevelEnc[level]);
+        return;
     }
 
     // ── MOTOR <id> <pwm> ────────────────────────────────────────
@@ -326,6 +363,93 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         } else {
             odomRecordPrint(out);
         }
+    }
+
+    // ── ODOM GOTO <1-4> ─────────────────────────────────────────
+    else if (strcmp(token, "odomgoto") == 0) {
+        char* val = strtok(nullptr, " ");
+        if (val == nullptr) {
+            out.println("Usage: odomgoto <1-4>");
+            return;
+        }
+        const uint8_t slot = (uint8_t)atoi(val);
+        if (odomGoto(slot)) {
+            const OdomWaypoint& wp = gOdomWaypoints[slot - 1];
+            out.printf("OdomGoto #%u: x=%.1f y=%.1f yaw=%.0f speed=%d\n",
+                       slot, wp.x_cm, wp.y_cm, wp.yaw_deg, wp.maxspeed_rpm);
+        } else if (slot < 1 || slot > ODOM_WP_COUNT) {
+            out.println("OdomGoto err: usage odomgoto <1-4>");
+        } else {
+            out.printf("OdomGoto err: slot %u belum terekam (%u/4)\n", slot, gOdomWpFilled);
+        }
+    }
+
+    // ── FOREST ──────────────────────────────────────────────────
+    else if (strcmp(token, "forest") == 0) {
+        char* sub = strtok(nullptr, " ");
+        if (sub == nullptr) {
+            out.println("Usage: forest cfg|get|goto|exit|cancel");
+            return;
+        }
+        for (char* p = sub; *p; ++p) *p = tolower(*p);
+
+        if (strcmp(sub, "cfg") == 0) {
+            char* d1s = strtok(nullptr, " ");
+            char* d2s = strtok(nullptr, " ");
+            if (d1s != nullptr && d2s != nullptr) {
+                forestSetDestinations((uint8_t)atoi(d1s), (uint8_t)atoi(d2s));
+                out.println("forest ok");
+            } else {
+                out.println("forest err usage");
+            }
+            return;
+        }
+
+        if (strcmp(sub, "get") == 0) {
+            out.printf("forest dest %u %u %u\n",
+                       gForestDest1, gForestDest2, gForestDest1Done ? 1u : 0u);
+            return;
+        }
+
+        if (strcmp(sub, "goto") == 0) {
+            char* slotStr = strtok(nullptr, " ");
+            if (slotStr == nullptr) {
+                out.println("forest err usage");
+                return;
+            }
+            const uint8_t slot = (uint8_t)atoi(slotStr);
+            if (slot != 1 && slot != 2) {
+                out.println("forest err usage");
+                return;
+            }
+            if (slot == 2 && !gForestDest1Done) {
+                out.println("forest err dest1_not_done");
+                return;
+            }
+            if (forestGotoSlot(slot)) {
+                out.println("forest ok");
+            } else if (slot == 2 && !gForestDest1Done) {
+                out.println("forest err dest1_not_done");
+            } else {
+                out.println("forest err invalid_id");
+            }
+            return;
+        }
+
+        if (strcmp(sub, "exit") == 0) {
+            forestTriggerExit();
+            out.println("forest ok");
+            return;
+        }
+
+        if (strcmp(sub, "cancel") == 0) {
+            cancelForestGoto();
+            out.println("forest ok");
+            return;
+        }
+
+        out.println("forest err usage");
+        return;
     }
 
     // ── HELP ────────────────────────────────────────────────────

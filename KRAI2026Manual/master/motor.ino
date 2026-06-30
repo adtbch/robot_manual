@@ -12,6 +12,7 @@
 
 #include "motor.h"
 #include "encoder.h"
+#include <Preferences.h>
 
 // =====================================================================
 //  ENCODER POSITION — Motor X & Y
@@ -62,6 +63,52 @@ namespace {
     }
 
 } // anonymous namespace
+
+// =====================================================================
+//  MOTOR Y LEVELS — runtime + Preferences (master only)
+// =====================================================================
+
+long gMotorYLevelEnc[6] = {
+    MOTOR_Y_LEVEL_DEFAULT[0],
+    MOTOR_Y_LEVEL_DEFAULT[1],
+    MOTOR_Y_LEVEL_DEFAULT[2],
+    MOTOR_Y_LEVEL_DEFAULT[3],
+    MOTOR_Y_LEVEL_DEFAULT[4],
+    MOTOR_Y_LEVEL_DEFAULT[5],
+};
+
+namespace {
+
+constexpr const char* MOTOR_Y_LEVEL_NVS_NS = "motor_y_level";
+
+} // anonymous namespace
+
+void initMotorYLevels() {
+    Preferences prefs;
+    prefs.begin(MOTOR_Y_LEVEL_NVS_NS, true);
+    for (uint8_t i = 0; i <= MOTOR_Y_LEVEL_MAX; i++) {
+        char key[3] = {'l', static_cast<char>('0' + i), '\0'};
+        gMotorYLevelEnc[i] = prefs.getLong(key, MOTOR_Y_LEVEL_DEFAULT[i]);
+    }
+    prefs.end();
+    Serial.printf("[MotorY] levels: %ld %ld %ld %ld %ld %ld\n",
+                  gMotorYLevelEnc[0], gMotorYLevelEnc[1], gMotorYLevelEnc[2],
+                  gMotorYLevelEnc[3], gMotorYLevelEnc[4], gMotorYLevelEnc[5]);
+}
+
+bool motorYLevelSave(const long levels[6]) {
+    for (uint8_t i = 0; i <= MOTOR_Y_LEVEL_MAX; i++) {
+        gMotorYLevelEnc[i] = constrain(levels[i], MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
+    }
+    Preferences prefs;
+    prefs.begin(MOTOR_Y_LEVEL_NVS_NS, false);
+    for (uint8_t i = 0; i <= MOTOR_Y_LEVEL_MAX; i++) {
+        char key[3] = {'l', static_cast<char>('0' + i), '\0'};
+        prefs.putLong(key, gMotorYLevelEnc[i]);
+    }
+    prefs.end();
+    return true;
+}
 
 // =====================================================================
 //  SETUP
@@ -206,6 +253,6 @@ void motorYPositionTick() {
 bool motorYAtLevel(uint8_t level) {
     if (level > MOTOR_Y_LEVEL_MAX) return false;
     const long current = getEncoderCount('y');
-    const long target = MOTOR_Y_LEVEL_ENC[level];
+    const long target = gMotorYLevelEnc[level];
     return abs(current - target) <= MOTOR_Y_POSITION_TOLERANCE;
 }

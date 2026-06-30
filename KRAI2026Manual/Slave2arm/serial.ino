@@ -30,6 +30,8 @@
 #include "limit_switch.h"
 #include "proximity.h"
 #include "pneumatic.h"
+#include "forest_config.h"
+#include "motor_y_level_proxy.h"
 
 // =====================================================================
 //  UART SETUP
@@ -280,7 +282,11 @@ void serialCommandTick() {
         if (c == '\n' || c == '\r') {
             if (masterBufIdx > 0) {
                 masterBuf[masterBufIdx] = '\0';
-                parseAndExecuteCommand(masterBuf, masterSerial);
+                if (!parseMasterMotorLevelLine(masterBuf)) {
+                    if (!parseMasterForestLine(masterBuf)) {
+                        parseAndExecuteCommand(masterBuf, masterSerial);
+                    }
+                }
                 masterBufIdx = 0;
             }
         } else if (masterBufIdx < SERIAL_CMD_BUF_SIZE - 1) {

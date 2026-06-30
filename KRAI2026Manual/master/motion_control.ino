@@ -30,6 +30,7 @@
 #include "config.h"
 #include "serial.h"
 #include "espnow.h"
+#include "odom.h"
 
 // =====================================================================
 //  CONFIG
@@ -140,8 +141,10 @@ void motionControlTick(const ControlPacket &pkt) {
     if (linkUp && (!gMotionWaypointMode || modeKinematics)) {
         gTargetSpeedRpm = SPEED_RPM_NORMAL;
         bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
-        // Jangan toggle mode saat OPTIONS+SHARE (record odom)
-        if (shareNow && !(gMotionPrevButtons & BTN_SHARE) && !(pkt.buttons & BTN_OPTIONS)) {
+        const bool odomCombo = (pkt.buttons & (BTN_SHARE | BTN_TOUCHPAD)) == (BTN_SHARE | BTN_TOUCHPAD);
+        // Jangan toggle mode saat SHARE+TOUCHPAD (odom record) atau mode_save aktif
+        if (shareNow && !(gMotionPrevButtons & BTN_SHARE) && !(pkt.buttons & BTN_OPTIONS)
+            && !odomCombo && !odomIsModeSave()) {
             gInputMode = (gInputMode == MODE_ANALOG) ? MODE_DPAD : MODE_ANALOG;
         }
         if (allInvertComboHeld(pkt.buttons) && !allInvertComboHeld(gMotionPrevButtons)) {

@@ -163,7 +163,7 @@ void driveMotorYByLevel(int16_t ly) {
     if (newLevel < gMotorYLevel && readLimitSwitch(LIMIT_Y_BAWAH)) return;
 
     gMotorYLevel = (uint8_t)newLevel;
-    motorYSetTarget(MOTOR_Y_LEVEL_ENC[gMotorYLevel]);
+    motorYSetTarget(gMotorYLevelEnc[gMotorYLevel]);
 }
 
 // ── Motor X ────────────────────────────────────────────────────────
@@ -267,7 +267,7 @@ void handleFlashTrigger(const ControlPacket &pkt) {
 void gripperMotorYSetLevel(uint8_t level) {
     level = constrain(level, 0, MOTOR_Y_LEVEL_MAX);
     gMotorYLevel = level;
-    motorYSetTarget(MOTOR_Y_LEVEL_ENC[level]);
+    motorYSetTarget(gMotorYLevelEnc[level]);
 }
 
 void gripperMotorYResetLevel() {

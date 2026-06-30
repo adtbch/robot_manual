@@ -10,6 +10,23 @@
 #include "forest.h"
 #include "motor.h"
 #include "serial.h"
+#include <Preferences.h>
+
+// Globals — forest dest config (API + UART)
+uint8_t gForestDest1     = 0;
+uint8_t gForestDest2     = 0;
+bool    gForestDest1Done = false;
+
+static uint8_t sActiveSlotMission = 0;
+
+static void forestNotifySlave2(const char* evt) {
+    slave2Serial.printf("forest evt %s\n", evt);
+}
+
+static void forestResetDest1Done() {
+    gForestDest1Done = false;
+    forestNotifySlave2("dest1_reset");
+}
 
 namespace {
 
@@ -28,21 +45,21 @@ static constexpr float   GRID_CENTER_X_CM  = ORIGIN_X_CM + 1.5f * CELL_CM;
 //  row2:  7     [8]     9
 //  row3: 10     11     12
 
-//  { x_cm,                    y_cm,                    height_enc,      speed_rpm,         valid }
+//  { x_cm,                    y_cm,                    height_level,    speed_rpm,         valid }
 const ForestWaypoint FOREST_WP_BLUE[13] = {
-    {0*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_2, DEFAULT_SPEED_RPM, true},  // [0]  forest 10b — via approach[3]
-    {0*CELL_CM + ORIGIN_X_CM, 0*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_3, DEFAULT_SPEED_RPM, true},  // [1]  col0 row0
-    {1*CELL_CM + ORIGIN_X_CM, 0*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_2, DEFAULT_SPEED_RPM, true},  // [2]  col1 row0
-    {2*CELL_CM + ORIGIN_X_CM, 0*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_3, DEFAULT_SPEED_RPM, true},  // [3]  col2 row0
-    {0*CELL_CM + ORIGIN_X_CM, 1*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_2, DEFAULT_SPEED_RPM, true},  // [4]  col0 row1
-    {0.0f,                    0.0f,                    0,               0,                 false}, // [5]  INVALID — forest tengah
-    {2*CELL_CM + ORIGIN_X_CM, 1*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_4, DEFAULT_SPEED_RPM, true},  // [6]  col2 row1
-    {0*CELL_CM + ORIGIN_X_CM, 2*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_3, DEFAULT_SPEED_RPM, true},  // [7]  col0 row2
-    {0.0f,                    0.0f,                    0,               0,                 false}, // [8]  INVALID — forest tengah
-    {2*CELL_CM + ORIGIN_X_CM, 2*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_3, DEFAULT_SPEED_RPM, true},  // [9]  col2 row2
-    {0*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_2, DEFAULT_SPEED_RPM, true},  // [10] forest 10a — via approach[0]
-    {1*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_3, DEFAULT_SPEED_RPM, true},  // [11] col1 row3
-    {2*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, MOTOR_Y_LEVEL_2, DEFAULT_SPEED_RPM, true},  // [12] col2 row3
+    {0*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [0]  forest 10b — via approach[3]
+    {0*CELL_CM + ORIGIN_X_CM, 0*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [1]  col0 row0
+    {1*CELL_CM + ORIGIN_X_CM, 0*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [2]  col1 row0
+    {2*CELL_CM + ORIGIN_X_CM, 0*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [3]  col2 row0
+    {0*CELL_CM + ORIGIN_X_CM, 1*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [4]  col0 row1
+    {0.0f,                    0.0f,                    0, 0,                 false}, // [5]  INVALID — forest tengah
+    {2*CELL_CM + ORIGIN_X_CM, 1*CELL_CM + ORIGIN_Y_CM, 4, DEFAULT_SPEED_RPM, true},  // [6]  col2 row1
+    {0*CELL_CM + ORIGIN_X_CM, 2*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [7]  col0 row2
+    {0.0f,                    0.0f,                    0, 0,                 false}, // [8]  INVALID — forest tengah
+    {2*CELL_CM + ORIGIN_X_CM, 2*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [9]  col2 row2
+    {0*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [10] forest 10a — via approach[0]
+    {1*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [11] col1 row3
+    {2*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [12] col2 row3
 };
 
 // Forest 10 punya dua posisi — dipilih berdasarkan gLastApproachedCol saat goForest(10):
@@ -181,15 +198,15 @@ char pickForestArmSide() {
     const int8_t ap = gLastApproachedCol;
     if (ap == 0 || ap == 2) {
         if (gAllianceColor == AllianceColor::BLUE) {
-            side = slave2ProxL() ? 'r' : 'l';
-        } else {
             side = slave2ProxR() ? 'l' : 'r';
+        } else {
+            side = slave2ProxL() ? 'r' : 'l';
         }
     } else if (ap == 1 || ap == 3) {
         if (gAllianceColor == AllianceColor::BLUE) {
-            side = slave2ProxR() ? 'l' : 'r';
-        } else {
             side = slave2ProxL() ? 'r' : 'l';
+        } else {
+            side = slave2ProxR() ? 'l' : 'r';
         }
     }
     return side;
@@ -227,6 +244,15 @@ float        sApX             = 0.0f;
 float        sApY             = 0.0f;
 int16_t      sApYaw           = 0;
 bool         sExitMode        = false;
+
+void forestOnGotoMissionComplete() {
+    if (sExitMode) return;
+    if (sActiveSlotMission == 1) {
+        gForestDest1Done = true;
+        forestNotifySlave2("dest1_done");
+    }
+    sActiveSlotMission = 0;
+}
 
 // Shared state-machine tick — dipakai goForest() dan exitFromForest().
 bool forestNavigate() {
@@ -341,7 +367,8 @@ bool forestNavigate() {
         case ForestPhase::FOREST_MOVE:
             if (gMotionWaypointMode) return true;
             if (!sExitMode && sActiveForestId > 0) {
-                motorYSetTarget(FOREST_WP_BLUE[forestWpIdx(sActiveForestId)].height_enc);
+                motorYSetTarget(motorYLevelEnc(
+                    FOREST_WP_BLUE[forestWpIdx(sActiveForestId)].height_level));
                 sPhase = ForestPhase::FOREST_ARM_Y;
                 return true;
             }
@@ -352,17 +379,19 @@ bool forestNavigate() {
             if (motorYIsActive()) return true;
             gForestArmSide = pickForestArmSide();
             deployForestArm(gForestArmSide,
-                FOREST_WP_BLUE[forestWpIdx(sActiveForestId)].height_enc);
+                motorYLevelEnc(FOREST_WP_BLUE[forestWpIdx(sActiveForestId)].height_level));
             if (gForestArmSide == 'l') {
                 sPhase = ForestPhase::FOREST_ARM_DEPLOY;
                 return true;
             }
+            forestOnGotoMissionComplete();
             sActiveForestId = 0;
             sPhase          = ForestPhase::COMPUTE;
             return false;
 
         case ForestPhase::FOREST_ARM_DEPLOY:
             if (motorYIsActive()) return true;
+            forestOnGotoMissionComplete();
             sActiveForestId = 0;
             sPhase          = ForestPhase::COMPUTE;
             return false;
@@ -373,15 +402,72 @@ bool forestNavigate() {
 } // namespace
 
 // =====================================================================
-//  GLOBAL STATE
+//  GLOBAL STATE — forest navigation history
 // =====================================================================
 
 int8_t gLastApproachedCol = -1;
 int8_t gLastForestId      = 0;
-char   gForestArmSide     = 0;   // 'l', 'r', atau 0 = belum dipilih
+char   gForestArmSide     = 0;
+
+namespace {
+
+constexpr const char* FOREST_DEST_NVS_NS = "forest_cfg";
+constexpr const char* FOREST_KEY_D1      = "dest1";
+constexpr const char* FOREST_KEY_D2      = "dest2";
+constexpr uint8_t     FOREST_DEFAULT_D1  = 2;
+constexpr uint8_t     FOREST_DEFAULT_D2  = 4;
+
+void forestSaveDestNvs() {
+    Preferences prefs;
+    prefs.begin(FOREST_DEST_NVS_NS, false);
+    prefs.putUChar(FOREST_KEY_D1, gForestDest1);
+    prefs.putUChar(FOREST_KEY_D2, gForestDest2);
+    prefs.end();
+}
+
+} // anonymous namespace
+
+void initForestDest() {
+    Preferences prefs;
+    prefs.begin(FOREST_DEST_NVS_NS, true);
+    gForestDest1 = prefs.getUChar(FOREST_KEY_D1, FOREST_DEFAULT_D1);
+    gForestDest2 = prefs.getUChar(FOREST_KEY_D2, FOREST_DEFAULT_D2);
+    prefs.end();
+    Serial.printf("[Forest] NVS dest1=%u dest2=%u\n", gForestDest1, gForestDest2);
+}
+
+void forestSetDestinations(uint8_t d1, uint8_t d2) {
+    gForestDest1 = d1;
+    gForestDest2 = d2;
+    forestResetDest1Done();
+    forestSaveDestNvs();
+    Serial.printf("[Forest] cfg dest1=%u dest2=%u\n", gForestDest1, gForestDest2);
+}
+
+bool forestIsDest1Done() {
+    return gForestDest1Done;
+}
+
+bool forestGotoSlot(uint8_t slot) {
+    if (slot != 1 && slot != 2) return false;
+    if (slot == 2 && !gForestDest1Done) return false;
+    const uint8_t id = (slot == 1) ? gForestDest1 : gForestDest2;
+    if (id < 1 || id > 12 || !FOREST_WP_BLUE[id].valid) return false;
+    sActiveSlotMission = slot;
+    if (slot == 1) {
+        forestResetDest1Done();
+    }
+    Serial.printf("[Forest] goto slot %u → forest %u\n", slot, id);
+    return goForest(id);
+}
+
+void forestTriggerExit() {
+    Serial.println("[Forest] exit");
+    exitFromForest();
+}
 
 // =====================================================================
-//  API
+//  API (navigate)
 // =====================================================================
 
 bool goForest(uint8_t id) {
@@ -428,4 +514,6 @@ void cancelForestGoto() {
     sPhase            = ForestPhase::COMPUTE;
     sSeqStep          = 0;
     gForestArmSide    = 0;
+    sActiveSlotMission = 0;
+    forestResetDest1Done();
 }

@@ -71,6 +71,7 @@ void setup() {
     bool espNowReady = espNowControlInit();
     // Init motors
     SetupMotors();
+    initMotorYLevels();
     // Init encoders
     setupEncoders();
     // Init limit switches
@@ -87,6 +88,7 @@ void setup() {
     setupSerialCommand();
     // Init alliance color (BOOT button + RGB LED + NVS)
     setupAlliance();
+    initForestDest();
 
     // setHomingAll();
     Serial.println("Setup zone1: limit Y/X + motor Y lv0 + motor X enc0");
@@ -109,6 +111,7 @@ void loop() {
     espNowControlReadPacket(gLastRxPacket);
     gripperControlTick(gLastRxPacket);
     motionControlTick(gLastRxPacket);
+    forestControlTick(gLastRxPacket);
     armBoxControlTick(gLastRxPacket);
     odomRecordTick(gLastRxPacket);
     // Encoder positioning motor X/Y

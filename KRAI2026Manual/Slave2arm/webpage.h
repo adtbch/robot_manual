@@ -109,6 +109,35 @@ input[type=number]{width:72px;background:#0f172a;border:1px solid #334155;border
 </div>
 </div>
 
+<div class="card">
+<h2>Forest Navigation</h2>
+<div class="row">
+<label>T1</label>
+<select id="forest-d1"></select>
+<label>T2</label>
+<select id="forest-d2"></select>
+</div>
+<div class="row">
+<button class="btn btn-blue" onclick="saveForestCfg()">Simpan</button>
+<button class="btn btn-green" onclick="forestGoto(1)">Go Tujuan 1</button>
+<button class="btn btn-gray" id="btn-forest-d2" onclick="forestGoto(2)" disabled>Go Tujuan 2</button>
+</div>
+<div class="row">
+<button class="btn btn-orange" onclick="apiPost('/api/forest/exit')">Exit Forest</button>
+<button class="btn btn-gray" onclick="apiPost('/api/forest/cancel')">Cancel</button>
+</div>
+<div class="status-line" id="forest-status">dest1_done: —</div>
+</div>
+
+<div class="card">
+<h2>Motor Y Levels <span style="font-weight:400;font-size:.7em">(Master)</span></h2>
+<div class="row" id="y-level-inputs"></div>
+<div class="row">
+<button class="btn btn-blue" onclick="saveMotorYLevels()">Simpan ke Master</button>
+</div>
+<div class="status-line" id="y-level-status">—</div>
+</div>
+
 <div class="card stop-row">
 <button class="btn btn-red" style="width:100%;padding:12px;font-size:.95em" onclick="emergencyStop()">■ STOP SEMUA</button>
 </div>
@@ -117,6 +146,8 @@ input[type=number]{width:72px;background:#0f172a;border:1px solid #334155;border
 <script>
 const MOCK_MODE = false;
 const BASE = MOCK_MODE ? '' : ('http://' + location.hostname);
+
+const FOREST_IDS = [1,2,3,4,6,7,9,10,11,12];
 
 const mockState = {
   limit: {depan:false,belakang:false,turun:false},
@@ -127,7 +158,9 @@ const mockState = {
   motorPwm: {x:0,k:0,y:0},
   enc: {x:120,y:450,k:null},
   clients: 1,
-  heap: 180000
+  heap: 180000,
+  forest: {dest1:4, dest2:6, dest1_done:false, last_ack:'ok'},
+  motorYLevels: [0,300,600,900,1200,1500]
 };
 
 const MOTORS = [
@@ -152,6 +185,9 @@ async function apiGet(path) {
   if (MOCK_MODE) {
     if (path === '/api/status') return {...mockState};
     if (path === '/api/enc') return {...mockState.enc};
+    if (path === '/api/forest/config') return {dest1:mockState.forest.dest1, dest2:mockState.forest.dest2};
+    if (path === '/api/forest/status') return {...mockState.forest};
+    if (path === '/api/motor_y_levels') return {ok:true, levels:[...mockState.motorYLevels]};
     return {};
   }
   const r = await fetch(BASE + path);
@@ -186,6 +222,23 @@ async function apiPost(path, body) {
     } else if (path === '/api/encreset') {
       mockState.enc = {x:0,y:0,k:null};
       log('enc reset');
+    } else if (path === '/api/forest/config') {
+      mockState.forest.dest1 = body.dest1;
+      mockState.forest.dest2 = body.dest2;
+      mockState.forest.dest1_done = false;
+      log('forest cfg ' + body.dest1 + ' ' + body.dest2);
+    } else if (path === '/api/forest/goto') {
+      if (body.slot === 2 && !mockState.forest.dest1_done) return {ok:false, error:'dest1_not_done'};
+      log('forest goto ' + body.slot);
+      if (body.slot === 1) mockState.forest.dest1_done = true;
+    } else if (path === '/api/forest/exit') {
+      log('forest exit');
+    } else if (path === '/api/forest/cancel') {
+      mockState.forest.dest1_done = false;
+      log('forest cancel');
+    } else if (path === '/api/motor_y_levels') {
+      mockState.motorYLevels = body.levels ? [...body.levels] : mockState.motorYLevels;
+      log('motor Y levels saved');
     }
     refreshUI(await apiGet('/api/status'));
     return {ok:true};
@@ -253,6 +306,84 @@ function refreshUI(d) {
   document.getElementById('heap-txt').textContent = d.heap ? ('heap ' + d.heap) : '';
 }
 
+async function pollForestStatus() {
+  try {
+    const f = await apiGet('/api/forest/status');
+    document.getElementById('forest-status').textContent =
+      'T1=F' + f.dest1 + ' T2=F' + f.dest2 + ' | dest1_done=' + f.dest1_done + ' | ' + f.last_ack;
+    document.getElementById('btn-forest-d2').disabled = !f.dest1_done;
+    const d1 = document.getElementById('forest-d1');
+    const d2 = document.getElementById('forest-d2');
+    if (d1 && f.dest1) d1.value = f.dest1;
+    if (d2 && f.dest2) d2.value = f.dest2;
+  } catch(e) {}
+}
+
+function saveForestCfg() {
+  const dest1 = parseInt(document.getElementById('forest-d1').value, 10);
+  const dest2 = parseInt(document.getElementById('forest-d2').value, 10);
+  apiPost('/api/forest/config', {dest1, dest2});
+}
+
+function forestGoto(slot) {
+  apiPost('/api/forest/goto', {slot});
+}
+
+function buildForestSelects() {
+  ['forest-d1','forest-d2'].forEach(id => {
+    const sel = document.getElementById(id);
+    FOREST_IDS.forEach(fid => {
+      const o = document.createElement('option');
+      o.value = fid;
+      o.textContent = 'F' + fid;
+      sel.appendChild(o);
+    });
+  });
+  document.getElementById('forest-d1').value = 4;
+  document.getElementById('forest-d2').value = 6;
+}
+
+const Y_LEVEL_DEFAULTS = [0,300,600,900,1200,1500];
+
+function buildYLevelInputs() {
+  const root = document.getElementById('y-level-inputs');
+  for (let i = 0; i < 6; i++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'sensor-item';
+    wrap.innerHTML = 'Lv' + i + '<br><input type="number" id="y-lv-' + i + '" value="' + Y_LEVEL_DEFAULTS[i] + '" min="0" max="2500" style="width:70px">';
+    root.appendChild(wrap);
+  }
+}
+
+async function loadMotorYLevels() {
+  try {
+    const d = await apiGet('/api/motor_y_levels');
+    if (d.levels) {
+      for (let i = 0; i < 6; i++) {
+        const el = document.getElementById('y-lv-' + i);
+        if (el) el.value = d.levels[i];
+      }
+      document.getElementById('y-level-status').textContent = 'loaded from master';
+    }
+  } catch(e) {
+    document.getElementById('y-level-status').textContent = 'query gagal';
+  }
+}
+
+async function saveMotorYLevels() {
+  const levels = [];
+  for (let i = 0; i < 6; i++) {
+    levels.push(parseInt(document.getElementById('y-lv-' + i).value, 10) || 0);
+  }
+  try {
+    const r = await apiPost('/api/motor_y_levels', {levels});
+    document.getElementById('y-level-status').textContent =
+      r.ok !== false ? 'saved to master' : ('err: ' + (r.error || '?'));
+  } catch(e) {
+    document.getElementById('y-level-status').textContent = 'save gagal';
+  }
+}
+
 async function pollStatus() {
   if (document.visibilityState !== 'visible') return;
   try {
@@ -288,8 +419,13 @@ function buildMotors() {
 }
 
 buildMotors();
+buildForestSelects();
+buildYLevelInputs();
+loadMotorYLevels();
 setInterval(pollStatus, 500);
+setInterval(pollForestStatus, 500);
 pollStatus();
+pollForestStatus();
 if (!MOCK_MODE) document.getElementById('conn-status').textContent = 'Terhubung ke ' + location.hostname;
 </script>
 </body>

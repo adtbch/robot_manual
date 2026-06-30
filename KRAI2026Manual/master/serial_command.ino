@@ -144,7 +144,6 @@ void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
 
 void sendGotoCommand(int16_t x_cm, int16_t y_cm, int16_t yaw_deg, int16_t speedRpm) {
     slave1Serial.printf("goto %d %d %d %d\n", x_cm, y_cm, yaw_deg, speedRpm);
-    Serial.printf("[Master] goto: x=%dcm y=%dcm yaw=%ddeg speed=%drpm\n", x_cm, y_cm, yaw_deg, speedRpm);
 }
 
 void sendShowOdomCommand() {

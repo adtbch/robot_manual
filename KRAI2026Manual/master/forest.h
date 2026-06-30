@@ -30,7 +30,7 @@
 struct ForestWaypoint {
     float   x_cm;
     float   y_cm;
-    long    height_enc;   // encoder target motor Y — gunakan MOTOR_Y_LEVEL_*
+    uint8_t height_level;  // indeks 0..5 → gMotorYLevelEnc[]
     int16_t speed_rpm;
     bool    valid;
 };
@@ -61,12 +61,23 @@ extern int8_t        gLastApproachedCol;  // -1 = belum pernah approach
 extern int8_t        gLastForestId;       //  0 = belum ada forest terakhir
 extern char          gForestArmSide;      // 'l', 'r', atau 0 = belum dipilih
 
+extern uint8_t gForestDest1;   // forest id tujuan 1 (1-12, 0=unset)
+extern uint8_t gForestDest2;   // forest id tujuan 2
+extern bool    gForestDest1Done;
+
 // =====================================================================
 //  API
 // =====================================================================
 
+void initForestDest();
+void forestSetDestinations(uint8_t d1, uint8_t d2);
+bool forestGotoSlot(uint8_t slot);   // 1 atau 2 — slot 2 butuh dest1_done
+bool forestIsDest1Done();
+void forestTriggerExit();
+void forestControlTick(const ControlPacket& pkt);
+
 // Gerak ke forest id (1-12) — panggil tiap loop() atau via forestTick().
-// Approach + yaw + goto forest + turun motor Y ke height_enc + pilih sisi arm.
+// Approach + yaw + goto forest + turun motor Y ke height_level + pilih sisi arm.
 // Return true  = masih berjalan.
 // Return false = selesai (tiba di forest, Y sampai, gForestArmSide terisi).
 bool goForest(uint8_t id);
@@ -78,7 +89,6 @@ bool forestTick();
 void cancelForestGoto();
 
 // Keluar dari forest — gerak ke approach [2], yaw pasti 180° (kondisi khusus).
-// Return true = masih berjalan; false = sudah tiba di [2] menghadap 180°.
 bool exitFromForest();
 
 #endif // FOREST_H

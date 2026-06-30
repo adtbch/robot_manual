@@ -14,6 +14,8 @@
 
 #include "config.h"
 
+extern HardwareSerial masterSerial;
+
 // =====================================================================
 //  PIN SERIAL — berdasarkan schematic KRAI 2026
 // =====================================================================

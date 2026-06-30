@@ -14,7 +14,7 @@
 #include <WebServer.h>
 
 constexpr const char* WEB_AP_SSID = "KRAI_Slave2_Test";
-constexpr const char* WEB_AP_PASS = "krai2026";
+constexpr const char* WEB_AP_PASS = "adit1234";
 
 extern WebServer webServer;
 

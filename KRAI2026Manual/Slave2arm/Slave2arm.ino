@@ -15,6 +15,7 @@
 #include "serial.h"
 #include "pneumatic.h"
 #include "webconfig.h"
+#include "forest_config.h"
 
 // =====================================================================
 //  SETUP
@@ -65,7 +66,6 @@ void loop() {
 
     // Motor X/K — continuous run with limit switch
     motorRunTick();
-
     // Motor Y — encoder positioning
     motorYPositionTick();
 }

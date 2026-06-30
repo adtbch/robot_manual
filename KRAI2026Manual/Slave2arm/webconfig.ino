@@ -14,6 +14,8 @@
 #include "limit_switch.h"
 #include "proximity.h"
 #include "pneumatic.h"
+#include "forest_config.h"
+#include "motor_y_level_proxy.h"
 
 WebServer webServer(80);
 TaskHandle_t webTaskHandle = nullptr;
@@ -194,6 +196,127 @@ void handleApiStop() {
     webServer.send(200, "application/json", "{\"ok\":true}");
 }
 
+void handleApiForestConfigGet() {
+    if (!forestQueryDestFromMaster()) {
+        webServer.send(503, "application/json",
+            String("{\"ok\":false,\"error\":\"") + forestLastAck() + "\"}");
+        return;
+    }
+    const String json = String("{\"dest1\":") + String(forestGetDest1())
+        + ",\"dest2\":" + String(forestGetDest2()) + "}";
+    webServer.send(200, "application/json", json);
+}
+
+void handleApiForestStatus() {
+    if (!forestQueryDestFromMaster()) {
+        webServer.send(503, "application/json",
+            String("{\"ok\":false,\"error\":\"") + forestLastAck() + "\"}");
+        return;
+    }
+    const String json = String("{\"dest1\":") + String(forestGetDest1())
+        + ",\"dest2\":" + String(forestGetDest2())
+        + ",\"dest1_done\":" + String(forestIsDest1DoneLocal() ? "true" : "false")
+        + ",\"last_ack\":\"" + String(forestLastAck()) + "\"}";
+    webServer.send(200, "application/json", json);
+}
+
+void handleApiForestConfigPost() {
+    if (webServer.method() != HTTP_POST) {
+        webServer.send(405, "application/json", "{\"error\":\"POST only\"}");
+        return;
+    }
+    const String body = webServer.arg("plain");
+    const uint8_t d1 = (uint8_t)getJsonInt(body, "dest1");
+    const uint8_t d2 = (uint8_t)getJsonInt(body, "dest2");
+    const bool ok = forestSaveDestinations(d1, d2);
+    if (ok) {
+        webServer.send(200, "application/json", "{\"ok\":true}");
+    } else {
+        webServer.send(400, "application/json",
+            String("{\"ok\":false,\"error\":\"") + forestLastAck() + "\"}");
+    }
+}
+
+void handleApiForestGoto() {
+    if (webServer.method() != HTTP_POST) {
+        webServer.send(405, "application/json", "{\"error\":\"POST only\"}");
+        return;
+    }
+    const uint8_t slot = (uint8_t)getJsonInt(webServer.arg("plain"), "slot");
+    if (forestSendGoto(slot)) {
+        webServer.send(200, "application/json", "{\"ok\":true}");
+    } else {
+        webServer.send(400, "application/json",
+            String("{\"ok\":false,\"error\":\"") + forestLastAck() + "\"}");
+    }
+}
+
+void handleApiForestExit() {
+    forestSendExit();
+    webServer.send(200, "application/json", "{\"ok\":true}");
+}
+
+void handleApiForestCancel() {
+    forestSendCancel();
+    webServer.send(200, "application/json", "{\"ok\":true}");
+}
+
+bool parseLevelsJson(const String& json, long out[6]) {
+    const int bi = json.indexOf("\"levels\"");
+    if (bi < 0) return false;
+    const int lb = json.indexOf('[', bi);
+    const int rb = json.indexOf(']', lb);
+    if (lb < 0 || rb <= lb) return false;
+
+    String arr = json.substring(lb + 1, rb);
+    int idx = 0;
+    int pos = 0;
+    while (idx < 6 && pos < (int)arr.length()) {
+        const int comma = arr.indexOf(',', pos);
+        String num = (comma < 0) ? arr.substring(pos) : arr.substring(pos, comma);
+        num.trim();
+        out[idx++] = num.toInt();
+        if (comma < 0) break;
+        pos = comma + 1;
+    }
+    return idx == 6;
+}
+
+void handleApiMotorYLevelsGet() {
+    long levels[6];
+    if (!motorYLevelQueryMaster(levels)) {
+        webServer.send(503, "application/json",
+            String("{\"ok\":false,\"error\":\"") + motorYLevelLastAck() + "\"}");
+        return;
+    }
+    String json = "{\"ok\":true,\"levels\":[";
+    for (int i = 0; i < 6; i++) {
+        if (i > 0) json += ',';
+        json += String(levels[i]);
+    }
+    json += "]}";
+    webServer.send(200, "application/json", json);
+}
+
+void handleApiMotorYLevelsPost() {
+    if (webServer.method() != HTTP_POST) {
+        webServer.send(405, "application/json", "{\"error\":\"POST only\"}");
+        return;
+    }
+    const String body = webServer.arg("plain");
+    long levels[6];
+    if (!parseLevelsJson(body, levels)) {
+        webServer.send(400, "application/json", "{\"ok\":false,\"error\":\"bad levels\"}");
+        return;
+    }
+    if (motorYLevelSaveToMaster(levels)) {
+        webServer.send(200, "application/json", "{\"ok\":true}");
+    } else {
+        webServer.send(400, "application/json",
+            String("{\"ok\":false,\"error\":\"") + motorYLevelLastAck() + "\"}");
+    }
+}
+
 void handleNotFound() {
     webServer.send(404, "text/plain", "404");
 }
@@ -231,6 +354,14 @@ void setupWebServer() {
     webServer.on("/api/pneall", HTTP_POST, handleApiPneAll);
     webServer.on("/api/encreset", HTTP_POST, handleApiEncReset);
     webServer.on("/api/stop", HTTP_POST, handleApiStop);
+    webServer.on("/api/forest/config", HTTP_GET, handleApiForestConfigGet);
+    webServer.on("/api/forest/config", HTTP_POST, handleApiForestConfigPost);
+    webServer.on("/api/forest/status", HTTP_GET, handleApiForestStatus);
+    webServer.on("/api/forest/goto", HTTP_POST, handleApiForestGoto);
+    webServer.on("/api/forest/exit", HTTP_POST, handleApiForestExit);
+    webServer.on("/api/forest/cancel", HTTP_POST, handleApiForestCancel);
+    webServer.on("/api/motor_y_levels", HTTP_GET, handleApiMotorYLevelsGet);
+    webServer.on("/api/motor_y_levels", HTTP_POST, handleApiMotorYLevelsPost);
     webServer.onNotFound(handleNotFound);
 
     webServer.begin();
