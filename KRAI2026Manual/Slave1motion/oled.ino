@@ -180,7 +180,7 @@ bool setupOLED() {
 }
 
 void updateOLED() {
-    if (!oledReady) return;
+    if (!oledReady) { Serial.println("OLED: not ready"); return; }
 
     // display.display() kirim ~1KB via I2C → ~80ms; throttle 100ms agar loop() tidak tercekik
     static Jeda jedaOled;
@@ -188,7 +188,7 @@ void updateOLED() {
 
     // Prioritas: kalau tombol sedang ditahan ≥ 3 detik, tampilkan pesan khusus
     if (isButtonLongHolding()) {
-        if (!I2cBus::acquire(I2cBus::Owner::OLED)) return;
+        if (!I2cBus::acquire(I2cBus::Owner::OLED)) { Serial.println("OLED: acquire fail (hold)"); return; }
         display.clearDisplay();
         display.setTextColor(SSD1306_WHITE);
         display.setTextSize(2);
@@ -213,7 +213,7 @@ void updateOLED() {
         currentMode = (OledMode)((currentMode + 1) % OLED_MODE_COUNT);
     }
 
-    if (!I2cBus::acquire(I2cBus::Owner::OLED)) return;
+    if (!I2cBus::acquire(I2cBus::Owner::OLED)) { Serial.println("OLED: acquire fail"); return; }
 
     switch (currentMode) {
         case OLED_MODE_YAW:   drawYawMode();   break;

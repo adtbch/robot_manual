@@ -139,4 +139,18 @@ struct PIDState {
     }
 };
 
+// =====================================================================
+//  SERIAL BINARY PROTOCOL FROM MASTER
+// =====================================================================
+struct __attribute__((packed)) SerialMotionCmd {
+    uint8_t  header1; // 0xAA
+    uint8_t  header2; // 0xBB
+    uint8_t  type;    // 1 = goto, 2 = kn
+    int16_t  x;       // x_cm / vx
+    int16_t  y;       // y_cm / vy
+    int16_t  yaw;     // yaw_deg
+    int16_t  speed;   // speedRpm
+    uint8_t  checksum;
+};
+
 #endif // CONFIG_H

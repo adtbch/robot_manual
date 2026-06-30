@@ -249,6 +249,123 @@ void readSerialLine(Stream& port, char* buf, uint8_t& idx, Print& out, bool from
     }
 }
 
+void executeBinaryCmd(const SerialMotionCmd& cmd) {
+    if (cmd.type == 1) { // GOTO
+        const float x_cm = cmd.x;
+        const float y_cm = cmd.y;
+        const float yaw = cmd.yaw;
+        const float speed = (cmd.speed > 0) ? cmd.speed : wpMaxSpeed;
+
+        static float lastBinX = -99999.0f;
+        static float lastBinY = -99999.0f;
+        static float lastBinYaw = -99999.0f;
+        static float lastBinSpeed = -99999.0f;
+
+        bool targetChanged = (x_cm != lastBinX || y_cm != lastBinY || yaw != lastBinYaw || speed != lastBinSpeed);
+
+        if (targetChanged) {
+            lastBinX = x_cm;
+            lastBinY = y_cm;
+            lastBinYaw = yaw;
+            lastBinSpeed = speed;
+            
+            // Panggil startWaypoint HANYA jika target berubah
+            if (getWaypointState() != WaypointState::RUNNING) {
+                testYawMode = false;
+                startWaypoint(x_cm, y_cm, yaw, speed);
+            }
+        }
+
+        // Kirim status ke master (di-throttle agar tidak spam UART TX)
+        static Jeda jedaWpFeedback;
+        if (getWaypointState() == WaypointState::REACHED) {
+            if (jedaWpFeedback.check(200)) { // Kirim max tiap 200ms
+                Serial1.printf("WP: REACHED\n");
+            }
+        } else if (getWaypointState() == WaypointState::RUNNING) {
+            if (jedaWpFeedback.check(200)) { // Kirim max tiap 200ms
+                Serial1.printf("WP: RUNNING\n");
+            }
+        }
+    } else if (cmd.type == 2) { // KN
+        driveFieldCentricWithYawCorrection(cmd.x, cmd.y, cmd.yaw);
+    }
+}
+
+void readSerialMasterBinary() {
+    static enum State {
+        SEARCH_H1,
+        SEARCH_H2,
+        READ_BODY
+    } state = SEARCH_H1;
+
+    static SerialMotionCmd cmdBuffer;
+    static uint8_t bodyIdx = 0;
+
+    while (Serial1.available() > 0) {
+        uint8_t b = Serial1.read();
+
+        if (state == SEARCH_H1) {
+            if (b == 0xAA) {
+                state = SEARCH_H2;
+            } else {
+                if (masterBufIdx < SERIAL_CMD_BUF_SIZE - 1) {
+                    if (b == '\n' || b == '\r') {
+                        if (masterBufIdx > 0) {
+                            masterBuf[masterBufIdx] = '\0';
+                            parseAndExecuteCommand(masterBuf, Serial1, true);
+                            masterBufIdx = 0;
+                        }
+                    } else {
+                        masterBuf[masterBufIdx++] = b;
+                    }
+                } else {
+                    masterBufIdx = 0;
+                }
+            }
+        } else if (state == SEARCH_H2) {
+            if (b == 0xBB) {
+                cmdBuffer.header1 = 0xAA;
+                cmdBuffer.header2 = 0xBB;
+                bodyIdx = 2;
+                state = READ_BODY;
+            } else {
+                for (uint8_t val : { (uint8_t)0xAA, b }) {
+                    if (masterBufIdx < SERIAL_CMD_BUF_SIZE - 1) {
+                        if (val == '\n' || val == '\r') {
+                            if (masterBufIdx > 0) {
+                                masterBuf[masterBufIdx] = '\0';
+                                parseAndExecuteCommand(masterBuf, Serial1, true);
+                                masterBufIdx = 0;
+                            }
+                        } else {
+                            masterBuf[masterBufIdx++] = val;
+                        }
+                    } else {
+                        masterBufIdx = 0;
+                    }
+                }
+                state = SEARCH_H1;
+            }
+        } else if (state == READ_BODY) {
+            ((uint8_t*)&cmdBuffer)[bodyIdx++] = b;
+            if (bodyIdx >= sizeof(SerialMotionCmd)) {
+                uint8_t cs = 0;
+                const uint8_t* ptr = (const uint8_t*)&cmdBuffer;
+                for (size_t i = 2; i < sizeof(SerialMotionCmd) - 1; i++) {
+                    cs ^= ptr[i];
+                }
+                if (cmdBuffer.checksum == cs) {
+                    executeBinaryCmd(cmdBuffer);
+                } else {
+                    Serial.println("[SerialMaster] Checksum error!");
+                }
+                state = SEARCH_H1;
+            }
+        }
+    }
+}
+
 void discardMasterUart() {
     while (Serial1.available() > 0) {
         Serial1.read();
@@ -294,6 +411,6 @@ void serialCommandTick() {
     if (isAutoTunerRunning()) {
         discardMasterUart();  // ponytail: buang RX master — kn stream gak ganggu autotune
     } else {
-        readSerialLine(Serial1, masterBuf, masterBufIdx, Serial1, true);
+        readSerialMasterBinary();
     }
 }

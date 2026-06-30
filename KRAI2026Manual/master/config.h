@@ -148,6 +148,20 @@ extern AllianceColor gAllianceColor;
 //  SHARED STATE — goto target (motion teleop + forest waypoint)
 // =====================================================================
 
+// =====================================================================
+//  SERIAL BINARY PROTOCOL TO SLAVE1
+// =====================================================================
+struct __attribute__((packed)) SerialMotionCmd {
+    uint8_t  header1; // 0xAA
+    uint8_t  header2; // 0xBB
+    uint8_t  type;    // 1 = goto, 2 = kn
+    int16_t  x;       // x_cm / vx
+    int16_t  y;       // y_cm / vy
+    int16_t  yaw;     // yaw_deg
+    int16_t  speed;   // speedRpm / dummy
+    uint8_t  checksum;
+};
+
 extern float   gTargetX_cm;
 extern float   gTargetY_cm;
 extern int16_t gTargetSpeedRpm;
