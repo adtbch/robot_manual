@@ -57,6 +57,8 @@ constexpr int PWM_ZERO = 0;
 constexpr int PWM_FREQUENCY = 20000;          // Hz
 constexpr int PWM_RESOLUTION = 10;            // bit
 
+enum class WaypointState : uint8_t { IDLE, RUNNING, REACHED };
+
 // =====================================================================
 //  STRUCTS
 // =====================================================================

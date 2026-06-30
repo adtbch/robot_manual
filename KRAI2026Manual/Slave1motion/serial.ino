@@ -55,6 +55,13 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
 
     for (char* p = token; *p; ++p) *p = tolower(*p);
 
+    // kn/rpm override waypoint — cancel dulu sebelum handler jalan
+    if (strcmp(token, "goto") != 0 && isWaypointActive()) {
+        if (strcmp(token, "kn") == 0 || strcmp(token, "rpm") == 0) {
+            cancelWaypoint();
+        }
+    }
+
     if (strcmp(token, "tune") == 0) {
         char* idxStr = strtok(nullptr, " ");
         char* kpStr = strtok(nullptr, " ");
@@ -125,13 +132,15 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             const float y_cm   = atof(yStr);
             const float yaw    = atof(yawStr);
             const float speed  = (spdStr != nullptr) ? atof(spdStr) : wpMaxSpeed;
-            testYawMode = false;
-            startWaypoint(x_cm, y_cm, yaw, speed);
-            if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg speed=%.0f rpm\n", x_cm, y_cm, yaw, speed);
-            if (getWaypointState() != WaypointState::REACHED) {
-                out.printf("WP: RUNNING\n");
-                Serial1.printf("WP: RUNNING\n");
-            } else {
+
+            // ponytail: skip startWaypoint saat RUNNING — master spam goto tidak reset progress
+            if (getWaypointState() != WaypointState::RUNNING) {
+                testYawMode = false;
+                startWaypoint(x_cm, y_cm, yaw, speed);
+                if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg speed=%.0f rpm\n", x_cm, y_cm, yaw, speed);
+            }
+
+            if (getWaypointState() == WaypointState::REACHED) {
                 out.printf("WP: REACHED\n");
                 Serial1.printf("WP: REACHED\n");
             }

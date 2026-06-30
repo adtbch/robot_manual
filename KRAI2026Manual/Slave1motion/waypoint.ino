@@ -49,6 +49,13 @@ void applyWaypointTarget(float x_m, float y_m, float yaw_deg) {
     wpTargetYaw_deg = yaw_deg;
 }
 
+bool isWithinWaypointTol(float x_m, float y_m, float yaw_deg) {
+    const float errX = x_m - odomX;
+    const float errY = y_m - odomY;
+    const float dist = sqrtf(errX * errX + errY * errY);
+    return dist < wpTolPos_m && fabsf(getYawError(yaw_deg)) < wpTolYaw_deg;
+}
+
 } // namespace
 
 // Tunable (NVS-stored)
@@ -103,7 +110,16 @@ void startWaypoint(float x_cm, float y_cm, float yaw_deg, float maxRpm) {
     wpComboActive = false;
     wpComboIndex  = 0;
     wpMaxSpeed    = maxRpm;
-    applyWaypointTarget(x_cm * 0.01f, y_cm * 0.01f, yaw_deg);
+    const float x_m = x_cm * 0.01f;
+    const float y_m = y_cm * 0.01f;
+    if (isWithinWaypointTol(x_m, y_m, yaw_deg)) {
+        wpState = WaypointState::REACHED;
+        rpmMotor(0, 0, 0, 0);
+        Serial.printf("[WP] Already at target pos=(%.3f,%.3f)m yaw=%.1fdeg\n",
+            odomX, odomY, getYaw());
+            return;
+        }
+    applyWaypointTarget(x_m, y_m, yaw_deg);
     wpState = WaypointState::RUNNING;
 }
 
@@ -130,17 +146,20 @@ uint8_t       getWaypointComboStep()  { return wpComboActive ? (uint8_t)(wpCombo
 //  TICK — panggil setiap loop()
 // =====================================================================
 
-void waypointTick(float maxSpeed) {
-    if (wpState != WaypointState::RUNNING) return;
+void waypointTick(float x_m, float y_m, float yaw_deg, float maxSpeed) {
+    // if (wpState != WaypointState::RUNNING) return;
 
+    wpTargetX_m     = x_m;
+    wpTargetY_m     = y_m;
+    wpTargetYaw_deg = yaw_deg;
+    
     static Jeda jeda;
     if (!jeda.check(40)) return;  // 25 Hz
 
     float errX = wpTargetX_m - odomX;
     float errY = wpTargetY_m - odomY;
-    float dist = sqrtf(errX * errX + errY * errY);
 
-    if (dist < wpTolPos_m && fabsf(getYawError(wpTargetYaw_deg)) < wpTolYaw_deg) {
+    if (isWithinWaypointTol(wpTargetX_m, wpTargetY_m, wpTargetYaw_deg)) {
         if (wpComboActive && wpComboIndex == 0) {
             wpComboIndex = 1;
             applyWaypointTarget(wpComboPts[1].x_m, wpComboPts[1].y_m, wpComboPts[1].yaw_deg);
@@ -150,7 +169,6 @@ void waypointTick(float maxSpeed) {
             // Recalc for new target; if also in range, next tick will catch it
             errX = wpTargetX_m - odomX;
             errY = wpTargetY_m - odomY;
-            dist = sqrtf(errX * errX + errY * errY);
         } else {
             wpComboActive = false;
             wpComboIndex  = 0;
@@ -158,6 +176,7 @@ void waypointTick(float maxSpeed) {
             rpmMotor(0, 0, 0, 0);
             Serial.printf("[WP] Reached! pos=(%.3f,%.3f)m yaw=%.1fdeg\n",
                           odomX, odomY, getYaw());
+            Serial1.printf("WP: REACHED\n");
             return;
         }
     }

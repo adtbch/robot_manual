@@ -461,6 +461,7 @@ static void handleNotFound() {
 static void webTask(void* param) {
     for (;;) {
         server.handleClient();
+        ArduinoOTA.handle();
         vTaskDelay(1);
     }
 }

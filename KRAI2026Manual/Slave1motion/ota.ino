@@ -63,9 +63,6 @@ void setupOTA() {
     Serial.println("OTA: READY");
 }
 
-void handleOTA() {
-    ArduinoOTA.handle();
-}
 
 bool isOtaUploading() {
     return otaUploading;
