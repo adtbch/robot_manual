@@ -2,26 +2,30 @@
  * =====================================================================
  * FILE    : motion_control.ino
  * PERAN   : Mapping joystick/dpad → field-centric motion ke slave1motion
- *           via UART1 (goto x_cm y_cm yaw speedRpm).
+ *           via UART1.
+ *
+ * DUA MODE KONTROL:
+ *   GOTO (modeKinematics=false):
+ *     stick → step-based increment gTargetX/Y_cm → sendGotoCommand
+ *     L1/R1 → atur step interval (seberapa sering target ++):
+ *       normal 20ms, L1 slow 100ms, R1 fast 5ms
+ *     Setiap step: ±GOTO_STEP_CM per axis, sendGotoCommand tiap tick
+ *
+ *   KINEMATICS (modeKinematics=true):
+ *     stick → vx/vy langsung → sendKnCommand
+ *     L1/R1 → atur RPM (kecepatan robot):
+ *       normal 75, L1 slow 25, R1 fast 150
  *
  * INPUT MODE (toggle dengan SHARE) — hanya untuk vx/vy:
  *   ANALOG → analog kiri joystick
  *   DPAD   → tombol panah (digital, full RPM)
  *
- * YAW (terpisah dari input mode di atas):
- *   Analog kanan (rx) → ±yaw manual, selalu aktif (kecuali R2 / L2)
+ * YAW (terpisah):
+ *   Analog kanan (rx) → ±yaw manual
  *   rx ±1° per step — normal 50ms, L1 slow 150ms, R1 fast 25ms
- *   L2 + analog kanan → snap kardinal: atas 0, kanan 90, bawah 180, kiri -90
- *   gModeInvert → atas 180, bawah 0, kiri 90, kanan -90
- *   Nilai disimpan di gYawTarget master → dikirim pada goto argumen yaw
+ *   L2 + analog kanan → snap kardinal
  *
- * SPEED MODE: vx/vy RPM max — normal 75, L1 slow 25, R1 fast 150
- *
- * INVERT INPUT (toggle L1+R1+L2+R2): gModeInvert — atas↔bawah, kiri↔kanan
- *
- * STREAM KE SLAVE1:
- *   stick → integrasi ke gTargetX/Y_cm → sendGotoCommand tiap tick
- *   forest waypoint nanti → set gTargetX/Y_cm langsung
+ * INVERT INPUT (toggle L1+R1+L2+R2): gModeInvert
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -39,6 +43,13 @@
 constexpr int16_t JOYSTICK_DEADZONE = 20;
 constexpr int16_t JOYSTICK_MAX      = 127;
 
+// GOTO mode: step interval — seberapa sering gTargetX/Y di-increment
+constexpr uint32_t GOTO_STEP_INTERVAL_NORMAL_MS = 20;
+constexpr uint32_t GOTO_STEP_INTERVAL_SLOW_MS   = 100;
+constexpr uint32_t GOTO_STEP_INTERVAL_FAST_MS   = 5;
+constexpr float GOTO_STEP_CM = 0.85f;  // cm per step per axis
+
+// KINEMATICS mode: RPM — kecepatan langsung vx/vy
 constexpr int16_t SPEED_RPM_NORMAL = 75;
 constexpr int16_t SPEED_RPM_SLOW = 25;
 constexpr int16_t SPEED_RPM_FAST = 150;
@@ -47,13 +58,6 @@ constexpr int16_t YAW_STICK_THRESHOLD = 30;
 constexpr uint32_t YAW_STEP_INTERVAL_NORMAL_MS = 50;
 constexpr uint32_t YAW_STEP_INTERVAL_SLOW_MS   = 150;
 constexpr uint32_t YAW_STEP_INTERVAL_FAST_MS   = 25;
-
-// Interval kirim command ke slave1
-constexpr uint32_t SEND_INTERVAL_NORMAL_MS = 20;
-constexpr uint32_t SEND_INTERVAL_SLOW_MS   = 100;
-constexpr uint32_t SEND_INTERVAL_FAST_MS   = 5;
-// ponytail: cm per RPM per detik — tune di lapangan (odom vs stick)
-constexpr float GOTO_CM_PER_RPM_SEC = 0.85f;
 
 // =====================================================================
 //  STATE — shared (extern di config.h)
@@ -72,9 +76,9 @@ namespace {
 
 uint32_t gMotionPrevButtons = 0;
 Jeda gJedaYawStep;
+Jeda gJedaGotoStep;
 Jeda gJedaSend;
-Jeda gJedaSendCommand;
-uint32_t gGotoIntegrateLastMs = 0;
+constexpr uint32_t GOTO_SEND_INTERVAL_MS = 20;
 
 constexpr uint32_t BTN_INVERT_COMBO = BTN_L1 | BTN_R1 | BTN_L2 | BTN_R2;
 
@@ -141,12 +145,12 @@ void updateYawTargetFromCardinalStick(int16_t rawRx, int16_t rawRy) {
 void motionControlTick(const ControlPacket &pkt) {
     int16_t vx = 0;
     int16_t vy = 0;
-    
+    uint32_t yawStepMs = YAW_STEP_INTERVAL_NORMAL_MS;
+    uint32_t gotoStepMs = GOTO_STEP_INTERVAL_NORMAL_MS;
     
     const bool linkUp = pkt.connected && espNowControlIsLinkAlive();
-    uint32_t sendIntervalMs = SEND_INTERVAL_NORMAL_MS;
     
-    if (linkUp /*&& (!gMotionWaypointMode || modeKinematics)*/) {
+    if (linkUp && (!gMotionWaypointMode || modeKinematics)) {
         gTargetSpeedRpm = SPEED_RPM_NORMAL;
         bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
         const bool odomCombo = (pkt.buttons & (BTN_SHARE | BTN_TOUCHPAD)) == (BTN_SHARE | BTN_TOUCHPAD);
@@ -177,20 +181,14 @@ void motionControlTick(const ControlPacket &pkt) {
             ly = -ly;
         }
 
-        uint32_t yawStepMs = YAW_STEP_INTERVAL_NORMAL_MS;
-        uint32_t speedRpm = SPEED_RPM_NORMAL;
         if (pkt.buttons & BTN_R1) {
             yawStepMs = YAW_STEP_INTERVAL_FAST_MS;
-            sendIntervalMs = SEND_INTERVAL_FAST_MS;
-            if (modeKinematics) {
-                speedRpm = SPEED_RPM_FAST;
-            }
+            gotoStepMs = GOTO_STEP_INTERVAL_FAST_MS;
+            gTargetSpeedRpm = SPEED_RPM_FAST;
         } else if (pkt.buttons & BTN_L1) {
             yawStepMs = YAW_STEP_INTERVAL_SLOW_MS;
-            sendIntervalMs = SEND_INTERVAL_SLOW_MS;
-            if (modeKinematics) {
-                speedRpm = SPEED_RPM_SLOW;
-            }
+            gotoStepMs = GOTO_STEP_INTERVAL_SLOW_MS;
+            gTargetSpeedRpm = SPEED_RPM_SLOW;
         }
 
         vx = mapJoystickToRpm(ly, gTargetSpeedRpm);
@@ -209,26 +207,27 @@ void motionControlTick(const ControlPacket &pkt) {
             vy = 0;
         }
         if (vx == 0 && vy == 0) {
-            gGotoIntegrateLastMs = millis();
+            gJedaGotoStep.reset();
         }
     } else {
         vx = 0;
         vy = 0;
-        gGotoIntegrateLastMs = millis();
+        gJedaGotoStep.reset();
     }
-    const uint32_t nowMs = millis();    
-    const float dtSec = (gGotoIntegrateLastMs == 0) ? 0.0f : (nowMs - gGotoIntegrateLastMs) / 1000.0f;
-    gGotoIntegrateLastMs = nowMs;
-    if (dtSec > 0.0f && dtSec < 0.5f) {
-        gTargetX_cm += (float)vx * GOTO_CM_PER_RPM_SEC * dtSec;
-        gTargetY_cm += (float)vy * GOTO_CM_PER_RPM_SEC * dtSec;
+
+    // GOTO: step-based increment gTargetX/Y (mirip yaw ±1° per step)
+    if (!modeKinematics && gJedaGotoStep.check(gotoStepMs)) {
+        if (vx != 0) gTargetX_cm += (vx > 0) ? GOTO_STEP_CM : -GOTO_STEP_CM;
+        if (vy != 0) gTargetY_cm += (vy > 0) ? GOTO_STEP_CM : -GOTO_STEP_CM;
     }
-    // if (gMotionWaypointMode) {
-        // if (gJedaSend.check(sendIntervalMs)){
-        // sendGotoCommand((int16_t)lroundf(gTargetX_cm),
-        //                 (int16_t)lroundf(gTargetY_cm),
-        //                 gYawTarget);
-        // } else {
-            sendKnCommand(vx, vy, gYawTarget);
-    // }
+    // Kirim ke slave1
+    if (!modeKinematics) {
+        if (gJedaSend.check(GOTO_SEND_INTERVAL_MS)) {
+            sendGotoCommand((int16_t)lroundf(gTargetX_cm),
+                            (int16_t)lroundf(gTargetY_cm),
+                            gYawTarget);
+        }
+    } else {
+        sendKnCommand(vx, vy, gYawTarget);
+    }
 }

@@ -113,6 +113,5 @@ void loop() {
             }
         }
     }
-    Serial.printf("%lu %d\n", millis(), (int)getWaypointState());
     updateOLED();
 }

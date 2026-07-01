@@ -43,7 +43,15 @@ bool     wpComboActive = false;
 uint8_t  wpComboIndex  = 0;
 WpPoint  wpComboPts[2];
 
+static constexpr uint8_t WP_REACHED_TX_MAX = 20;
+static uint8_t           wpReachedTxCount  = 0;
+
+void wpReachedTxReset() {
+    wpReachedTxCount = 0;
+}
+
 void applyWaypointTarget(float x_m, float y_m, float yaw_deg) {
+    wpReachedTxReset();
     wpTargetX_m     = x_m;
     wpTargetY_m     = y_m;
     wpTargetYaw_deg = yaw_deg;
@@ -99,10 +107,17 @@ void saveWaypointPid() {
 //  PUBLIC API
 // =====================================================================
 
+void wpNotifyReachedToMaster() {
+    if (wpReachedTxCount >= WP_REACHED_TX_MAX) return;
+    Serial1.println("WP: REACHED");
+    wpReachedTxCount++;
+}
+
 void cancelWaypoint() {
     wpComboActive = false;
     wpComboIndex  = 0;
     wpState       = WaypointState::IDLE;
+    wpReachedTxReset();
     rpmMotor(0, 0, 0, 0);
 }
 
@@ -114,7 +129,7 @@ void startWaypoint(float x_cm, float y_cm, float yaw_deg, float maxRpm) {
     const float y_m = y_cm * 0.01f;
     if (isWithinWaypointTol(x_m, y_m, yaw_deg)) {
         wpState = WaypointState::REACHED;
-        Serial1.println("WP: REACHED");
+        wpNotifyReachedToMaster();
         rpmMotor(0, 0, 0, 0);
         Serial.printf("[WP] Already at target pos=(%.3f,%.3f)m yaw=%.1fdeg\n",
             odomX, odomY, getYaw());
@@ -157,6 +172,11 @@ void waypointTick(float x_m, float y_m, float yaw_deg, float maxSpeed) {
     static Jeda jeda;
     if (!jeda.check(40)) return;  // 25 Hz
 
+    if (wpState == WaypointState::REACHED &&
+        !isWithinWaypointTol(wpTargetX_m, wpTargetY_m, wpTargetYaw_deg)) {
+        wpState = WaypointState::RUNNING;
+    }
+
     float errX = wpTargetX_m - odomX;
     float errY = wpTargetY_m - odomY;
 
@@ -177,7 +197,7 @@ void waypointTick(float x_m, float y_m, float yaw_deg, float maxSpeed) {
             rpmMotor(0, 0, 0, 0);
             Serial.printf("[WP] Reached! pos=(%.3f,%.3f)m yaw=%.1fdeg\n",
                           odomX, odomY, getYaw());
-            Serial1.printf("WP: REACHED\n");
+            wpNotifyReachedToMaster();
             return;
         }
     }

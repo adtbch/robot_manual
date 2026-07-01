@@ -139,11 +139,6 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
                 startWaypoint(x_cm, y_cm, yaw, speed);
                 if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg speed=%.0f rpm\n", x_cm, y_cm, yaw, speed);
             }
-
-            if (getWaypointState() == WaypointState::REACHED) {
-                out.printf("WP: REACHED\n");
-                Serial1.printf("WP: REACHED\n");
-            }
         } else {
             if (!fromMasterUart) out.println("Format: goto <x_cm> <y_cm> <yaw_deg> [speed_rpm]");
         }
@@ -273,18 +268,6 @@ void executeBinaryCmd(const SerialMotionCmd& cmd) {
             if (getWaypointState() != WaypointState::RUNNING) {
                 testYawMode = false;
                 startWaypoint(x_cm, y_cm, yaw, speed);
-            }
-        }
-
-        // Kirim status ke master (di-throttle agar tidak spam UART TX)
-        static Jeda jedaWpFeedback;
-        if (getWaypointState() == WaypointState::REACHED) {
-            if (jedaWpFeedback.check(200)) { // Kirim max tiap 200ms
-                Serial1.printf("WP: REACHED\n");
-            }
-        } else if (getWaypointState() == WaypointState::RUNNING) {
-            if (jedaWpFeedback.check(200)) { // Kirim max tiap 200ms
-                Serial1.printf("WP: RUNNING\n");
             }
         }
     } else if (cmd.type == 2) { // KN

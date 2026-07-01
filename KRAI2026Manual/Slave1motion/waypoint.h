@@ -26,6 +26,7 @@ void startWaypoint(float x_cm, float y_cm, float yaw_deg, float maxRpm);
 void startWaypointCombo(float x1_cm, float y1_cm, float yaw1_deg,
                         float x2_cm, float y2_cm, float yaw2_deg, float maxRpm);
 void waypointTick(float x_m, float y_m, float yaw_deg, float maxSpeed);
+void wpNotifyReachedToMaster();  // UART ke master, max 20x per applyWaypointTarget
 
 // Status
 bool          isWaypointActive();
