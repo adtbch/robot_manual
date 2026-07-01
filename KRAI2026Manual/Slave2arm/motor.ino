@@ -102,6 +102,22 @@ void motorStopAll() {
 //  MOTOR Y — encoder positioning (bang-bang)
 // =====================================================================
 
+constexpr int MOTOR_Y_HOLD_PWM = 50;
+
+namespace {
+
+void motorYHoldAtTarget(long error) {
+    if (error > 0) {
+        pwmMotor('y', MOTOR_Y_HOLD_PWM);
+    } else if (error < 0) {
+        pwmMotor('y', -MOTOR_Y_HOLD_PWM);
+    } else {
+        pwmMotor('y', MOTOR_Y_HOLD_PWM);
+    }
+}
+
+} // anonymous namespace
+
 void motorYSetTarget(long targetEncoder) {
     gMotorY.target = constrain(targetEncoder, MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
     gMotorY.active = true;
@@ -135,7 +151,7 @@ void motorYPositionTick() {
     const long error = gMotorY.target - current;
 
     if (abs(error) <= MOTOR_Y_TOLERANCE) {
-        pwmMotor('y', 0);
+        motorYHoldAtTarget(error);
         return;
     }
 
