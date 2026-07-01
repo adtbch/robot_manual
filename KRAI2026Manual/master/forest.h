@@ -11,8 +11,8 @@
  *   row3: 10     11     12
  *
  * Koordinat absolut (odom frame) — kalibrasi via mode record odom.
- * gAllianceColor: pickForestArmSide(); forestNavigate() negasi Y untuk
- * forest 1, 3, 12, dan 10b saja saat BLUE.
+ * RED / BLUE: set terekam terpisah di NVS; forestApplyAlliance() muat set aktif.
+ * gAllianceColor: pickForestArmSide() saja (bukan flip koordinat navigasi).
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -43,12 +43,20 @@ struct ForestColApproach {
     bool    has_yaw;
 };
 
+struct ForestAllianceRec {
+    ForestColApproach approach[4];
+    float             anchorX[4];
+    float             anchorY[4];
+    bool              anchorOk[4];
+};
+
 // =====================================================================
 //  SHARED STATE
 // =====================================================================
 
 extern ForestWaypoint    gForestWp[13];
 extern ForestColApproach gForestApproach[4];
+extern ForestAllianceRec gForestRec[2];
 
 extern AllianceColor gAllianceColor;
 extern int8_t        gLastApproachedCol;
@@ -64,6 +72,7 @@ extern bool    gForestDest1Done;
 // =====================================================================
 
 void initForestDest();
+void forestApplyAlliance(AllianceColor c);
 void forestSetDestinations(uint8_t d1, uint8_t d2);
 bool forestGotoSlot(uint8_t slot);
 bool forestIsDest1Done();
@@ -73,6 +82,7 @@ void forestControlTick(const ControlPacket& pkt);
 void forestRecordApproach(uint8_t idx, float x_cm, float y_cm, float yaw_deg);
 void forestRecordWp(uint8_t forestId, float x_cm, float y_cm);
 void forestRecordClear();
+void forestRecordClear(AllianceColor c);
 void forestRecordPrint(Print& out);
 
 bool goForest(uint8_t id);

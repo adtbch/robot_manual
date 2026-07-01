@@ -77,6 +77,13 @@ uint8_t slave1BufIdx = 0;
 char slave2Buf[SERIAL_CMD_BUF_SIZE];
 uint8_t slave2BufIdx = 0;
 
+AllianceColor parseRecordClearAlliance(char* team) {
+    if (team == nullptr) return gAllianceColor;
+    if (strcmp(team, "red") == 0) return AllianceColor::RED;
+    if (strcmp(team, "blue") == 0) return AllianceColor::BLUE;
+    return gAllianceColor;
+}
+
 // Sensor lines saja — jangan strtok dulu command forest/motorlevel dll.
 bool isSlave2SensorLine(const char* line) {
     return strncmp(line, "prox ", 5) == 0
@@ -114,10 +121,10 @@ void printHelp(Print& out) {
     out.println("  gripper <reset|homing>  reset atau homing gripper");
     out.println("  status            semua status");
     out.println("  odom [poll]       odometri slave1 (cache / poll)");
-    out.println("  odomrec           zone1 terekam");
-    out.println("  odomrec clear     hapus record zone1");
-    out.println("  forestrec         approach + forest 2/6/7/11");
-    out.println("  forestrec clear   reset approach + forest terekam");
+    out.println("  odomrec           zone1 RED + BLUE terekam");
+    out.println("  odomrec clear [red|blue]  hapus zone1 (default: tim aktif)");
+    out.println("  forestrec         approach + forest 2/6/7/11 RED + BLUE");
+    out.println("  forestrec clear [red|blue]  reset record (default: tim aktif)");
     out.println("  odomgoto <1-4>    gerak ke titik odom terekam");
     out.println("  forest cfg <d1> <d2>  set tujuan forest 1/2");
     out.println("  forest get            baca dest1 dest2 dari NVS");
@@ -382,8 +389,13 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
             for (char* p = sub; *p; ++p) *p = tolower(*p);
         }
         if (sub != nullptr && strcmp(sub, "clear") == 0) {
-            odomRecordClear();
-            out.println("OdomRecord cleared");
+            char* team = strtok(nullptr, " ");
+            if (team != nullptr) {
+                for (char* p = team; *p; ++p) *p = tolower(*p);
+            }
+            const AllianceColor c = parseRecordClearAlliance(team);
+            odomRecordClear(c);
+            out.printf("OdomRecord %s cleared\n", allianceLabel(c));
         } else {
             odomRecordPrint(out);
         }
@@ -416,8 +428,13 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
             for (char* p = sub; *p; ++p) *p = tolower(*p);
         }
         if (sub != nullptr && strcmp(sub, "clear") == 0) {
-            forestRecordClear();
-            out.println("ForestRecord cleared");
+            char* team = strtok(nullptr, " ");
+            if (team != nullptr) {
+                for (char* p = team; *p; ++p) *p = tolower(*p);
+            }
+            const AllianceColor c = parseRecordClearAlliance(team);
+            forestRecordClear(c);
+            out.printf("ForestRecord %s cleared\n", allianceLabel(c));
         } else {
             forestRecordPrint(out);
         }

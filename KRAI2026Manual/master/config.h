@@ -144,6 +144,16 @@ extern bool gModeInvert;
 enum class AllianceColor : uint8_t { BLUE, RED };
 extern AllianceColor gAllianceColor;
 
+inline uint8_t allianceIdx(AllianceColor c) {
+    return static_cast<uint8_t>(c);
+}
+inline uint8_t allianceIdx() {
+    return allianceIdx(gAllianceColor);
+}
+inline const char* allianceLabel(AllianceColor c) {
+    return (c == AllianceColor::BLUE) ? "BLUE" : "RED";
+}
+
 // =====================================================================
 //  SHARED STATE — goto target (motion teleop + forest waypoint)
 // =====================================================================

@@ -18,6 +18,7 @@ bool    gForestDest1Done = false;
 
 ForestWaypoint    gForestWp[13];
 ForestColApproach gForestApproach[4];
+ForestAllianceRec gForestRec[2] = {};
 
 static uint8_t sActiveSlotMission = 0;
 
@@ -73,6 +74,30 @@ const ForestColApproach FOREST_AP_DEFAULT[4] = {
     {0.0f, 0.0f, false,  180, true},
 };
 
+static char forestAllianceChar(AllianceColor c) {
+    return (c == AllianceColor::BLUE) ? 'b' : 'r';
+}
+
+static int8_t forestRecAnchorIdx(uint8_t forestId) {
+    for (uint8_t k = 0; k < sizeof(FOREST_REC_IDS); k++) {
+        if (FOREST_REC_IDS[k] == forestId) return static_cast<int8_t>(k);
+    }
+    return -1;
+}
+
+static void forestInitRecDefaults(ForestAllianceRec& rec) {
+    for (int i = 0; i < 4; i++) {
+        rec.approach[i] = FOREST_AP_DEFAULT[i];
+        rec.approach[i].has_pre = false;
+    }
+    for (uint8_t k = 0; k < 4; k++) {
+        const uint8_t id = FOREST_REC_IDS[k];
+        rec.anchorX[k]  = FOREST_WP_DEFAULT[id].x_cm;
+        rec.anchorY[k]  = FOREST_WP_DEFAULT[id].y_cm;
+        rec.anchorOk[k] = false;
+    }
+}
+
 void forestInitDefaults() {
     for (int i = 0; i < 13; i++) {
         gForestWp[i] = FOREST_WP_DEFAULT[i];
@@ -82,106 +107,175 @@ void forestInitDefaults() {
     }
 }
 
-void forestSaveApproachNvs(uint8_t idx) {
+void forestSaveApproachNvs(AllianceColor c, uint8_t idx) {
     if (idx >= 4) return;
-    char key[8];
+    const ForestColApproach& ap = gForestRec[allianceIdx(c)].approach[idx];
+    char key[12];
     Preferences prefs;
     prefs.begin(FOREST_WP_NVS_NS, false);
-    snprintf(key, sizeof(key), "ap%u_x", idx);
-    prefs.putFloat(key, gForestApproach[idx].pre_x_cm);
-    snprintf(key, sizeof(key), "ap%u_y", idx);
-    prefs.putFloat(key, gForestApproach[idx].pre_y_cm);
-    snprintf(key, sizeof(key), "ap%u_w", idx);
-    prefs.putShort(key, gForestApproach[idx].yaw_deg);
-    snprintf(key, sizeof(key), "ap%u_ok", idx);
-    prefs.putUChar(key, gForestApproach[idx].has_pre ? 1 : 0);
+    snprintf(key, sizeof(key), "ap_%c_%u_x", forestAllianceChar(c), idx);
+    prefs.putFloat(key, ap.pre_x_cm);
+    snprintf(key, sizeof(key), "ap_%c_%u_y", forestAllianceChar(c), idx);
+    prefs.putFloat(key, ap.pre_y_cm);
+    snprintf(key, sizeof(key), "ap_%c_%u_w", forestAllianceChar(c), idx);
+    prefs.putShort(key, ap.yaw_deg);
+    snprintf(key, sizeof(key), "ap_%c_%u_ok", forestAllianceChar(c), idx);
+    prefs.putUChar(key, ap.has_pre ? 1 : 0);
     prefs.end();
 }
 
-void forestSaveForestWpNvs(uint8_t forestId) {
-    if (forestId >= 13) return;
-    char key[8];
+void forestSaveForestWpNvs(AllianceColor c, uint8_t forestId) {
+    const int8_t k = forestRecAnchorIdx(forestId);
+    if (k < 0) return;
+    const ForestAllianceRec& rec = gForestRec[allianceIdx(c)];
+    char key[12];
     Preferences prefs;
     prefs.begin(FOREST_WP_NVS_NS, false);
-    snprintf(key, sizeof(key), "f%u_x", forestId);
-    prefs.putFloat(key, gForestWp[forestId].x_cm);
-    snprintf(key, sizeof(key), "f%u_y", forestId);
-    prefs.putFloat(key, gForestWp[forestId].y_cm);
-    snprintf(key, sizeof(key), "f%u_ok", forestId);
+    snprintf(key, sizeof(key), "f_%c_%u_x", forestAllianceChar(c), forestId);
+    prefs.putFloat(key, rec.anchorX[k]);
+    snprintf(key, sizeof(key), "f_%c_%u_y", forestAllianceChar(c), forestId);
+    prefs.putFloat(key, rec.anchorY[k]);
+    snprintf(key, sizeof(key), "f_%c_%u_ok", forestAllianceChar(c), forestId);
     prefs.putUChar(key, 1);
     prefs.end();
 }
 
-void forestLoadWpNvs() {
+void forestLoadRecNvs(AllianceColor c) {
+    forestInitRecDefaults(gForestRec[allianceIdx(c)]);
     Preferences prefs;
     prefs.begin(FOREST_WP_NVS_NS, true);
+    const char ac = forestAllianceChar(c);
+    ForestAllianceRec& rec = gForestRec[allianceIdx(c)];
+
     for (uint8_t i = 0; i < 4; i++) {
-        char key[8];
-        snprintf(key, sizeof(key), "ap%u_ok", i);
-        if (prefs.getUChar(key, 0) == 0) continue;
-        snprintf(key, sizeof(key), "ap%u_x", i);
-        gForestApproach[i].pre_x_cm = prefs.getFloat(key, 0.0f);
-        snprintf(key, sizeof(key), "ap%u_y", i);
-        gForestApproach[i].pre_y_cm = prefs.getFloat(key, 0.0f);
-        snprintf(key, sizeof(key), "ap%u_w", i);
-        gForestApproach[i].yaw_deg = prefs.getShort(key, FOREST_AP_DEFAULT[i].yaw_deg);
-        gForestApproach[i].has_pre = true;
-        gForestApproach[i].has_yaw = FOREST_AP_DEFAULT[i].has_yaw;
+        char key[12];
+        snprintf(key, sizeof(key), "ap_%c_%u_ok", ac, i);
+        uint8_t ok = prefs.getUChar(key, 0);
+        bool legacy = false;
+        if (ok == 0 && c == AllianceColor::RED) {
+            snprintf(key, sizeof(key), "ap%u_ok", i);
+            ok = prefs.getUChar(key, 0);
+            legacy = (ok != 0);
+        }
+        if (ok == 0) continue;
+
+        ForestColApproach& ap = rec.approach[i];
+        if (legacy) {
+            snprintf(key, sizeof(key), "ap%u_x", i);
+            ap.pre_x_cm = prefs.getFloat(key, 0.0f);
+            snprintf(key, sizeof(key), "ap%u_y", i);
+            ap.pre_y_cm = prefs.getFloat(key, 0.0f);
+            snprintf(key, sizeof(key), "ap%u_w", i);
+            ap.yaw_deg = prefs.getShort(key, FOREST_AP_DEFAULT[i].yaw_deg);
+        } else {
+            snprintf(key, sizeof(key), "ap_%c_%u_x", ac, i);
+            ap.pre_x_cm = prefs.getFloat(key, 0.0f);
+            snprintf(key, sizeof(key), "ap_%c_%u_y", ac, i);
+            ap.pre_y_cm = prefs.getFloat(key, 0.0f);
+            snprintf(key, sizeof(key), "ap_%c_%u_w", ac, i);
+            ap.yaw_deg = prefs.getShort(key, FOREST_AP_DEFAULT[i].yaw_deg);
+        }
+        ap.has_pre = true;
+        ap.has_yaw = FOREST_AP_DEFAULT[i].has_yaw;
     }
-    for (uint8_t k = 0; k < sizeof(FOREST_REC_IDS); k++) {
+
+    for (uint8_t k = 0; k < 4; k++) {
         const uint8_t id = FOREST_REC_IDS[k];
-        char key[8];
-        snprintf(key, sizeof(key), "f%u_ok", id);
-        if (prefs.getUChar(key, 0) == 0) continue;
-        snprintf(key, sizeof(key), "f%u_x", id);
-        gForestWp[id].x_cm = prefs.getFloat(key, gForestWp[id].x_cm);
-        snprintf(key, sizeof(key), "f%u_y", id);
-        gForestWp[id].y_cm = prefs.getFloat(key, gForestWp[id].y_cm);
+        char key[12];
+        snprintf(key, sizeof(key), "f_%c_%u_ok", ac, id);
+        uint8_t ok = prefs.getUChar(key, 0);
+        bool legacy = false;
+        if (ok == 0 && c == AllianceColor::RED) {
+            snprintf(key, sizeof(key), "f%u_ok", id);
+            ok = prefs.getUChar(key, 0);
+            legacy = (ok != 0);
+        }
+        if (ok == 0) continue;
+
+        if (legacy) {
+            snprintf(key, sizeof(key), "f%u_x", id);
+            rec.anchorX[k] = prefs.getFloat(key, rec.anchorX[k]);
+            snprintf(key, sizeof(key), "f%u_y", id);
+            rec.anchorY[k] = prefs.getFloat(key, rec.anchorY[k]);
+        } else {
+            snprintf(key, sizeof(key), "f_%c_%u_x", ac, id);
+            rec.anchorX[k] = prefs.getFloat(key, rec.anchorX[k]);
+            snprintf(key, sizeof(key), "f_%c_%u_y", ac, id);
+            rec.anchorY[k] = prefs.getFloat(key, rec.anchorY[k]);
+        }
+        rec.anchorOk[k] = true;
     }
     prefs.end();
 }
 
-// Anchor: F2,F6,F7,F11 (record). Sisanya offset ±FOREST_CELL_CM pada grid.
-void forestDeriveWpFromRecorded() {
+// Anchor: F2,F6,F7,F11 (record). Sisanya offset ±FOREST_CELL_CM; BLUE negasi arah offset.
+void forestDeriveWpFromRecorded(AllianceColor alliance) {
     const ForestWaypoint& f2  = gForestWp[2];
     const ForestWaypoint& f6  = gForestWp[6];
     const ForestWaypoint& f7  = gForestWp[7];
     const ForestWaypoint& f11 = gForestWp[11];
     if (!f2.valid || !f6.valid || !f7.valid || !f11.valid) return;
 
-    const float c = FOREST_CELL_CM;
+    const float cell = FOREST_CELL_CM;
+    const float s    = (alliance == AllianceColor::BLUE) ? -1.0f : 1.0f;
 
-    gForestWp[1].x_cm  = f2.x_cm;       // F1: kiri F2, baris sama
-    gForestWp[1].y_cm  = f2.y_cm + c;
-    gForestWp[3].x_cm  = f2.x_cm;       // F3: kanan F2
-    gForestWp[3].y_cm  = f2.y_cm - c;
-    gForestWp[4].x_cm  = f7.x_cm - c;           // F4: atas F7
+    gForestWp[1].x_cm  = f2.x_cm;
+    gForestWp[1].y_cm  = f2.y_cm + s * cell;
+    gForestWp[3].x_cm  = f2.x_cm;
+    gForestWp[3].y_cm  = f2.y_cm - s * cell;
+    gForestWp[4].x_cm  = f7.x_cm - s * cell;
     gForestWp[4].y_cm  = f7.y_cm;
-    gForestWp[9].x_cm  = f6.x_cm + c;           // F9: bawah F6
+    gForestWp[9].x_cm  = f6.x_cm + s * cell;
     gForestWp[9].y_cm  = f6.y_cm;
-    gForestWp[10].x_cm = f7.x_cm + c;           // 10a: bawah F7
+    gForestWp[10].x_cm = f7.x_cm + s * cell;
     gForestWp[10].y_cm = f7.y_cm;
-    gForestWp[0].x_cm  = f11.x_cm;           // 10b: sama baris 10a
-    gForestWp[0].y_cm  = f11.y_cm + c;
-    gForestWp[12].x_cm = f11.x_cm;      // F12: kanan F11
-    gForestWp[12].y_cm = f11.y_cm - c;
+    gForestWp[0].x_cm  = f11.x_cm;
+    gForestWp[0].y_cm  = f11.y_cm + s * cell;
+    gForestWp[12].x_cm = f11.x_cm;
+    gForestWp[12].y_cm = f11.y_cm - s * cell;
 }
 
-void forestClearApproachNvs(uint8_t idx) {
-    char key[8];
+void forestApplyAlliance(AllianceColor c) {
+    forestInitDefaults();
+    const ForestAllianceRec& rec = gForestRec[allianceIdx(c)];
+    for (uint8_t i = 0; i < 4; i++) {
+        if (rec.approach[i].has_pre) {
+            gForestApproach[i] = rec.approach[i];
+            gForestApproach[i].has_yaw = FOREST_AP_DEFAULT[i].has_yaw;
+        }
+    }
+    for (uint8_t k = 0; k < 4; k++) {
+        if (!rec.anchorOk[k]) continue;
+        const uint8_t id = FOREST_REC_IDS[k];
+        gForestWp[id].x_cm = rec.anchorX[k];
+        gForestWp[id].y_cm = rec.anchorY[k];
+    }
+    forestDeriveWpFromRecorded(c);
+}
+
+void forestClearApproachNvs(AllianceColor c, uint8_t idx) {
+    char key[12];
     Preferences prefs;
     prefs.begin(FOREST_WP_NVS_NS, false);
-    snprintf(key, sizeof(key), "ap%u_ok", idx);
+    snprintf(key, sizeof(key), "ap_%c_%u_ok", forestAllianceChar(c), idx);
     prefs.remove(key);
+    if (c == AllianceColor::RED) {
+        snprintf(key, sizeof(key), "ap%u_ok", idx);
+        prefs.remove(key);
+    }
     prefs.end();
 }
 
-void forestClearForestWpNvs(uint8_t forestId) {
-    char key[8];
+void forestClearForestWpNvs(AllianceColor c, uint8_t forestId) {
+    char key[12];
     Preferences prefs;
     prefs.begin(FOREST_WP_NVS_NS, false);
-    snprintf(key, sizeof(key), "f%u_ok", forestId);
+    snprintf(key, sizeof(key), "f_%c_%u_ok", forestAllianceChar(c), forestId);
     prefs.remove(key);
+    if (c == AllianceColor::RED) {
+        snprintf(key, sizeof(key), "f%u_ok", forestId);
+        prefs.remove(key);
+    }
     prefs.end();
 }
 
@@ -334,25 +428,6 @@ void forestOnGotoMissionComplete() {
     sActiveSlotMission = 0;
 }
 
-// BLUE: negasi Y hanya forest 1, 3, 12, dan 10b (bukan 10a / forest lain)
-bool forestNeedsAllianceYFlip(uint8_t forestId, uint8_t wpIdx) {
-    if (gAllianceColor != AllianceColor::BLUE) return false;
-    if (forestId == 1 || forestId == 3 || forestId == 12) return true;
-    return forestId == 10 && wpIdx == FOREST10B_IDX;
-}
-
-bool forestApproachNeedsAllianceYFlip(uint8_t destForestId) {
-    if (gAllianceColor != AllianceColor::BLUE) return false;
-    if (destForestId == 1 || destForestId == 3 || destForestId == 12) return true;
-    if (destForestId != 10) return false;
-    for (int i = 0; i < 4; i++) {
-        if (sSeq[i] == FOREST10B_AP) return true;
-        if (sSeq[i] == FOREST10A_AP) return false;
-        if (sSeq[i] == -1) break;
-    }
-    return false;
-}
-
 bool forestNavigate() {
     while (true) {
         switch (sPhase) {
@@ -379,9 +454,6 @@ bool forestNavigate() {
 
                 gTargetX_cm         = wp.x_cm;
                 gTargetY_cm         = wp.y_cm;
-                if (forestNeedsAllianceYFlip(forestId, wpIdx)) {
-                    gTargetY_cm = -gTargetY_cm;
-                }
                 gTargetSpeedRpm     = wp.speed_rpm;
                 gMotionWaypointMode = true;
                 sPhase              = ForestPhase::FOREST_MOVE;
@@ -428,9 +500,6 @@ bool forestNavigate() {
 
             gTargetX_cm         = sApX;
             gTargetY_cm         = sApY;
-            if (forestApproachNeedsAllianceYFlip(sTarget)) {
-                gTargetY_cm = -gTargetY_cm;
-            }
             gTargetSpeedRpm     = sExitMode ? DEFAULT_SPEED_RPM
                                             : gForestWp[sTarget].speed_rpm;
             gMotionWaypointMode = true;
@@ -441,12 +510,8 @@ bool forestNavigate() {
         case ForestPhase::APPROACH_MOVE:
             if (gMotionWaypointMode) return true;
             if (gForestApproach[gLastApproachedCol].has_yaw) {
-                float apY = sApY;
-                if (forestApproachNeedsAllianceYFlip(sTarget)) {
-                    apY = -apY;
-                }
                 gTargetX_cm = sApX;
-                gTargetY_cm = apY;  // + flip alliance kalau perlu
+                gTargetY_cm = sApY;
                 gYawTarget  = sApYaw;
                 gMotionWaypointMode = true;
                 sPhase = ForestPhase::APPROACH_YAW;
@@ -517,16 +582,17 @@ int8_t gLastForestId      = 0;
 char   gForestArmSide     = 0;
 
 void initForestDest() {
-    forestInitDefaults();
-    forestLoadWpNvs();
-    forestDeriveWpFromRecorded();
+    forestLoadRecNvs(AllianceColor::BLUE);
+    forestLoadRecNvs(AllianceColor::RED);
+    forestApplyAlliance(gAllianceColor);
 
     Preferences prefs;
     prefs.begin(FOREST_DEST_NVS_NS, true);
     gForestDest1 = prefs.getUChar(FOREST_KEY_D1, FOREST_DEFAULT_D1);
     gForestDest2 = prefs.getUChar(FOREST_KEY_D2, FOREST_DEFAULT_D2);
     prefs.end();
-    Serial.printf("[Forest] NVS dest1=%u dest2=%u\n", gForestDest1, gForestDest2);
+    Serial.printf("[Forest] NVS dest1=%u dest2=%u active=%s\n",
+                  gForestDest1, gForestDest2, allianceLabel(gAllianceColor));
 }
 
 void forestSetDestinations(uint8_t d1, uint8_t d2) {
@@ -561,56 +627,74 @@ void forestTriggerExit() {
 
 void forestRecordApproach(uint8_t idx, float x_cm, float y_cm, float yaw_deg) {
     if (idx >= 4) return;
-    gForestApproach[idx].pre_x_cm = x_cm;
-    gForestApproach[idx].pre_y_cm = y_cm;
-    gForestApproach[idx].yaw_deg  = (int16_t)lroundf(yaw_deg);
-    gForestApproach[idx].has_pre  = true;
-    gForestApproach[idx].has_yaw  = FOREST_AP_DEFAULT[idx].has_yaw;
-    forestSaveApproachNvs(idx);
-    Serial.printf("[ForestRec] approach[%u] x=%.1f y=%.1f yaw=%d\n",
-                  idx, x_cm, y_cm, gForestApproach[idx].yaw_deg);
+    ForestAllianceRec& rec = gForestRec[allianceIdx()];
+    rec.approach[idx].pre_x_cm = x_cm;
+    rec.approach[idx].pre_y_cm = y_cm;
+    rec.approach[idx].yaw_deg  = (int16_t)lroundf(yaw_deg);
+    rec.approach[idx].has_pre  = true;
+    rec.approach[idx].has_yaw  = FOREST_AP_DEFAULT[idx].has_yaw;
+    forestSaveApproachNvs(gAllianceColor, idx);
+    forestApplyAlliance(gAllianceColor);
+    Serial.printf("[ForestRec] %s approach[%u] x=%.1f y=%.1f yaw=%d\n",
+                  allianceLabel(gAllianceColor), idx, x_cm, y_cm, rec.approach[idx].yaw_deg);
 }
 
 void forestRecordWp(uint8_t forestId, float x_cm, float y_cm) {
-    if (forestId >= 13 || !gForestWp[forestId].valid) return;
-    gForestWp[forestId].x_cm = x_cm;
-    gForestWp[forestId].y_cm = y_cm;
-    forestSaveForestWpNvs(forestId);
-    forestDeriveWpFromRecorded();
-    Serial.printf("[ForestRec] forest %u x=%.1f y=%.1f\n", forestId, x_cm, y_cm);
+    const int8_t k = forestRecAnchorIdx(forestId);
+    if (k < 0 || forestId >= 13 || !FOREST_WP_DEFAULT[forestId].valid) return;
+    ForestAllianceRec& rec = gForestRec[allianceIdx()];
+    rec.anchorX[k]  = x_cm;
+    rec.anchorY[k]  = y_cm;
+    rec.anchorOk[k] = true;
+    forestSaveForestWpNvs(gAllianceColor, forestId);
+    forestApplyAlliance(gAllianceColor);
+    Serial.printf("[ForestRec] %s forest %u x=%.1f y=%.1f\n",
+                  allianceLabel(gAllianceColor), forestId, x_cm, y_cm);
+}
+
+void forestRecordClear(AllianceColor c) {
+    forestInitRecDefaults(gForestRec[allianceIdx(c)]);
+    for (uint8_t i = 0; i < 4; i++) {
+        forestClearApproachNvs(c, i);
+    }
+    for (uint8_t k = 0; k < 4; k++) {
+        forestClearForestWpNvs(c, FOREST_REC_IDS[k]);
+    }
+    if (c == gAllianceColor) {
+        forestApplyAlliance(c);
+    }
+    Serial.printf("[ForestRec] %s cleared approach + forest 2/6/7/11\n", allianceLabel(c));
 }
 
 void forestRecordClear() {
-    for (uint8_t i = 0; i < 4; i++) {
-        gForestApproach[i] = FOREST_AP_DEFAULT[i];
-        forestClearApproachNvs(i);
-    }
-    for (uint8_t k = 0; k < sizeof(FOREST_REC_IDS); k++) {
-        const uint8_t id = FOREST_REC_IDS[k];
-        gForestWp[id].x_cm = FOREST_WP_DEFAULT[id].x_cm;
-        gForestWp[id].y_cm = FOREST_WP_DEFAULT[id].y_cm;
-        forestClearForestWpNvs(id);
-    }
-    forestDeriveWpFromRecorded();
-    Serial.println("[ForestRec] cleared approach + forest 2/6/7/11");
+    forestRecordClear(gAllianceColor);
 }
 
 void forestRecordPrint(Print& out) {
-    out.println("ForestRec approach:");
-    for (uint8_t i = 0; i < 4; i++) {
-        const ForestColApproach& ap = gForestApproach[i];
-        if (ap.has_pre) {
-            out.printf("  [%u] x=%.1f y=%.1f yaw=%d\n",
-                       i, ap.pre_x_cm, ap.pre_y_cm, ap.yaw_deg);
-        } else {
-            out.printf("  [%u] (belum terekam)\n", i);
+    out.printf("ForestRec (active=%s)\n", allianceLabel(gAllianceColor));
+    for (uint8_t ai = 0; ai < 2; ai++) {
+        const AllianceColor c = static_cast<AllianceColor>(ai);
+        const ForestAllianceRec& rec = gForestRec[ai];
+        out.printf("  %s approach:\n", allianceLabel(c));
+        for (uint8_t i = 0; i < 4; i++) {
+            const ForestColApproach& ap = rec.approach[i];
+            if (ap.has_pre) {
+                out.printf("    [%u] x=%.1f y=%.1f yaw=%d\n",
+                           i, ap.pre_x_cm, ap.pre_y_cm, ap.yaw_deg);
+            } else {
+                out.printf("    [%u] (belum terekam)\n", i);
+            }
         }
-    }
-    out.println("ForestRec wp:");
-    for (uint8_t k = 0; k < sizeof(FOREST_REC_IDS); k++) {
-        const uint8_t id = FOREST_REC_IDS[k];
-        const ForestWaypoint& wp = gForestWp[id];
-        out.printf("  forest %u: x=%.1f y=%.1f\n", id, wp.x_cm, wp.y_cm);
+        out.printf("  %s wp:\n", allianceLabel(c));
+        for (uint8_t k = 0; k < 4; k++) {
+            const uint8_t id = FOREST_REC_IDS[k];
+            if (rec.anchorOk[k]) {
+                out.printf("    forest %u: x=%.1f y=%.1f\n",
+                           id, rec.anchorX[k], rec.anchorY[k]);
+            } else {
+                out.printf("    forest %u: (belum terekam)\n", id);
+            }
+        }
     }
 }
 

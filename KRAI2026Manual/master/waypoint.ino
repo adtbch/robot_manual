@@ -18,6 +18,7 @@
 
 #include "config.h"
 #include "forest.h"
+#include "odom.h"
 #include <Preferences.h>
 #include <Adafruit_NeoPixel.h>
 
@@ -99,9 +100,10 @@ void toggleAllianceColor() {
         : AllianceColor::BLUE;
     nvsSaveAllianceColor();
     updateRgbLed();
+    odomApplyAlliance();
+    forestApplyAlliance(gAllianceColor);
 
-    Serial.printf("Alliance: %s\n",
-        gAllianceColor == AllianceColor::BLUE ? "BLUE" : "RED");
+    Serial.printf("Alliance: %s\n", allianceLabel(gAllianceColor));
 }
 
 } // anonymous namespace
