@@ -218,8 +218,12 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         char* val = strtok(nullptr, " ");
         if (id != nullptr && val != nullptr) {
             int pwm = constrain(atoi(val), -PWM_MAX, PWM_MAX);
-            pwmMotor(id[0], pwm);
-            out.printf("Motor '%c' PWM: %d\n", id[0], pwm);
+            char motorId = id[0];
+            // Stop position control dulu, baru apply PWM langsung
+            if (motorId == 'x') motorXStop();
+            if (motorId == 'y') motorYStop();
+            pwmMotor(motorId, pwm);
+            out.printf("Motor '%c' PWM: %d\n", motorId, pwm);
         } else {
             out.println("Usage: motor <id> <pwm>  (contoh: motor x 500)");
         }

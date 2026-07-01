@@ -445,11 +445,9 @@ bool forestNavigate() {
                 if (forestApproachNeedsAllianceYFlip(sTarget)) {
                     apY = -apY;
                 }
-                sendGotoCommand(
-                    (int16_t)lroundf(sApX),
-                    (int16_t)lroundf(apY),
-                    sApYaw
-                );
+                gTargetX_cm = sApX;
+                gTargetY_cm = apY;  // + flip alliance kalau perlu
+                gYawTarget  = sApYaw;
                 gMotionWaypointMode = true;
                 sPhase = ForestPhase::APPROACH_YAW;
                 return true;

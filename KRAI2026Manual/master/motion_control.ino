@@ -40,6 +40,8 @@ constexpr int16_t JOYSTICK_DEADZONE = 20;
 constexpr int16_t JOYSTICK_MAX      = 127;
 
 constexpr int16_t SPEED_RPM_NORMAL = 75;
+constexpr int16_t SPEED_RPM_SLOW = 25;
+constexpr int16_t SPEED_RPM_FAST = 150;
 
 constexpr int16_t YAW_STICK_THRESHOLD = 30;
 constexpr uint32_t YAW_STEP_INTERVAL_NORMAL_MS = 50;
@@ -71,6 +73,7 @@ namespace {
 uint32_t gMotionPrevButtons = 0;
 Jeda gJedaYawStep;
 Jeda gJedaSend;
+Jeda gJedaSendCommand;
 uint32_t gGotoIntegrateLastMs = 0;
 
 constexpr uint32_t BTN_INVERT_COMBO = BTN_L1 | BTN_R1 | BTN_L2 | BTN_R2;
@@ -141,8 +144,9 @@ void motionControlTick(const ControlPacket &pkt) {
     
     
     const bool linkUp = pkt.connected && espNowControlIsLinkAlive();
+    uint32_t sendIntervalMs = SEND_INTERVAL_NORMAL_MS;
     
-    if (linkUp && (!gMotionWaypointMode || modeKinematics)) {
+    if (linkUp /*&& (!gMotionWaypointMode || modeKinematics)*/) {
         gTargetSpeedRpm = SPEED_RPM_NORMAL;
         bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
         const bool odomCombo = (pkt.buttons & (BTN_SHARE | BTN_TOUCHPAD)) == (BTN_SHARE | BTN_TOUCHPAD);
@@ -174,13 +178,19 @@ void motionControlTick(const ControlPacket &pkt) {
         }
 
         uint32_t yawStepMs = YAW_STEP_INTERVAL_NORMAL_MS;
-        uint32_t sendIntervalMs = SEND_INTERVAL_NORMAL_MS;
+        uint32_t speedRpm = SPEED_RPM_NORMAL;
         if (pkt.buttons & BTN_R1) {
             yawStepMs = YAW_STEP_INTERVAL_FAST_MS;
             sendIntervalMs = SEND_INTERVAL_FAST_MS;
+            if (modeKinematics) {
+                speedRpm = SPEED_RPM_FAST;
+            }
         } else if (pkt.buttons & BTN_L1) {
             yawStepMs = YAW_STEP_INTERVAL_SLOW_MS;
             sendIntervalMs = SEND_INTERVAL_SLOW_MS;
+            if (modeKinematics) {
+                speedRpm = SPEED_RPM_SLOW;
+            }
         }
 
         vx = mapJoystickToRpm(ly, gTargetSpeedRpm);
@@ -201,11 +211,6 @@ void motionControlTick(const ControlPacket &pkt) {
         if (vx == 0 && vy == 0) {
             gGotoIntegrateLastMs = millis();
         }
-        // Throttle kirim command
-        if (!gJedaSend.check(sendIntervalMs)) {
-            vx = 0;
-            vy = 0;
-        }
     } else {
         vx = 0;
         vy = 0;
@@ -218,11 +223,12 @@ void motionControlTick(const ControlPacket &pkt) {
         gTargetX_cm += (float)vx * GOTO_CM_PER_RPM_SEC * dtSec;
         gTargetY_cm += (float)vy * GOTO_CM_PER_RPM_SEC * dtSec;
     }
-    if (!modeKinematics) {
-        sendGotoCommand((int16_t)lroundf(gTargetX_cm),
-                        (int16_t)lroundf(gTargetY_cm),
-                        gYawTarget);
-    } else {
-        sendKnCommand(vx, vy, gYawTarget);
-    }
+    // if (gMotionWaypointMode) {
+        // if (gJedaSend.check(sendIntervalMs)){
+        // sendGotoCommand((int16_t)lroundf(gTargetX_cm),
+        //                 (int16_t)lroundf(gTargetY_cm),
+        //                 gYawTarget);
+        // } else {
+            sendKnCommand(vx, vy, gYawTarget);
+    // }
 }

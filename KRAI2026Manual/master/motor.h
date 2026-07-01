@@ -25,12 +25,12 @@ struct MotorConfig {
 //  PIN MOTOR — berdasarkan schematic KRAI 2026
 // =====================================================================
 // Motor1 (axis X / arm)
-constexpr uint8_t MOTOR1_PIN_DIR  = 1;   // direction pin
-constexpr uint8_t MOTOR1_PIN_PWM  = 2;   // speed pin (LEDC PWM)
+constexpr uint8_t MOTOR1_PIN_DIR  = 42;   // direction pin
+constexpr uint8_t MOTOR1_PIN_PWM  = 41;   // speed pin (LEDC PWM)
 
 // Motor2 (axis Y / arm)
-constexpr uint8_t MOTOR2_PIN_DIR  = 42;   // direction pin
-constexpr uint8_t MOTOR2_PIN_PWM  = 41;   // speed pin (LEDC PWM)
+constexpr uint8_t MOTOR2_PIN_DIR  = 1;   // direction pin
+constexpr uint8_t MOTOR2_PIN_PWM  = 2;   // speed pin (LEDC PWM)
 
 // =====================================================================
 //  JUMLAH MOTOR
