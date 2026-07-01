@@ -23,6 +23,7 @@
 #include "motor.h"
 #include "encoder.h"
 #include "limit_switch.h"
+#include "odom.h"
 
 // =====================================================================
 //  CONFIG
@@ -284,6 +285,7 @@ void setServoBAngle(int angle) {
 }
 
 void gripperControlTick(const ControlPacket &pkt) {
+    if (odomIsModeSave()) return;
     handleGripperButtons(pkt);
     handleManualServoB(pkt);
     handleGripperMotors(pkt);

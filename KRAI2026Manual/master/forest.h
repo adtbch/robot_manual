@@ -10,9 +10,9 @@
  *   row2:  7     [8]     9     ← posisi 8 invalid (forest tengah)
  *   row3: 10     11     12
  *
- * MODE WARNA:
- *   RED  (default) — koordinat asli lapangan; Y positif = maju
- *   BLUE           — Y dinegasi (gTargetY_cm = -gTargetY_cm); robot mulai dari sisi berlawanan
+ * Koordinat absolut (odom frame) — kalibrasi via mode record odom.
+ * gAllianceColor: pickForestArmSide(); forestNavigate() negasi Y untuk
+ * forest 1, 3, 12, dan 10b saja saat BLUE.
  *
  * BOARD   : ESP32-S3 (Master)
  * =====================================================================
@@ -35,34 +35,28 @@ struct ForestWaypoint {
     bool    valid;
 };
 
-// Approach point di koridor — waypoint sebelum masuk area forest.
-//
-//  [0] kiri       │        │       [1] kanan
-//  [2] bot-kiri   │  GRID  │   [3] bot-kanan
-//
-// [0] — koridor kiri atas  : dipakai forest 4,7,10; transit keluar kiri
-// [1] — koridor kanan atas : dipakai forest 6,9;    transit keluar kanan
-// [2] — koridor kiri bawah : forest 11,12 via jalur kiri
-// [3] — koridor kanan bawah: forest 11,12 via jalur kanan
 struct ForestColApproach {
     float   pre_x_cm;
     float   pre_y_cm;
     bool    has_pre;
-    int16_t yaw_deg;  // heading robot saat tiba di approach point (-180..180)
-    bool    has_yaw;  // false = skip yaw phase
+    int16_t yaw_deg;
+    bool    has_yaw;
 };
 
 // =====================================================================
 //  SHARED STATE
 // =====================================================================
 
-extern AllianceColor gAllianceColor;  // default RED
-extern int8_t        gLastApproachedCol;  // -1 = belum pernah approach
-extern int8_t        gLastForestId;       //  0 = belum ada forest terakhir
-extern char          gForestArmSide;      // 'l', 'r', atau 0 = belum dipilih
+extern ForestWaypoint    gForestWp[13];
+extern ForestColApproach gForestApproach[4];
 
-extern uint8_t gForestDest1;   // forest id tujuan 1 (1-12, 0=unset)
-extern uint8_t gForestDest2;   // forest id tujuan 2
+extern AllianceColor gAllianceColor;
+extern int8_t        gLastApproachedCol;
+extern int8_t        gLastForestId;
+extern char          gForestArmSide;
+
+extern uint8_t gForestDest1;
+extern uint8_t gForestDest2;
 extern bool    gForestDest1Done;
 
 // =====================================================================
@@ -71,24 +65,19 @@ extern bool    gForestDest1Done;
 
 void initForestDest();
 void forestSetDestinations(uint8_t d1, uint8_t d2);
-bool forestGotoSlot(uint8_t slot);   // 1 atau 2 — slot 2 butuh dest1_done
+bool forestGotoSlot(uint8_t slot);
 bool forestIsDest1Done();
 void forestTriggerExit();
 void forestControlTick(const ControlPacket& pkt);
 
-// Gerak ke forest id (1-12) — panggil tiap loop() atau via forestTick().
-// Approach + yaw + goto forest + turun motor Y ke height_level + pilih sisi arm.
-// Return true  = masih berjalan.
-// Return false = selesai (tiba di forest, Y sampai, gForestArmSide terisi).
+void forestRecordApproach(uint8_t idx, float x_cm, float y_cm, float yaw_deg);
+void forestRecordWp(uint8_t forestId, float x_cm, float y_cm);
+void forestRecordClear();
+void forestRecordPrint(Print& out);
+
 bool goForest(uint8_t id);
-
-// Lanjutkan navigasi forest yang sedang berjalan — panggil tiap loop().
 bool forestTick();
-
-// Batalkan sequence aktif.
 void cancelForestGoto();
-
-// Keluar dari forest — gerak ke approach [2], yaw pasti 180° (kondisi khusus).
 bool exitFromForest();
 
 #endif // FOREST_H

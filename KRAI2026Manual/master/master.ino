@@ -89,6 +89,7 @@ void setup() {
     // Init alliance color (BOOT button + RGB LED + NVS)
     setupAlliance();
     initForestDest();
+    initOdomRec();
 
     // setHomingAll();
     Serial.println("Setup zone1: limit Y/X + motor Y lv0 + motor X enc0");

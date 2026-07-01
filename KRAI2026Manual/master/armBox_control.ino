@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "serial.h"
+#include "odom.h"
 
 // armBox.ino
 void armBoxDone(char side);
@@ -80,6 +81,7 @@ void runArmBoxInputAction(ArmBoxInputDir dir) {
 } // anonymous namespace
 
 void armBoxControlTick(const ControlPacket &pkt) {
+    if (odomIsModeSave()) return;
     if (!(pkt.buttons & BTN_CIRCLE)) {
         gArmBoxPrevDir = ARMBOX_DIR_NONE;
         return;

@@ -114,8 +114,10 @@ void printHelp(Print& out) {
     out.println("  gripper <reset|homing>  reset atau homing gripper");
     out.println("  status            semua status");
     out.println("  odom [poll]       odometri slave1 (cache / poll)");
-    out.println("  odomrec           tampilkan titik terekam");
-    out.println("  odomrec clear     hapus record odom");
+    out.println("  odomrec           zone1 terekam");
+    out.println("  odomrec clear     hapus record zone1");
+    out.println("  forestrec         approach + forest 2/6/7/11");
+    out.println("  forestrec clear   reset approach + forest terekam");
     out.println("  odomgoto <1-4>    gerak ke titik odom terekam");
     out.println("  forest cfg <d1> <d2>  set tujuan forest 1/2");
     out.println("  forest get            baca dest1 dest2 dari NVS");
@@ -398,7 +400,22 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         } else if (slot < 1 || slot > ODOM_WP_COUNT) {
             out.println("OdomGoto err: usage odomgoto <1-4>");
         } else {
-            out.printf("OdomGoto err: slot %u belum terekam (%u/4)\n", slot, gOdomWpFilled);
+            out.printf("OdomGoto err: slot %u belum terekam (%u/4 valid)\n",
+                       slot, odomZone1ValidCount());
+        }
+    }
+
+    // ── FOREST RECORD ───────────────────────────────────────────
+    else if (strcmp(token, "forestrec") == 0) {
+        char* sub = strtok(nullptr, " ");
+        if (sub != nullptr) {
+            for (char* p = sub; *p; ++p) *p = tolower(*p);
+        }
+        if (sub != nullptr && strcmp(sub, "clear") == 0) {
+            forestRecordClear();
+            out.println("ForestRecord cleared");
+        } else {
+            forestRecordPrint(out);
         }
     }
 

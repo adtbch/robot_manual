@@ -12,10 +12,12 @@
 #include "serial.h"
 #include <Preferences.h>
 
-// Globals — forest dest config (API + UART)
 uint8_t gForestDest1     = 0;
 uint8_t gForestDest2     = 0;
 bool    gForestDest1Done = false;
+
+ForestWaypoint    gForestWp[13];
+ForestColApproach gForestApproach[4];
 
 static uint8_t sActiveSlotMission = 0;
 
@@ -30,74 +32,161 @@ static void forestResetDest1Done() {
 
 namespace {
 
-// ponytail: semua konstanta placeholder — ukur lapangan lalu update
-static constexpr float   CELL_CM           = 120.0f;
-static constexpr float   ORIGIN_X_CM       = 0.0f;   // offset X asal forest dari odom (0,0)
-static constexpr float   ORIGIN_Y_CM       = 0.0f;   // offset Y asal forest dari odom (0,0)
-static constexpr int16_t DEFAULT_SPEED_RPM = 100;
+constexpr float   CELL_CM           = 120.0f;
+constexpr float   ORIGIN_X_CM       = 0.0f;
+constexpr float   ORIGIN_Y_CM       = 0.0f;
+constexpr int16_t DEFAULT_SPEED_RPM = 100;
+constexpr float   GRID_CENTER_X_CM  = ORIGIN_X_CM + 1.5f * CELL_CM;
 
-// Titik tengah horizontal grid — dipakai untuk putuskan jalur kiri/kanan ke bottom forest
-static constexpr float   GRID_CENTER_X_CM  = ORIGIN_X_CM + 1.5f * CELL_CM;
+constexpr uint8_t FOREST10A_IDX = 10;
+constexpr uint8_t FOREST10B_IDX = 0;
+constexpr int8_t  FOREST10A_AP  = 0;
+constexpr int8_t  FOREST10B_AP  = 3;
 
-//        col0   col1   col2
-//  row0:  1      2      3
-//  row1:  4     [5]     6
-//  row2:  7     [8]     9
-//  row3: 10     11     12
+} // namespace (constants only — reopened below)
 
-//  { x_cm,                    y_cm,                    height_level,    speed_rpm,         valid }
-const ForestWaypoint FOREST_WP_BLUE[13] = {
-    {0*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [0]  forest 10b — via approach[3]
-    {0*CELL_CM + ORIGIN_X_CM, 0*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [1]  col0 row0
-    {1*CELL_CM + ORIGIN_X_CM, 0*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [2]  col1 row0
-    {2*CELL_CM + ORIGIN_X_CM, 0*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [3]  col2 row0
-    {0*CELL_CM + ORIGIN_X_CM, 1*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [4]  col0 row1
-    {0.0f,                    0.0f,                    0, 0,                 false}, // [5]  INVALID — forest tengah
-    {2*CELL_CM + ORIGIN_X_CM, 1*CELL_CM + ORIGIN_Y_CM, 4, DEFAULT_SPEED_RPM, true},  // [6]  col2 row1
-    {0*CELL_CM + ORIGIN_X_CM, 2*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [7]  col0 row2
-    {0.0f,                    0.0f,                    0, 0,                 false}, // [8]  INVALID — forest tengah
-    {2*CELL_CM + ORIGIN_X_CM, 2*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [9]  col2 row2
-    {0*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [10] forest 10a — via approach[0]
-    {1*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, 3, DEFAULT_SPEED_RPM, true},  // [11] col1 row3
-    {2*CELL_CM + ORIGIN_X_CM, 3*CELL_CM + ORIGIN_Y_CM, 2, DEFAULT_SPEED_RPM, true},  // [12] col2 row3
+constexpr uint8_t FOREST_REC_IDS[] = {2, 6, 7, 11};
+constexpr const char* FOREST_WP_NVS_NS = "forest_wp";
+constexpr float       FOREST_CELL_CM   = 120.0f;  // jarak grid; samakan dengan CELL_CM di namespace
+
+// x/y non-record dihitung di forestDeriveWpFromRecorded() dari anchor 2,6,7,11
+const ForestWaypoint FOREST_WP_DEFAULT[13] = {
+    {0.0f, 0.0f, 2, DEFAULT_SPEED_RPM, true},  // [0]  10b — derived dari F7
+    {0.0f, 0.0f, 3, DEFAULT_SPEED_RPM, true},  // [1]  F1 — derived dari F2
+    {120.0f, 0.0f, 2, DEFAULT_SPEED_RPM, true},  // [2]  record
+    {0.0f, 0.0f, 3, DEFAULT_SPEED_RPM, true},  // [3]  F3 — derived dari F2
+    {0.0f, 0.0f, 2, DEFAULT_SPEED_RPM, true},  // [4]  F4 — derived dari F7
+    {0.0f, 0.0f, 0, 0,                 false}, // [5]  invalid
+    {240.0f, 120.0f, 4, DEFAULT_SPEED_RPM, true},  // [6]  record
+    {0.0f, 240.0f, 3, DEFAULT_SPEED_RPM, true},  // [7]  record
+    {0.0f, 0.0f, 0, 0,                 false}, // [8]  invalid
+    {0.0f, 0.0f, 3, DEFAULT_SPEED_RPM, true},  // [9]  F9 — derived dari F6
+    {0.0f, 0.0f, 2, DEFAULT_SPEED_RPM, true},  // [10] 10a — derived dari F7
+    {120.0f, 360.0f, 3, DEFAULT_SPEED_RPM, true},  // [11] record
+    {0.0f, 0.0f, 2, DEFAULT_SPEED_RPM, true},  // [12] F12 — derived dari F11
 };
 
-// Forest 10 punya dua posisi — dipilih berdasarkan gLastApproachedCol saat goForest(10):
-//   approach[0] → FOREST_WP_BLUE[10] (10a), langsung tanpa lewat [2]
-//   approach[3] → FOREST_WP_BLUE[0]  (10b), langsung tanpa approach tambahan
-static constexpr uint8_t FOREST10A_IDX = 10;
-static constexpr uint8_t FOREST10B_IDX = 0;
-static constexpr int8_t  FOREST10A_AP  = 0;
-static constexpr int8_t  FOREST10B_AP  = 3;
-
-// Approach corridor points — isi pre_x/y saat dimensi lapangan sudah diukur.
-//
-// Layout fisik:
-//     [0] kiri       │ GRID │       [1] kanan
-//    (kiri atas)     │      │      (kanan atas)
-//                    │      │
-//     [2] bot-kiri   │ GRID │   [3] bot-kanan
-//    (kiri bawah)    │      │      (kanan bawah)
-//
-// [0] — koridor kiri atas  : dipakai untuk forest 4,7,10; transit keluar kiri
-// [1] — koridor kanan atas : dipakai untuk forest 6,9;    transit keluar kanan
-// [2] — koridor kiri bawah : dipakai untuk forest 11,12 via jalur kiri
-// [3] — koridor kanan bawah: dipakai untuk forest 11,12 via jalur kanan
-//
-// yaw_deg: heading robot setelah tiba di approach (hadap ke dalam grid)
-// ponytail: yaw placeholder — ukur lapangan lalu update
-const ForestColApproach FOREST_COL_APPROACH[4] = {
-    {0.0f, 0.0f, false,  -90, true},  // [0] kiri      — hadap kiri
-    {0.0f, 0.0f, false,   90, true},  // [1] kanan     — hadap kanan
-    {0.0f, 0.0f, false,  180, true},  // [2] bot-kiri  — hadap belakang
-    {0.0f, 0.0f, false,  180, true},  // [3] bot-kanan — hadap belakang
+const ForestColApproach FOREST_AP_DEFAULT[4] = {
+    {0.0f, 0.0f, false,  -90, true},
+    {0.0f, 0.0f, false,   90, true},
+    {0.0f, 0.0f, false,  180, true},
+    {0.0f, 0.0f, false,  180, true},
 };
 
-// -------------------------------------------------------------------------
-//  GROUP ROUTING
-// -------------------------------------------------------------------------
+void forestInitDefaults() {
+    for (int i = 0; i < 13; i++) {
+        gForestWp[i] = FOREST_WP_DEFAULT[i];
+    }
+    for (int i = 0; i < 4; i++) {
+        gForestApproach[i] = FOREST_AP_DEFAULT[i];
+    }
+}
 
-// Group 0=TOP(1-3), 1=COL0(4,7), 2=COL2(6,9), 3=BOTTOM(11,12), 4=COL0_BOT(10)
+void forestSaveApproachNvs(uint8_t idx) {
+    if (idx >= 4) return;
+    char key[8];
+    Preferences prefs;
+    prefs.begin(FOREST_WP_NVS_NS, false);
+    snprintf(key, sizeof(key), "ap%u_x", idx);
+    prefs.putFloat(key, gForestApproach[idx].pre_x_cm);
+    snprintf(key, sizeof(key), "ap%u_y", idx);
+    prefs.putFloat(key, gForestApproach[idx].pre_y_cm);
+    snprintf(key, sizeof(key), "ap%u_w", idx);
+    prefs.putShort(key, gForestApproach[idx].yaw_deg);
+    snprintf(key, sizeof(key), "ap%u_ok", idx);
+    prefs.putUChar(key, gForestApproach[idx].has_pre ? 1 : 0);
+    prefs.end();
+}
+
+void forestSaveForestWpNvs(uint8_t forestId) {
+    if (forestId >= 13) return;
+    char key[8];
+    Preferences prefs;
+    prefs.begin(FOREST_WP_NVS_NS, false);
+    snprintf(key, sizeof(key), "f%u_x", forestId);
+    prefs.putFloat(key, gForestWp[forestId].x_cm);
+    snprintf(key, sizeof(key), "f%u_y", forestId);
+    prefs.putFloat(key, gForestWp[forestId].y_cm);
+    snprintf(key, sizeof(key), "f%u_ok", forestId);
+    prefs.putUChar(key, 1);
+    prefs.end();
+}
+
+void forestLoadWpNvs() {
+    Preferences prefs;
+    prefs.begin(FOREST_WP_NVS_NS, true);
+    for (uint8_t i = 0; i < 4; i++) {
+        char key[8];
+        snprintf(key, sizeof(key), "ap%u_ok", i);
+        if (prefs.getUChar(key, 0) == 0) continue;
+        snprintf(key, sizeof(key), "ap%u_x", i);
+        gForestApproach[i].pre_x_cm = prefs.getFloat(key, 0.0f);
+        snprintf(key, sizeof(key), "ap%u_y", i);
+        gForestApproach[i].pre_y_cm = prefs.getFloat(key, 0.0f);
+        snprintf(key, sizeof(key), "ap%u_w", i);
+        gForestApproach[i].yaw_deg = prefs.getShort(key, FOREST_AP_DEFAULT[i].yaw_deg);
+        gForestApproach[i].has_pre = true;
+        gForestApproach[i].has_yaw = FOREST_AP_DEFAULT[i].has_yaw;
+    }
+    for (uint8_t k = 0; k < sizeof(FOREST_REC_IDS); k++) {
+        const uint8_t id = FOREST_REC_IDS[k];
+        char key[8];
+        snprintf(key, sizeof(key), "f%u_ok", id);
+        if (prefs.getUChar(key, 0) == 0) continue;
+        snprintf(key, sizeof(key), "f%u_x", id);
+        gForestWp[id].x_cm = prefs.getFloat(key, gForestWp[id].x_cm);
+        snprintf(key, sizeof(key), "f%u_y", id);
+        gForestWp[id].y_cm = prefs.getFloat(key, gForestWp[id].y_cm);
+    }
+    prefs.end();
+}
+
+// Anchor: F2,F6,F7,F11 (record). Sisanya offset ±FOREST_CELL_CM pada grid.
+void forestDeriveWpFromRecorded() {
+    const ForestWaypoint& f2  = gForestWp[2];
+    const ForestWaypoint& f6  = gForestWp[6];
+    const ForestWaypoint& f7  = gForestWp[7];
+    const ForestWaypoint& f11 = gForestWp[11];
+    if (!f2.valid || !f6.valid || !f7.valid || !f11.valid) return;
+
+    const float c = FOREST_CELL_CM;
+
+    gForestWp[1].x_cm  = f2.x_cm;       // F1: kiri F2, baris sama
+    gForestWp[1].y_cm  = f2.y_cm + c;
+    gForestWp[3].x_cm  = f2.x_cm;       // F3: kanan F2
+    gForestWp[3].y_cm  = f2.y_cm - c;
+    gForestWp[4].x_cm  = f7.x_cm - c;           // F4: atas F7
+    gForestWp[4].y_cm  = f7.y_cm;
+    gForestWp[9].x_cm  = f6.x_cm + c;           // F9: bawah F6
+    gForestWp[9].y_cm  = f6.y_cm;
+    gForestWp[10].x_cm = f7.x_cm + c;           // 10a: bawah F7
+    gForestWp[10].y_cm = f7.y_cm;
+    gForestWp[0].x_cm  = f11.x_cm;           // 10b: sama baris 10a
+    gForestWp[0].y_cm  = f11.y_cm + c;
+    gForestWp[12].x_cm = f11.x_cm;      // F12: kanan F11
+    gForestWp[12].y_cm = f11.y_cm - c;
+}
+
+void forestClearApproachNvs(uint8_t idx) {
+    char key[8];
+    Preferences prefs;
+    prefs.begin(FOREST_WP_NVS_NS, false);
+    snprintf(key, sizeof(key), "ap%u_ok", idx);
+    prefs.remove(key);
+    prefs.end();
+}
+
+void forestClearForestWpNvs(uint8_t forestId) {
+    char key[8];
+    Preferences prefs;
+    prefs.begin(FOREST_WP_NVS_NS, false);
+    snprintf(key, sizeof(key), "f%u_ok", forestId);
+    prefs.remove(key);
+    prefs.end();
+}
+
+namespace {
+
 uint8_t forestGroup(uint8_t id) {
     if (id <= 3)             return 0;
     if (id == 4 || id == 7) return 1;
@@ -106,18 +195,15 @@ uint8_t forestGroup(uint8_t id) {
     return 3;
 }
 
-// Baris forest dalam grid (0-based): row = (id-1)/3
 uint8_t forestRow(uint8_t id) { return (id - 1) / 3; }
 
-// Estimasi posisi X robot saat ini dari state terakhir (sebelum ada odometri penuh).
 float getCurrentX_cm() {
-    if (gLastForestId > 0) return FOREST_WP_BLUE[gLastForestId].x_cm;
+    if (gLastForestId > 0) return gForestWp[gLastForestId].x_cm;
     if (gLastApproachedCol == 0 || gLastApproachedCol == 2) return ORIGIN_X_CM - 0.5f * CELL_CM;
     if (gLastApproachedCol == 1 || gLastApproachedCol == 3) return ORIGIN_X_CM + 2.5f * CELL_CM;
     return GRID_CENTER_X_CM;
 }
 
-// Isi seq[0..3] dengan urutan approach index. seq berakhir di -1 (sentinel).
 void computeApproachSeq(uint8_t tid, int8_t seq[4]) {
     seq[0] = seq[1] = seq[2] = seq[3] = -1;
     int k = 0;
@@ -166,7 +252,6 @@ void computeApproachSeq(uint8_t tid, int8_t seq[4]) {
     }
 }
 
-// Urutan approach menuju [2] saat exitFromForest() — berdasarkan gLastApproachedCol saja.
 void computeExitSeq(int8_t seq[4]) {
     seq[0] = seq[1] = seq[2] = seq[3] = -1;
     int k = 0;
@@ -182,7 +267,7 @@ void computeExitSeq(int8_t seq[4]) {
             seq[k++] = 2;
             break;
         default:
-            seq[k++] = 2;  // ponytail: lastApproached belum ada, fallback langsung [2]
+            seq[k++] = 2;
             break;
     }
 }
@@ -212,7 +297,6 @@ char pickForestArmSide() {
     return side;
 }
 
-// Arm kiri = master motor Y; arm kanan = slave2 motortarget (sama pola armBox.ino).
 void deployForestArm(char side, long heightEnc) {
     if (side == 'l')
         motorYSetTarget(heightEnc);
@@ -220,17 +304,13 @@ void deployForestArm(char side, long heightEnc) {
         sendSlave2Command("motortarget %ld", heightEnc);
 }
 
-// -------------------------------------------------------------------------
-//  STATE MACHINE INTERNAL
-// -------------------------------------------------------------------------
-
 enum class ForestPhase : uint8_t {
     COMPUTE,
     APPROACH_MOVE,
     APPROACH_YAW,
     FOREST_MOVE,
-    FOREST_ARM_Y,      // turun motor Y master ke height_enc forest
-    FOREST_ARM_DEPLOY, // arm kiri: tunggu master Y sampai LEVEL_5
+    FOREST_ARM_Y,
+    FOREST_ARM_DEPLOY,
 };
 
 static constexpr uint8_t FOREST_TARGET_EXIT = 255;
@@ -254,7 +334,25 @@ void forestOnGotoMissionComplete() {
     sActiveSlotMission = 0;
 }
 
-// Shared state-machine tick — dipakai goForest() dan exitFromForest().
+// BLUE: negasi Y hanya forest 1, 3, 12, dan 10b (bukan 10a / forest lain)
+bool forestNeedsAllianceYFlip(uint8_t forestId, uint8_t wpIdx) {
+    if (gAllianceColor != AllianceColor::BLUE) return false;
+    if (forestId == 1 || forestId == 3 || forestId == 12) return true;
+    return forestId == 10 && wpIdx == FOREST10B_IDX;
+}
+
+bool forestApproachNeedsAllianceYFlip(uint8_t destForestId) {
+    if (gAllianceColor != AllianceColor::BLUE) return false;
+    if (destForestId == 1 || destForestId == 3 || destForestId == 12) return true;
+    if (destForestId != 10) return false;
+    for (int i = 0; i < 4; i++) {
+        if (sSeq[i] == FOREST10B_AP) return true;
+        if (sSeq[i] == FOREST10A_AP) return false;
+        if (sSeq[i] == -1) break;
+    }
+    return false;
+}
+
 bool forestNavigate() {
     while (true) {
         switch (sPhase) {
@@ -277,15 +375,16 @@ bool forestNavigate() {
                 sTarget           = 0;
 
                 const uint8_t wpIdx = forestWpIdx(forestId);
-                const ForestWaypoint& wp = FOREST_WP_BLUE[wpIdx];
+                const ForestWaypoint& wp = gForestWp[wpIdx];
 
-                gTargetX_cm     = wp.x_cm;
-                gTargetY_cm     = wp.y_cm;
-                gTargetSpeedRpm = wp.speed_rpm;
-                if (gAllianceColor == AllianceColor::BLUE) gTargetY_cm = -gTargetY_cm;
-
+                gTargetX_cm         = wp.x_cm;
+                gTargetY_cm         = wp.y_cm;
+                if (forestNeedsAllianceYFlip(forestId, wpIdx)) {
+                    gTargetY_cm = -gTargetY_cm;
+                }
+                gTargetSpeedRpm     = wp.speed_rpm;
                 gMotionWaypointMode = true;
-                sPhase = ForestPhase::FOREST_MOVE;
+                sPhase              = ForestPhase::FOREST_MOVE;
                 return true;
             }
 
@@ -300,16 +399,16 @@ bool forestNavigate() {
             sSeqStep++;
             gLastApproachedCol = ap;
 
-            if (!FOREST_COL_APPROACH[ap].has_pre) {
+            if (!gForestApproach[ap].has_pre) {
                 continue;
             }
 
-            sApX   = FOREST_COL_APPROACH[ap].pre_x_cm;
-            sApY   = FOREST_COL_APPROACH[ap].pre_y_cm;
-            sApYaw = FOREST_COL_APPROACH[ap].yaw_deg;
+            sApX   = gForestApproach[ap].pre_x_cm;
+            sApY   = gForestApproach[ap].pre_y_cm;
+            sApYaw = gForestApproach[ap].yaw_deg;
 
             if (sExitMode && ap == 2 && nextApInSeq == -1) {
-                sApYaw = 180;  // exit finish — kondisi khusus, selalu hadap atas
+                sApYaw = 180;
             } else {
                 if (alreadyHere || ap == nextApInSeq) {
                     sApYaw = 0;
@@ -323,31 +422,32 @@ bool forestNavigate() {
                     sApYaw = -90;
                 } else if (ap == 3 && nextApInSeq == -1 && prevApInSeq != 2
                            && forestGroup(sTarget) == 0) {
-                    sApYaw = 0;  // [3]→forest TOP saja
+                    sApYaw = 0;
                 }
             }
-            if (gAllianceColor == AllianceColor::BLUE
-                && sApYaw != 180 && sApYaw != -180) {
-                sApYaw = -sApYaw;
+
+            gTargetX_cm         = sApX;
+            gTargetY_cm         = sApY;
+            if (forestApproachNeedsAllianceYFlip(sTarget)) {
+                gTargetY_cm = -gTargetY_cm;
             }
-
-            gTargetX_cm     = sApX;
-            gTargetY_cm     = sApY;
-            gTargetSpeedRpm = sExitMode ? DEFAULT_SPEED_RPM
-                                        : FOREST_WP_BLUE[sTarget].speed_rpm;
-            if (gAllianceColor == AllianceColor::BLUE) gTargetY_cm = -gTargetY_cm;
-
+            gTargetSpeedRpm     = sExitMode ? DEFAULT_SPEED_RPM
+                                            : gForestWp[sTarget].speed_rpm;
             gMotionWaypointMode = true;
-            sPhase = ForestPhase::APPROACH_MOVE;
+            sPhase              = ForestPhase::APPROACH_MOVE;
             return true;
         }
 
         case ForestPhase::APPROACH_MOVE:
             if (gMotionWaypointMode) return true;
-            if (FOREST_COL_APPROACH[gLastApproachedCol].has_yaw) {
+            if (gForestApproach[gLastApproachedCol].has_yaw) {
+                float apY = sApY;
+                if (forestApproachNeedsAllianceYFlip(sTarget)) {
+                    apY = -apY;
+                }
                 sendGotoCommand(
                     (int16_t)lroundf(sApX),
-                    (int16_t)lroundf(gAllianceColor == AllianceColor::BLUE ? -sApY : sApY),
+                    (int16_t)lroundf(apY),
                     sApYaw
                 );
                 gMotionWaypointMode = true;
@@ -367,7 +467,7 @@ bool forestNavigate() {
             if (gMotionWaypointMode) return true;
             if (!sExitMode && sActiveForestId > 0) {
                 motorYSetTarget(motorYLevelEnc(
-                    FOREST_WP_BLUE[forestWpIdx(sActiveForestId)].height_level));
+                    gForestWp[forestWpIdx(sActiveForestId)].height_level));
                 sPhase = ForestPhase::FOREST_ARM_Y;
                 return true;
             }
@@ -378,7 +478,7 @@ bool forestNavigate() {
             if (motorYIsActive()) return true;
             gForestArmSide = pickForestArmSide();
             deployForestArm(gForestArmSide,
-                motorYLevelEnc(FOREST_WP_BLUE[forestWpIdx(sActiveForestId)].height_level));
+                motorYLevelEnc(gForestWp[forestWpIdx(sActiveForestId)].height_level));
             if (gForestArmSide == 'l') {
                 sPhase = ForestPhase::FOREST_ARM_DEPLOY;
                 return true;
@@ -400,16 +500,6 @@ bool forestNavigate() {
 
 } // namespace
 
-// =====================================================================
-//  GLOBAL STATE — forest navigation history
-// =====================================================================
-
-int8_t gLastApproachedCol = -1;
-int8_t gLastForestId      = 0;
-char   gForestArmSide     = 0;
-
-namespace {
-
 constexpr const char* FOREST_DEST_NVS_NS = "forest_cfg";
 constexpr const char* FOREST_KEY_D1      = "dest1";
 constexpr const char* FOREST_KEY_D2      = "dest2";
@@ -424,9 +514,15 @@ void forestSaveDestNvs() {
     prefs.end();
 }
 
-} // anonymous namespace
+int8_t gLastApproachedCol = -1;
+int8_t gLastForestId      = 0;
+char   gForestArmSide     = 0;
 
 void initForestDest() {
+    forestInitDefaults();
+    forestLoadWpNvs();
+    forestDeriveWpFromRecorded();
+
     Preferences prefs;
     prefs.begin(FOREST_DEST_NVS_NS, true);
     gForestDest1 = prefs.getUChar(FOREST_KEY_D1, FOREST_DEFAULT_D1);
@@ -451,7 +547,7 @@ bool forestGotoSlot(uint8_t slot) {
     if (slot != 1 && slot != 2) return false;
     if (slot == 2 && !gForestDest1Done) return false;
     const uint8_t id = (slot == 1) ? gForestDest1 : gForestDest2;
-    if (id < 1 || id > 12 || !FOREST_WP_BLUE[id].valid) return false;
+    if (id < 1 || id > 12 || !gForestWp[id].valid) return false;
     sActiveSlotMission = slot;
     if (slot == 1) {
         forestResetDest1Done();
@@ -465,12 +561,63 @@ void forestTriggerExit() {
     exitFromForest();
 }
 
-// =====================================================================
-//  API (navigate)
-// =====================================================================
+void forestRecordApproach(uint8_t idx, float x_cm, float y_cm, float yaw_deg) {
+    if (idx >= 4) return;
+    gForestApproach[idx].pre_x_cm = x_cm;
+    gForestApproach[idx].pre_y_cm = y_cm;
+    gForestApproach[idx].yaw_deg  = (int16_t)lroundf(yaw_deg);
+    gForestApproach[idx].has_pre  = true;
+    gForestApproach[idx].has_yaw  = FOREST_AP_DEFAULT[idx].has_yaw;
+    forestSaveApproachNvs(idx);
+    Serial.printf("[ForestRec] approach[%u] x=%.1f y=%.1f yaw=%d\n",
+                  idx, x_cm, y_cm, gForestApproach[idx].yaw_deg);
+}
+
+void forestRecordWp(uint8_t forestId, float x_cm, float y_cm) {
+    if (forestId >= 13 || !gForestWp[forestId].valid) return;
+    gForestWp[forestId].x_cm = x_cm;
+    gForestWp[forestId].y_cm = y_cm;
+    forestSaveForestWpNvs(forestId);
+    forestDeriveWpFromRecorded();
+    Serial.printf("[ForestRec] forest %u x=%.1f y=%.1f\n", forestId, x_cm, y_cm);
+}
+
+void forestRecordClear() {
+    for (uint8_t i = 0; i < 4; i++) {
+        gForestApproach[i] = FOREST_AP_DEFAULT[i];
+        forestClearApproachNvs(i);
+    }
+    for (uint8_t k = 0; k < sizeof(FOREST_REC_IDS); k++) {
+        const uint8_t id = FOREST_REC_IDS[k];
+        gForestWp[id].x_cm = FOREST_WP_DEFAULT[id].x_cm;
+        gForestWp[id].y_cm = FOREST_WP_DEFAULT[id].y_cm;
+        forestClearForestWpNvs(id);
+    }
+    forestDeriveWpFromRecorded();
+    Serial.println("[ForestRec] cleared approach + forest 2/6/7/11");
+}
+
+void forestRecordPrint(Print& out) {
+    out.println("ForestRec approach:");
+    for (uint8_t i = 0; i < 4; i++) {
+        const ForestColApproach& ap = gForestApproach[i];
+        if (ap.has_pre) {
+            out.printf("  [%u] x=%.1f y=%.1f yaw=%d\n",
+                       i, ap.pre_x_cm, ap.pre_y_cm, ap.yaw_deg);
+        } else {
+            out.printf("  [%u] (belum terekam)\n", i);
+        }
+    }
+    out.println("ForestRec wp:");
+    for (uint8_t k = 0; k < sizeof(FOREST_REC_IDS); k++) {
+        const uint8_t id = FOREST_REC_IDS[k];
+        const ForestWaypoint& wp = gForestWp[id];
+        out.printf("  forest %u: x=%.1f y=%.1f\n", id, wp.x_cm, wp.y_cm);
+    }
+}
 
 bool goForest(uint8_t id) {
-    if (id == 0 || id > 12 || !FOREST_WP_BLUE[id].valid) return false;
+    if (id == 0 || id > 12 || !gForestWp[id].valid) return false;
 
     const bool newMission = sExitMode || (sActiveForestId != id && sTarget != id);
     if (newMission) {

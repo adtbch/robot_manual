@@ -9,8 +9,10 @@
 #include "forest.h"
 #include "config.h"
 #include "espnow.h"
+#include "odom.h"
 
 void forestControlTick(const ControlPacket& pkt) {
+    if (odomIsModeSave()) return;
     static uint32_t prevButtons = 0;
 
     if (!pkt.connected || !espNowControlIsLinkAlive()) {
