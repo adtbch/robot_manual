@@ -24,8 +24,9 @@ constexpr int HOMING_PWM = 400;
 // =====================================================================
 
 void setServoHoming() {
+    setServoAngle('t', 70);
+    setServoAngle('b', 0);
     setServoAngle('d', 0);
-    setServoAngle('b', 70);
     gGripperState = IDLE;
 }
 
@@ -52,4 +53,9 @@ void setMotorHoming() {
 void setHomingAll() {
     setMotorHoming();
     setServoHoming();
+}
+
+void setArmHoming() {
+    motorKSetDirection(-1);
+    sendSlave2Command("motor k -255");
 }

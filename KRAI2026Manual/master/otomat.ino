@@ -74,7 +74,7 @@ void gripperZone1() {
 
         case CLOSING:
             if (gJedaGripper.check(300)) {
-                setServoAngle('b', 100);
+                setServoAngle('t', 90);
                 gripperMotorYSetLevel(1);
                 gGripperState = UP;
             }
@@ -83,6 +83,7 @@ void gripperZone1() {
         case UP:
             if (motorYAtLevel(1)) {
                 odomGoto(2);
+                gJedaGripper.reset();
                 gGripperState = STRAIGHTEN;
             };
             break;
@@ -100,7 +101,7 @@ void gripperZone1() {
 
 void gripperReadytoStab() {
     if (gGripperState == STRAIGHTEN) {
-        setServoAngle('b', 0);
+        setServoAngle('t', 0);
         gGripperState = READY_TO_STAB;
     }
 }

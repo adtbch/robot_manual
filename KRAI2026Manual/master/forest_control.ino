@@ -30,7 +30,10 @@ void forestControlTick(const ControlPacket& pkt) {
     const uint32_t nowDpad  = pkt.buttons & kDpad;
 
     if ((nowDpad & BTN_UP) && !(prevDpad & BTN_UP)) {
+        gripperMotorYSetLevel(4);
+        sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
         forestGotoSlot(1);
+
     } else if ((nowDpad & BTN_LEFT) && !(prevDpad & BTN_LEFT)) {
         forestGotoSlot(2);
     } else if ((nowDpad & BTN_DOWN) && !(prevDpad & BTN_DOWN)) {

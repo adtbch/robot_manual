@@ -63,7 +63,7 @@ static uint8_t gMotorYLevel = 0;
 namespace {
 
 uint32_t gPrevButtons = 0;
-int gServoBAngle = 70;
+int gServoTAngle = 80;
 Jeda gJedaMotorYStep;
 Jeda gJedaMotorYLevel;
 Jeda gJedaMotorXStep;
@@ -212,6 +212,11 @@ void handleGripperButtons(const ControlPacket &pkt) {
         }
         return;
     }
+    if (isPressed(pkt.buttons, BTN_CROSS)) {
+        static bool servoBState = false;
+        servoBState = !servoBState;
+        setServoAngle('b', servoBState ? 90 : 0);
+    }
 }
 
 void handleManualServoB(const ControlPacket &pkt) {
@@ -221,7 +226,7 @@ void handleManualServoB(const ControlPacket &pkt) {
     if (dir == 0) return;
 
     const int step = pickSpeedStep(pkt.buttons, ARM_STEP_NORMAL, ARM_STEP_SLOW, ARM_STEP_FAST);
-    setServoBAngle(gServoBAngle + dir * step);
+    setServoTAngle(gServoTAngle + dir * step);
 }
 
 void handleGripperMotors(const ControlPacket &pkt) { 
@@ -275,13 +280,13 @@ void gripperMotorYResetLevel() {
     gripperMotorYSetLevel(0);
 }
 
-int getServoBAngle() {
-    return gServoBAngle;
+int getServoTAngle() {
+    return gServoTAngle;
 }
 
-void setServoBAngle(int angle) {
-    gServoBAngle = constrain(angle, 0, 100);
-    setServoAngle('b', gServoBAngle);
+void setServoTAngle(int angle) {
+    gServoTAngle = constrain(angle, 0, 100);
+    setServoAngle('t', gServoTAngle);
 }
 
 void gripperControlTick(const ControlPacket &pkt) {

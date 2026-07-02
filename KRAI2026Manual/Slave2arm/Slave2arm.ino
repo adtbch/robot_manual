@@ -41,6 +41,12 @@ void setup() {
     setupProximity();
     Serial.println("Proximity: READY");
 
+    // Homing — blocking, sementara master masih delay
+    motorYHoming();
+    Serial.println("Motor Y homed");
+    motorXHoming();
+    Serial.println("Motor X homed");
+
     // Init serial (UART1)
     setupSerial();
     Serial.println("UART1: READY");

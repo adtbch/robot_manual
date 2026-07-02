@@ -95,4 +95,8 @@ bool executeMotorCommand(char motorId, int pwm);
 int motorRunGetPwm(char id);
 int motorYGetLastPwm();
 
+// Homing — blocking, dipanggil dari setup()
+void motorYHoming();
+void motorXHoming();
+
 #endif // MOTOR_H
