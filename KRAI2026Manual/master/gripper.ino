@@ -40,7 +40,7 @@ void setMotorHoming() {
     }
     pwmMotor('y', 0);
     resetEncoderCount('y');
-    motorYSetTarget(0);
+    gripperMotorYSetLevel(0);
     
     pwmMotor('x', HOMING_PWM);
     while (!readLimitSwitch(LIMIT_X_MUNDUR)) {

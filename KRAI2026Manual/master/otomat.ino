@@ -82,8 +82,8 @@ void gripperZone1() {
 
         case UP:
             if (motorYAtLevel(1)) {
+                motorXSetTarget(0);
                 odomGoto(2);
-                gJedaGripper.reset();
                 gGripperState = STRAIGHTEN;
             };
             break;

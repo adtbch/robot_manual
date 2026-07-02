@@ -38,6 +38,7 @@ void forestControlTick(const ControlPacket& pkt) {
         forestGotoSlot(2);
     } else if ((nowDpad & BTN_DOWN) && !(prevDpad & BTN_DOWN)) {
         forestTriggerExit();
+        zoneState = 2;
     }
 
     prevButtons = pkt.buttons;
