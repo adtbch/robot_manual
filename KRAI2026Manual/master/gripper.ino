@@ -24,7 +24,7 @@ constexpr int HOMING_PWM = 400;
 // =====================================================================
 
 void setServoHoming() {
-    setServoAngle('t', 70);
+    setServoAngle('t', 0);
     setServoAngle('b', 0);
     setServoAngle('d', 0);
     gGripperState = IDLE;
@@ -48,6 +48,7 @@ void setMotorHoming() {
     }
     pwmMotor('x', 0);
     resetEncoderCount('x');
+    motorXSetTarget(1500);
 }
 
 void setHomingAll() {

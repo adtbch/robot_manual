@@ -27,7 +27,7 @@
 //  STATE — GRIPPER
 // =====================================================================
 
-GripperState gGripperState = IDLE;
+GripperState gGripperState = READY_TO_STAB;
 
 namespace {
 
@@ -47,11 +47,11 @@ ArmBoxState gArmBoxR = ARMBOX_IDLE;
 ArmBoxState gArmBoxL = ARMBOX_IDLE;
 Jeda jedaArmBoxR;
 Jeda jedaArmBoxL;
-
 } // anonymous namespace
 
 void setupZone1() {
     setServoHoming();
+    setServoAngle('t', 80);
     odomGoto(1);
     gripperMotorYSetLevel(0);
     motorXSetTarget(1500);
