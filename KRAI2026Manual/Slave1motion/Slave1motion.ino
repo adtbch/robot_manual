@@ -113,5 +113,5 @@ void loop() {
             }
         }
     }
-    updateOLED();
+    // updateOLED();
 }
