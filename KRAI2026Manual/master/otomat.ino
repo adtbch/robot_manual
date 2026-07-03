@@ -54,7 +54,7 @@ void setupZone1() {
     setServoHoming();
     odomGoto(1);
     gripperMotorYSetLevel(0);
-    motorXSetTarget(200);
+    motorXSetTarget(1500);
 }
 
 // =====================================================================

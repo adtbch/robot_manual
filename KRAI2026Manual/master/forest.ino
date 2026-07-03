@@ -456,6 +456,7 @@ bool forestNavigate() {
                 gTargetY_cm         = wp.y_cm;
                 gTargetSpeedRpm     = wp.speed_rpm;
                 gMotionWaypointMode = true;
+                sendGotoCommand(gTargetX_cm, gTargetY_cm, gYawTarget, gTargetSpeedRpm);
                 sPhase              = ForestPhase::FOREST_MOVE;
                 return true;
             }
@@ -503,6 +504,7 @@ bool forestNavigate() {
             gTargetSpeedRpm     = sExitMode ? DEFAULT_SPEED_RPM
                                             : gForestWp[sTarget].speed_rpm;
             gMotionWaypointMode = true;
+            sendGotoCommand(gTargetX_cm, gTargetY_cm, gYawTarget, gTargetSpeedRpm);
             sPhase              = ForestPhase::APPROACH_MOVE;
             return true;
         }
@@ -512,8 +514,8 @@ bool forestNavigate() {
             if (gForestApproach[gLastApproachedCol].has_yaw) {
                 gTargetX_cm = sApX;
                 gTargetY_cm = sApY;
-                gYawTarget  = sApYaw;
                 gMotionWaypointMode = true;
+                sendGotoCommand(gTargetX_cm, gTargetY_cm, gYawTarget, gTargetSpeedRpm);
                 sPhase = ForestPhase::APPROACH_YAW;
                 return true;
             }
@@ -523,6 +525,7 @@ bool forestNavigate() {
         case ForestPhase::APPROACH_YAW:
             if (gMotionWaypointMode) return true;
             gYawTarget = sApYaw;
+            sendGotoCommand(gTargetX_cm, gTargetY_cm, gYawTarget, gTargetSpeedRpm);
             sPhase = ForestPhase::COMPUTE;
             continue;
 

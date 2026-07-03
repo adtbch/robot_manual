@@ -28,8 +28,8 @@
 //  MAC ADDRESS — WAJIB DIISI SEBELUM UPLOAD
 // =====================================================================
 // MAC ESP32-S3 penerima (target ESP-NOW).
-// Cara cari: Serial Monitor receiver saat boot, baris "MAC STA". EC:DA:3B:4D:9B:D4
-constexpr uint8_t kEspNowTargetMac[6] = {0xEC, 0xDA, 0x3B, 0x4D, 0x9B, 0xD4};
+// Cara cari: Serial Monitor receiver saat boot, baris "MAC STA". 94:A9:90:D2:32:90
+constexpr uint8_t kEspNowTargetMac[6] = {0x94, 0xA9, 0x90, 0xD2, 0x32, 0x90};
 
 // =====================================================================
 //  KONFIGURASI KOMUNIKASI

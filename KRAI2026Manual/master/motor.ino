@@ -20,8 +20,8 @@
 //  ENCODER POSITION — Motor X & Y
 // =====================================================================
 
-constexpr int  MOTOR_X_MOVE_PWM = 400;
-constexpr int  MOTOR_Y_MOVE_PWM = 400;
+constexpr int  MOTOR_X_MOVE_PWM = 800;
+constexpr int  MOTOR_Y_MOVE_PWM = 800;
 constexpr long MOTOR_X_POSITION_TOLERANCE = 5;
 constexpr long MOTOR_Y_POSITION_TOLERANCE = 5;
 
@@ -47,6 +47,7 @@ namespace {
     MotorTarget gMotorX;
     MotorTarget gMotorY;
     int gMotorYLastPwm = 0;
+    int gMotorXLastPwm = 0;
 
     int findMotorIndex(char id) {
         for (size_t i = 0; i < MOTOR_COUNT; i++) {
@@ -269,6 +270,17 @@ void motorYLimitTick() {
         motorYStop();
         gMotorY.target = 0;
         resetEncoderCount('y');
+    }
+}
+
+void motorXLimitTick() {
+    if (!readLimitSwitch(LIMIT_X_MUNDUR)) return;
+
+    const bool movingFront = gMotorXLastPwm > 0 || gMotorX.target > 0;
+    if (!movingFront) {
+        motorXStop();
+        gMotorX.target = 0;
+        resetEncoderCount('x');
     }
 }
 
