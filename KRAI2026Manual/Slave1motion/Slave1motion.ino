@@ -67,6 +67,25 @@ void setup() {
     }
     Serial.println("MPU: READY");
     oledShowStatus("MPU: READY", "Starting...");
+
+    // Pindahkan I2C (OLED & MPU) ke Core 0 agar tidak block Core 1 (UART/PID)
+    xTaskCreatePinnedToCore(
+        [](void* pvParam) {
+            while (true) {
+                if (!isAutoTunerRunning()) {
+                    updateYaw();
+                }
+                updateOLED();
+                vTaskDelay(pdMS_TO_TICKS(10)); // 10ms cukup (MPU 100Hz, OLED throttled 100ms)
+            }
+        },
+        "I2cTask",
+        4096,
+        NULL,
+        1,
+        NULL,
+        0 // Core 0
+    );
 }
 
 // =====================================================================
@@ -101,9 +120,9 @@ void loop() {
 
     updateOdometry();
     
-    // Waypoint dan TestYaw mutex — waypoint lebih prioritas
+    // Waypoint dan TestYaw mutex - waypoint lebih prioritas
     if (!isAutoTunerRunning()) {
-        updateYaw();
+        // updateYaw() sudah pindah ke I2cTask di Core 0
         if (getWaypointState() != WaypointState::IDLE) {
             waypointTick(wpTargetX_m, wpTargetY_m, wpTargetYaw_deg, wpMaxSpeed);
         } else if (testYawMode) {
@@ -113,5 +132,5 @@ void loop() {
             }
         }
     }
-    updateOLED();
+    // updateOLED() sudah pindah ke I2cTask di Core 0
 }
