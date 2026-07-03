@@ -327,7 +327,7 @@ void espNowControlTick() {
     if (!gEspNow.isReady) {
         return;
     }
-    printStatsIfDue();
+    // printStatsIfDue();
 }
 
 bool espNowControlReadPacket(ControlPacket &outPacket) {

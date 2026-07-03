@@ -1,12 +1,20 @@
 /*
  * =====================================================================
  * FILE    : motion_control.ino
- * PERAN   : Mapping joystick/dpad → field-centric KN motion ke slave1motion
- *           via UART1. KN-only (velocity langsung, no GOTO/waypoint).
+ * PERAN   : Mapping joystick/dpad → field-centric motion ke slave1motion
+ *           via UART1.
  *
- *   stick → vx/vy langsung → sendKnCommand
- *   L1/R1 → atur RPM (kecepatan robot):
- *     normal 75, L1 slow 25, R1 fast 150
+ * DUA MODE KONTROL:
+ *   GOTO (modeKinematics=false):
+ *     stick → step-based increment gTargetX/Y_cm → sendGotoCommand
+ *     L1/R1 → atur step interval (seberapa sering target ++):
+ *       normal 20ms, L1 slow 100ms, R1 fast 5ms
+ *     Setiap step: ±GOTO_STEP_CM per axis, sendGotoCommand tiap tick
+ *
+ *   KINEMATICS (modeKinematics=true):
+ *     stick → vx/vy langsung → sendKnCommand
+ *     L1/R1 → atur RPM (kecepatan robot):
+ *       normal 75, L1 slow 25, R1 fast 150
  *
  * INPUT MODE (toggle dengan SHARE) — hanya untuk vx/vy:
  *   ANALOG → analog kiri joystick
@@ -35,7 +43,7 @@
 constexpr int16_t JOYSTICK_DEADZONE = 20;
 constexpr int16_t JOYSTICK_MAX      = 127;
 
-// RPM — kecepatan langsung vx/vy via KN
+// KINEMATICS mode: RPM — kecepatan langsung vx/vy
 constexpr int16_t SPEED_RPM_NORMAL = 75;
 constexpr int16_t SPEED_RPM_SLOW = 25;
 constexpr int16_t SPEED_RPM_FAST = 150;
@@ -56,7 +64,7 @@ float gTargetX_cm = 0.0f;
 float gTargetY_cm = 0.0f;
 int16_t gTargetSpeedRpm = SPEED_RPM_NORMAL;
 bool gMotionWaypointMode = false;
-bool modeKinematics = true;  // KN-only
+bool modeKinematics = true;  // KN-only — GOTO dihapus
 
 namespace {
 
@@ -132,7 +140,7 @@ void motionControlTick(const ControlPacket &pkt) {
     
     const bool linkUp = pkt.connected && espNowControlIsLinkAlive();
     
-    if (linkUp && (!gMotionWaypointMode || modeKinematics)) {
+    if (linkUp && (!gMotionWaypointMode)) {
         gTargetSpeedRpm = SPEED_RPM_NORMAL;
         bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
         const bool odomCombo = (pkt.buttons & (BTN_SHARE | BTN_TOUCHPAD)) == (BTN_SHARE | BTN_TOUCHPAD);
@@ -177,9 +185,12 @@ void motionControlTick(const ControlPacket &pkt) {
 
         const int16_t rawRx = applyStickDeadzone(pkt.rx);
         const int16_t rawRy = applyStickDeadzone(-(int16_t)pkt.ry);
-        if (pkt.buttons & BTN_L2) {
+        // ponytail: pakai l2Value threshold bukan BTN_L2 — trigger PS4 butuh penuh untuk set bit digital
+        const bool l2Active = (pkt.l2Value > 64) && !(pkt.buttons & BTN_R2);
+        const bool r2Active = (pkt.r2Value > 64);
+        if (l2Active) {
             updateYawTargetFromCardinalStick(rawRx, rawRy);
-        } else if (!(pkt.buttons & BTN_R2)) {
+        } else if (!r2Active) {
             updateYawTargetFromStick(rawRx, yawStepMs);
         }
         if (pkt.buttons & BTN_SQUARE) {
@@ -190,7 +201,7 @@ void motionControlTick(const ControlPacket &pkt) {
         vx = 0;
         vy = 0;
     }
-
-    // KN-only: kirim velocity langsung ke Slave1
-    sendKnCommand(vx, vy, gYawTarget);
+    // Kirim ke slave1
+        sendKnCommand(vx, vy, gYawTarget);
+    
 }
