@@ -70,6 +70,7 @@ namespace {
 
 uint32_t gMotionPrevButtons = 0;
 Jeda gJedaYawStep;
+Jeda gJedaSend;
 
 constexpr uint32_t BTN_INVERT_COMBO = BTN_L1 | BTN_R1 | BTN_L2 | BTN_R2;
 
@@ -201,7 +202,7 @@ void motionControlTick(const ControlPacket &pkt) {
         vx = 0;
         vy = 0;
     }
-    // Kirim ke slave1
+    if(!gMotionWaypointMode){
         sendKnCommand(vx, vy, gYawTarget);
-    
+    }
 }
