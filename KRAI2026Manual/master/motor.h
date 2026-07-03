@@ -47,9 +47,9 @@ constexpr int PWM_RESOLUTION = 10;      // bit (2^10 = 1024)
 
 // Encoder travel limits — origin (0) = posisi homing (bawah + mundur)
 constexpr long MOTOR_X_ENC_MIN = 0;
-constexpr long MOTOR_X_ENC_MAX = 2500;
+constexpr long MOTOR_X_ENC_MAX = 3660;
 constexpr long MOTOR_Y_ENC_MIN = 0;
-constexpr long MOTOR_Y_ENC_MAX = 2500;
+constexpr long MOTOR_Y_ENC_MAX = 4058;
 
 // Capit senjata — level naik/turun Y (0 = bawah/homing, 5 = paling atas)
 constexpr uint8_t MOTOR_Y_LEVEL_MAX = 5;
@@ -81,6 +81,7 @@ long motorXGetTarget();
 void motorXStop();
 bool motorXIsActive();
 void motorXPositionTick();
+void motorXLimitTick();
 
 // =====================================================================
 //  MOTOR Y — encoder positioning + hold anti-gravitasi di target

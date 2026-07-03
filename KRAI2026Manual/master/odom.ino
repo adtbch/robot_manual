@@ -351,7 +351,6 @@ bool odomGoto(uint8_t slot) {
     gTargetSpeedRpm     = wp.maxspeed_rpm;
     gMotionWaypointMode = true;
 
-    Serial.printf("[OdomGoto] #%u → x=%.1f y=%.1f yaw=%d speed=%d\n",
-                  slot, gTargetX_cm, gTargetY_cm, gYawTarget, gTargetSpeedRpm);
+    sendGotoCommand(gTargetX_cm, gTargetY_cm, gYawTarget, gTargetSpeedRpm);
     return true;
 }

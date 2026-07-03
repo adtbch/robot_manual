@@ -132,5 +132,5 @@ void loop() {
             }
         }
     }
-    // updateOLED() sudah pindah ke I2cTask di Core 0
+    updateOLED();
 }

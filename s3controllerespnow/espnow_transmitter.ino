@@ -73,25 +73,31 @@ bool espnow_init() {
     // Register callback pengiriman
     esp_now_register_send_cb(saat_espnow_terkirim);
 
-    // Daftarkan receiver sebagai peer
-    if (!esp_now_is_peer_exist(kEspNowTargetMac)) {
-        esp_now_peer_info_t peer = {};
-        memcpy(peer.peer_addr, kEspNowTargetMac, 6);
-        peer.channel = kEspNowChannel;
-        peer.encrypt = false;
-        peer.ifidx   = WIFI_IF_STA;
+    // Daftarkan semua receiver sebagai peer
+    for (uint8_t i = 0; i < kEspNowTargetCount; i++) {
+        if (!esp_now_is_peer_exist(kEspNowTargetMacs[i])) {
+            esp_now_peer_info_t peer = {};
+            memcpy(peer.peer_addr, kEspNowTargetMacs[i], 6);
+            peer.channel = kEspNowChannel;
+            peer.encrypt = false;
+            peer.ifidx   = WIFI_IF_STA;
 
-        const esp_err_t peer_err = esp_now_add_peer(&peer);
-        if (peer_err != ESP_OK && peer_err != ESP_ERR_ESPNOW_EXIST) {
-            Serial.printf("[ESP-NOW] Gagal daftarkan peer: err=%d\n", (int)peer_err);
-            return false;
+            const esp_err_t peer_err = esp_now_add_peer(&peer);
+            if (peer_err != ESP_OK && peer_err != ESP_ERR_ESPNOW_EXIST) {
+                Serial.printf("[ESP-NOW] Peer %d gagal: err=%d\n", i, (int)peer_err);
+                return false;
+            }
         }
     }
 
-    Serial.printf("[ESP-NOW] Init OK — target %02X:%02X:%02X:%02X:%02X:%02X ch=%d\n",
-        kEspNowTargetMac[0], kEspNowTargetMac[1], kEspNowTargetMac[2],
-        kEspNowTargetMac[3], kEspNowTargetMac[4], kEspNowTargetMac[5],
-        kEspNowChannel);
+    Serial.println("[ESP-NOW] Init OK — target(s):");
+    for (uint8_t i = 0; i < kEspNowTargetCount; i++) {
+        Serial.printf("  [%d] %02X:%02X:%02X:%02X:%02X:%02X\n", i,
+            kEspNowTargetMacs[i][0], kEspNowTargetMacs[i][1],
+            kEspNowTargetMacs[i][2], kEspNowTargetMacs[i][3],
+            kEspNowTargetMacs[i][4], kEspNowTargetMacs[i][5]);
+    }
+    Serial.printf("  ch=%d\n", kEspNowChannel);
 
     return true;
 }
@@ -109,8 +115,9 @@ bool espnow_init() {
 void kirim_via_espnow(const ControlPacket &paket) {
     if (!espnow_siap) return;
 
+    // nullptr = kirim ke semua peer — master utama + spare
     const esp_err_t err = esp_now_send(
-        kEspNowTargetMac,
+        nullptr,
         reinterpret_cast<const uint8_t *>(&paket),
         sizeof(ControlPacket)
     );

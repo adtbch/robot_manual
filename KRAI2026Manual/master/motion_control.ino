@@ -52,6 +52,7 @@ constexpr int16_t YAW_STICK_THRESHOLD = 30;
 constexpr uint32_t YAW_STEP_INTERVAL_NORMAL_MS = 50;
 constexpr uint32_t YAW_STEP_INTERVAL_SLOW_MS   = 150;
 constexpr uint32_t YAW_STEP_INTERVAL_FAST_MS   = 25;
+constexpr uint32_t kSendIntervalMs = 20;  // kirim ke slave1motion tiap 20ms
 
 // =====================================================================
 //  STATE — shared (extern di config.h)
@@ -203,6 +204,8 @@ void motionControlTick(const ControlPacket &pkt) {
         vy = 0;
     }
     if(!gMotionWaypointMode){
-        sendKnCommand(vx, vy, gYawTarget);
+        if (gJedaSend.check(kSendIntervalMs)) {
+            sendKnCommand(vx, vy, gYawTarget);
+        }
     }
 }

@@ -25,11 +25,16 @@
 #include <WiFi.h>
 
 // =====================================================================
-//  MAC ADDRESS — WAJIB DIISI SEBELUM UPLOAD
+//  MAC ADDRESS — Master utama + spare
 // =====================================================================
 // MAC ESP32-S3 penerima (target ESP-NOW).
-// Cara cari: Serial Monitor receiver saat boot, baris "MAC STA". EC:DA:3B:4D:9B:D4
-constexpr uint8_t kEspNowTargetMac[6] = {0xEC, 0xDA, 0x3B, 0x4D, 0x9B, 0xD4};
+// Baris pertama = master utama, baris kedua = spare (isi MAC cadangan).
+// Controller coba semua, ESP-NOW kirim ke yang aktif.
+constexpr uint8_t kEspNowTargetMacs[][6] = {
+    {0x94, 0xA9, 0x90, 0xD3, 0x15, 0x40}, // Master utama 94:A9:90:D3:15:40
+    {0xC0, 0x4E, 0x30, 0x0A, 0xF3, 0x18}, // Spare — isi MAC Master cadangan
+};
+constexpr uint8_t kEspNowTargetCount = sizeof(kEspNowTargetMacs) / 6;
 
 // =====================================================================
 //  KONFIGURASI KOMUNIKASI

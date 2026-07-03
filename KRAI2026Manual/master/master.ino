@@ -117,6 +117,7 @@ void loop() {
     odomRecordTick(gLastRxPacket);
     // Encoder positioning motor X/Y
     motorXPositionTick();
+    motorXLimitTick();
     motorYLimitTick();
     motorYPositionTick();
 

@@ -308,9 +308,8 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
 
     // ── ENC ─────────────────────────────────────────────────────
     else if (strcmp(token, "enc") == 0) {
-        for (size_t i = 0; i < ENCODER_COUNT; i++) {
-            out.printf("  Encoder%zu: %ld\n", i + 1, getEncoderCount(i));
-        }
+        out.printf("EncX: %ld\n", getEncoderCount('x'));
+        out.printf("EncY: %ld\n", getEncoderCount('y'));
     }
 
     // ── ENCRESET ────────────────────────────────────────────────

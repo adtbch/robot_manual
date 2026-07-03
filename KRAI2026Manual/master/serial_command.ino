@@ -169,6 +169,10 @@ void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
     }
 }
 
+void sendGotoCommand(float x_cm, float y_cm, int16_t yawTarget, int16_t speedRpm) {
+    slave1Serial.printf("goto %.3f %.3f %d 0\n", x_cm , y_cm , yawTarget);
+}
+
 void sendShowOdomCommand() {
     // ponytail: skip jika buffer penuh — cegah blocking
     if (slave1Serial.availableForWrite() >= 16) {
