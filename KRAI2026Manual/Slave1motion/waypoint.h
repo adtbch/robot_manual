@@ -13,7 +13,7 @@
 #include "config.h"
 
 // Default max RPM untuk waypoint
-constexpr float WP_DEFAULT_MAX_RPM = 300.0f;
+constexpr float WP_DEFAULT_MAX_RPM = 400.0f;
 
 
 // NVS init/save

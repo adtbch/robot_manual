@@ -53,9 +53,13 @@ float gOdomW_deg = 0.0f;
 
 void setupSerial() {
     // UART1 — ke slave1
+    slave1Serial.setRxBufferSize(2048);
+    slave1Serial.setTxBufferSize(2048);
     slave1Serial.begin(SLAVE_BAUD, SERIAL_8N1, SLAVE1_RX, SLAVE1_TX);
 
     // UART2 — ke slave2
+    slave2Serial.setRxBufferSize(2048);
+    slave2Serial.setTxBufferSize(2048);
     slave2Serial.begin(SLAVE_BAUD, SERIAL_8N1, SLAVE2_RX, SLAVE2_TX);
 }
 
@@ -154,8 +158,11 @@ bool parseSlave1Response(char* line) {
         gOdomW_deg = atof(wStr);
         gOdomValid = true;
         odomOnSampleReceived(gOdomX_m, gOdomY_m, gOdomW_deg);
-        Serial.printf("[Slave1] odomToMaster: x=%.3fm y=%.3fm w=%.1fdeg\n",
-                      gOdomX_m, gOdomY_m, gOdomW_deg);
+        // ponytail: skip USB print jika buffer penuh (freeze protection)
+        if (Serial.availableForWrite() >= 64) {
+            Serial.printf("[Slave1] odomToMaster: x=%.3fm y=%.3fm w=%.1fdeg\n",
+                          gOdomX_m, gOdomY_m, gOdomW_deg);
+        }
         return true;
     }
 
