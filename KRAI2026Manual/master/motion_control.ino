@@ -43,12 +43,6 @@
 constexpr int16_t JOYSTICK_DEADZONE = 20;
 constexpr int16_t JOYSTICK_MAX      = 127;
 
-// GOTO mode: step interval — seberapa sering gTargetX/Y di-increment
-constexpr uint32_t GOTO_STEP_INTERVAL_NORMAL_MS = 20;
-constexpr uint32_t GOTO_STEP_INTERVAL_SLOW_MS   = 100;
-constexpr uint32_t GOTO_STEP_INTERVAL_FAST_MS   = 5;
-constexpr float GOTO_STEP_CM = 0.85f;  // cm per step per axis
-
 // KINEMATICS mode: RPM — kecepatan langsung vx/vy
 constexpr int16_t SPEED_RPM_NORMAL = 75;
 constexpr int16_t SPEED_RPM_SLOW = 25;
@@ -76,9 +70,7 @@ namespace {
 
 uint32_t gMotionPrevButtons = 0;
 Jeda gJedaYawStep;
-Jeda gJedaGotoStep;
 Jeda gJedaSend;
-constexpr uint32_t GOTO_SEND_INTERVAL_MS = 20;
 
 constexpr uint32_t BTN_INVERT_COMBO = BTN_L1 | BTN_R1 | BTN_L2 | BTN_R2;
 
@@ -146,11 +138,10 @@ void motionControlTick(const ControlPacket &pkt) {
     int16_t vx = 0;
     int16_t vy = 0;
     uint32_t yawStepMs = YAW_STEP_INTERVAL_NORMAL_MS;
-    uint32_t gotoStepMs = GOTO_STEP_INTERVAL_NORMAL_MS;
     
     const bool linkUp = pkt.connected && espNowControlIsLinkAlive();
     
-    if (linkUp && (!gMotionWaypointMode || modeKinematics)) {
+    if (linkUp && (!gMotionWaypointMode)) {
         gTargetSpeedRpm = SPEED_RPM_NORMAL;
         bool shareNow = (pkt.buttons & BTN_SHARE) != 0;
         const bool odomCombo = (pkt.buttons & (BTN_SHARE | BTN_TOUCHPAD)) == (BTN_SHARE | BTN_TOUCHPAD);
@@ -183,11 +174,9 @@ void motionControlTick(const ControlPacket &pkt) {
 
         if (pkt.buttons & BTN_R1) {
             yawStepMs = YAW_STEP_INTERVAL_FAST_MS;
-            gotoStepMs = GOTO_STEP_INTERVAL_FAST_MS;
             gTargetSpeedRpm = SPEED_RPM_FAST;
         } else if (pkt.buttons & BTN_L1) {
             yawStepMs = YAW_STEP_INTERVAL_SLOW_MS;
-            gotoStepMs = GOTO_STEP_INTERVAL_SLOW_MS;
             gTargetSpeedRpm = SPEED_RPM_SLOW;
         }
 
@@ -206,28 +195,11 @@ void motionControlTick(const ControlPacket &pkt) {
             vx = 0;
             vy = 0;
         }
-        if (vx == 0 && vy == 0) {
-            gJedaGotoStep.reset();
-        }
     } else {
         vx = 0;
         vy = 0;
-        gJedaGotoStep.reset();
     }
-
-    // GOTO: step-based increment gTargetX/Y (mirip yaw ±1° per step)
-    if (!modeKinematics && gJedaGotoStep.check(gotoStepMs)) {
-        if (vx != 0) gTargetX_cm += (vx > 0) ? GOTO_STEP_CM : -GOTO_STEP_CM;
-        if (vy != 0) gTargetY_cm += (vy > 0) ? GOTO_STEP_CM : -GOTO_STEP_CM;
-    }
-    // Kirim ke slave1
-    if (!modeKinematics) {
-        if (gJedaSend.check(GOTO_SEND_INTERVAL_MS)) {
-            sendGotoCommand((int16_t)lroundf(gTargetX_cm),
-                            (int16_t)lroundf(gTargetY_cm),
-                            gYawTarget);
-        }
-    } else {
+    if(!gMotionWaypointMode){
         sendKnCommand(vx, vy, gYawTarget);
     }
 }
