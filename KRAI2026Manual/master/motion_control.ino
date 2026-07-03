@@ -1,20 +1,12 @@
 /*
  * =====================================================================
  * FILE    : motion_control.ino
- * PERAN   : Mapping joystick/dpad → field-centric motion ke slave1motion
- *           via UART1.
+ * PERAN   : Mapping joystick/dpad → field-centric KN motion ke slave1motion
+ *           via UART1. KN-only (velocity langsung, no GOTO/waypoint).
  *
- * DUA MODE KONTROL:
- *   GOTO (modeKinematics=false):
- *     stick → step-based increment gTargetX/Y_cm → sendGotoCommand
- *     L1/R1 → atur step interval (seberapa sering target ++):
- *       normal 20ms, L1 slow 100ms, R1 fast 5ms
- *     Setiap step: ±GOTO_STEP_CM per axis, sendGotoCommand tiap tick
- *
- *   KINEMATICS (modeKinematics=true):
- *     stick → vx/vy langsung → sendKnCommand
- *     L1/R1 → atur RPM (kecepatan robot):
- *       normal 75, L1 slow 25, R1 fast 150
+ *   stick → vx/vy langsung → sendKnCommand
+ *   L1/R1 → atur RPM (kecepatan robot):
+ *     normal 75, L1 slow 25, R1 fast 150
  *
  * INPUT MODE (toggle dengan SHARE) — hanya untuk vx/vy:
  *   ANALOG → analog kiri joystick
@@ -64,7 +56,7 @@ float gTargetX_cm = 0.0f;
 float gTargetY_cm = 0.0f;
 int16_t gTargetSpeedRpm = SPEED_RPM_NORMAL;
 bool gMotionWaypointMode = false;
-bool modeKinematics = false;
+bool modeKinematics = true;  // KN-only
 
 namespace {
 

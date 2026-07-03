@@ -134,11 +134,9 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
             const float speed  = (spdStr != nullptr) ? atof(spdStr) : wpMaxSpeed;
 
             // ponytail: skip startWaypoint saat RUNNING — master spam goto tidak reset progress
-            if (getWaypointState() != WaypointState::RUNNING) {
-                testYawMode = false;
-                startWaypoint(x_cm, y_cm, yaw, speed);
-                if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg speed=%.0f rpm\n", x_cm, y_cm, yaw, speed);
-            }
+            testYawMode = false;
+            startWaypoint(x_cm, y_cm, yaw, speed);
+            if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg speed=%.0f rpm\n", x_cm, y_cm, yaw, speed);
         } else {
             if (!fromMasterUart) out.println("Format: goto <x_cm> <y_cm> <yaw_deg> [speed_rpm]");
         }
@@ -177,7 +175,10 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
     } else if (strcmp(token, "odom") == 0) {
         // Master poll → balas ke UART peminta (Serial1 saat dari master)
         out.printf("odomToMaster %.3f %.3f %.1f\n", odomX, odomY, odomTheta);
-        Serial1.printf("odomToMaster %.3f %.3f %.1f\n", odomX, odomY, odomTheta);
+        // ponytail: skip jika UART TX penuh
+        if (Serial1.availableForWrite() >= 64) {
+            Serial1.printf("odomToMaster %.3f %.3f %.1f\n", odomX, odomY, odomTheta);
+        }
     } else if (strcmp(token, "odomreset") == 0) {
         resetOdometry();
         if (!fromMasterUart) out.println("Odometri direset ke (0,0,0).");
@@ -265,10 +266,8 @@ void executeBinaryCmd(const SerialMotionCmd& cmd) {
             lastBinSpeed = speed;
             
             // Panggil startWaypoint HANYA jika target berubah
-            if (getWaypointState() != WaypointState::RUNNING) {
-                testYawMode = false;
-                startWaypoint(x_cm, y_cm, yaw, speed);
-            }
+            testYawMode = false;
+            startWaypoint(x_cm, y_cm, yaw, speed);
         }
     } else if (cmd.type == 2) { // KN
         driveFieldCentricWithYawCorrection(cmd.x, cmd.y, cmd.yaw);
@@ -341,7 +340,9 @@ void readSerialMasterBinary() {
                 if (cmdBuffer.checksum == cs) {
                     executeBinaryCmd(cmdBuffer);
                 } else {
-                    Serial.println("[SerialMaster] Checksum error!");
+                    if (Serial.availableForWrite() >= 32) {
+                        Serial.println("[SerialMaster] Checksum error!");
+                    }
                 }
                 state = SEARCH_H1;
             }
@@ -367,6 +368,9 @@ void setupSerial() {
     digitalWrite(WSN_SET_PIN, HIGH);
 
     Serial2.begin(SERIAL_WSN_BAUD, SERIAL_8N1, SERIAL_WSN_RX, SERIAL_WSN_TX);
+
+    Serial1.setRxBufferSize(2048);
+    Serial1.setTxBufferSize(2048);
     Serial1.begin(SERIAL_MASTER_BAUD, SERIAL_8N1, SERIAL_MASTER_RX, SERIAL_MASTER_TX);
 
     Serial.printf("[Serial] Master UART RX=%d TX=%d @ %lu baud | WSN RX=%d TX=%d\n",

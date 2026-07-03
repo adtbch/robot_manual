@@ -125,12 +125,12 @@ bool parseSlave2Sensor(char* cmd) {
 bool parseSlave1Status(char* line) {
     if (strncmp(line, "WP: REACHED", 11) == 0) {
         gMotionWaypointMode = false;
-        Serial.printf("[Master] Waypoint reached\n");
+        // Serial.printf("[Master] Waypoint reached\n");  // ponytail: nonaktif — spam USB blocking
         return true;
     }
     if (strncmp(line, "WP: RUNNING", 11) == 0) {
         // gMotionWaypointMode = true;
-        Serial.printf("[Master] Waypoint running\n");
+        // Serial.printf("[Master] Waypoint running\n");
         return true;
     }
     return false;
@@ -163,18 +163,20 @@ static void sendBinaryMotionCmd(uint8_t type, int16_t x, int16_t y, int16_t yaw,
 }
 
 void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
-    // sendBinaryMotionCmd(2, vx, vy, yawTarget, 0);
-    slave1Serial.printf("kn %d %d %d\n", vx, vy, yawTarget);
-}
-
-void sendGotoCommand(int16_t x_cm, int16_t y_cm, int16_t yaw_deg) {
-    // sendBinaryMotionCmd(1, x_cm, y_cm, yaw_deg, speedRpm);
-    slave1Serial.printf("goto %d %d %d\n", x_cm, y_cm, yaw_deg);
+    // ponytail: skip jika UART TX buffer penuh — cegah blocking cascade
+    if (slave1Serial.availableForWrite() >= 32) {
+        slave1Serial.printf("kn %d %d %d\n", vx, vy, yawTarget);
+    }
 }
 
 void sendShowOdomCommand() {
-    slave1Serial.printf("odom\n");
-    Serial.printf("odom\n");  // debug
+    // ponytail: skip jika buffer penuh — cegah blocking
+    if (slave1Serial.availableForWrite() >= 16) {
+        slave1Serial.printf("odom\n");
+    }
+    if (Serial.availableForWrite() >= 16) {
+        Serial.printf("odom\n");  // debug
+    }
 }
 
 
@@ -188,5 +190,8 @@ void sendSlave2Command(const char* fmt, ...) {
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
-    slave2Serial.println(buf);
+    // ponytail: skip jika buffer penuh — cegah blocking
+    if (slave2Serial.availableForWrite() >= 64) {
+        slave2Serial.println(buf);
+    }
 }
