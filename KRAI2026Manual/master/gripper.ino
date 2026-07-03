@@ -53,6 +53,7 @@ void setMotorHoming() {
 
 void setHomingAll() {
     setMotorHoming();
+    delay(2000);
     setServoHoming();
 }
 
