@@ -90,7 +90,7 @@ uint32_t gArmBoxPrevButtons = 0;
 } // anonymous namespace
 
 void handleL2SquareManual(const ControlPacket &pkt) {
-    if (pkt.mode != 0) return;
+    if (gControllerMode != 0) return;
     if (!isComboEdge(pkt.buttons, gArmBoxPrevButtons, BTN_L2, BTN_SQUARE)) return;
 
     gripperMotorYSetLevel(4);
@@ -104,7 +104,7 @@ void handleL2SquareManual(const ControlPacket &pkt) {
 constexpr int8_t LX_DIRECTION_THRESHOLD = 100;
 
 void handleL2CircleLxManual(const ControlPacket &pkt) {
-    if (pkt.mode != 0) return;
+    if (gControllerMode != 0) return;
     if (!(pkt.buttons & BTN_L2)) return;
     if (!(pkt.buttons & BTN_CIRCLE)) return;
 

@@ -12,7 +12,7 @@
 #include "odom.h"
 
 void forestControlTick(const ControlPacket& pkt) {
-    if (gLastRxPacket.mode != 1) return;
+    if (gControllerMode != 1) return;
     if (odomIsModeSave()) return;
     static uint32_t prevButtons = 0;
 

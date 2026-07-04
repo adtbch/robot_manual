@@ -38,6 +38,7 @@
 
 uint8_t zoneState = 1;
 ControlPacket gLastRxPacket = {};
+uint8_t gControllerMode = 0;  // default: manual
 
 // =====================================================================
 //  BOX STATE — tracking motor Y untuk kirim "box done" ke slave2
@@ -110,6 +111,9 @@ void loop() {
     // ESP-NOW receiver
     espNowControlTick();
     espNowControlReadPacket(gLastRxPacket);
+    if (gLastRxPacket.connected) {
+        gControllerMode = gLastRxPacket.mode;
+    }
     gripperControlTick(gLastRxPacket);
     motionControlTick(gLastRxPacket);
     forestControlTick(gLastRxPacket);
