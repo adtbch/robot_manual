@@ -26,8 +26,8 @@ struct MotorConfig {
 //  PIN MOTOR — berdasarkan schematic KRAI 2026
 // =====================================================================
 // MotorXArmKanan (axis X arm kanan)
-constexpr uint8_t MOTOR_XARM_KANAN_PIN1 = 4;
-constexpr uint8_t MOTOR_XARM_KANAN_PIN2 = 7;
+constexpr uint8_t MOTOR_XARM_KANAN_PIN1 = 7;
+constexpr uint8_t MOTOR_XARM_KANAN_PIN2 = 4;
 
 // MotorYArmKanan (axis Y arm kanan)
 constexpr uint8_t MOTOR_YARM_KANAN_PIN1 = 6;
