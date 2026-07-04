@@ -164,7 +164,8 @@ uint8_t       getWaypointComboStep()  { return wpComboActive ? (uint8_t)(wpCombo
 // =====================================================================
 
 void waypointTick(float x_m, float y_m, float yaw_deg, float maxSpeed) {
-    // if (wpState != WaypointState::RUNNING) return;
+    // ponytail: Cegah tabrakan dengan manual drive (kn) — jangan execute PID kalau IDLE
+    if (wpState != WaypointState::RUNNING) return;
 
     wpTargetX_m     = x_m;
     wpTargetY_m     = y_m;

@@ -50,11 +50,11 @@ Jeda jedaArmBoxL;
 } // anonymous namespace
 
 void setupZone1() {
-    setServoHoming();
-    setServoAngle('t', 80);
+    // setServoHoming();
+    // setServoAngle('t', 80);
     odomGoto(1);
-    gripperMotorYSetLevel(0);
-    motorXSetTarget(1500);
+    // gripperMotorYSetLevel(0);
+    // motorXSetTarget(1500);
 }
 
 // =====================================================================

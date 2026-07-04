@@ -243,7 +243,7 @@ int pidComputeYaw(PIDState &pid, float target, float current, float dt) {
     pid.lastTime = millis();
 
     float output = pOut + iOut + dOut;
-    return (int)constrain(output, -200.0f, 200.0f);
+    return (int)constrain(output, -100.0f, 100.0f);
 }
 
 // =====================================================================

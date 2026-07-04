@@ -163,6 +163,7 @@ void odomApplySample(OdomRecTarget target, float x_cm, float y_cm, float yaw_deg
         case OdomRecTarget::ZONE1_2:
         case OdomRecTarget::ZONE1_3: {
             const uint8_t idx = static_cast<uint8_t>(target) - static_cast<uint8_t>(OdomRecTarget::ZONE1_0);
+            
             OdomWaypoint& wp  = gOdomZone1[ai][idx];
             wp.x_cm           = x_cm;
             wp.y_cm           = y_cm;

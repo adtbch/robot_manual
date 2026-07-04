@@ -62,7 +62,49 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
         }
     }
 
-    if (strcmp(token, "tune") == 0) {
+    if (strcmp(token, "kn") == 0) {
+        char* vxStr = strtok(nullptr, " ");
+        char* vyStr = strtok(nullptr, " ");
+        char* yawStr = strtok(nullptr, " ");
+        if (vxStr != nullptr && vyStr != nullptr && yawStr != nullptr) {
+            const int vx = atoi(vxStr);
+            const int vy = atoi(vyStr);
+            const int yaw = atoi(yawStr);
+            
+            // ponytail: manual override waypoint HANYA jika joystick benar-benar digerakkan
+            if (isWaypointActive()) {
+                if (vx != 0 || vy != 0) {
+                    cancelWaypoint();
+                } else {
+                    // Abaikan KN idle dari master jika sedang autonav
+                    return;
+                }
+            }
+            
+            driveFieldCentricWithYawCorrection(vx, vy, yaw);
+            if (!fromMasterUart) out.printf("KN: vx=%d vy=%d yaw=%d\n", vx, vy, yaw);
+        } else {
+            if (!fromMasterUart) out.println("Format: kn <vx> <vy> <yawDeg>");
+        }
+    } else if (strcmp(token, "goto") == 0) {
+        char* xStr    = strtok(nullptr, " ");
+        char* yStr    = strtok(nullptr, " ");
+        char* yawStr  = strtok(nullptr, " ");
+        char* spdStr  = strtok(nullptr, " ");  // opsional
+        if (xStr != nullptr && yStr != nullptr && yawStr != nullptr) {
+            const float x_cm   = atof(xStr);
+            const float y_cm   = atof(yStr);
+            const float yaw    = atof(yawStr);
+            const float speed  = (spdStr != nullptr) ? atof(spdStr) : wpMaxSpeed;
+
+            // ponytail: skip startWaypoint saat RUNNING — master spam goto tidak reset progress
+            testYawMode = false;
+            startWaypoint(x_cm, y_cm, yaw, speed);
+            if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg speed=%.0f rpm\n", x_cm, y_cm, yaw, speed);
+        } else {
+            if (!fromMasterUart) out.println("Format: goto <x_cm> <y_cm> <yaw_deg> [speed_rpm]");
+        }
+    }else if (strcmp(token, "tune") == 0) {
         char* idxStr = strtok(nullptr, " ");
         char* kpStr = strtok(nullptr, " ");
         char* kiStr = strtok(nullptr, " ");
@@ -109,37 +151,6 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
         } else {
             if (!fromMasterUart) out.println("Format: rpm <fr> <fl> <br> <bl>");
         }
-    } else if (strcmp(token, "kn") == 0) {
-        char* vxStr = strtok(nullptr, " ");
-        char* vyStr = strtok(nullptr, " ");
-        char* yawStr = strtok(nullptr, " ");
-        if (vxStr != nullptr && vyStr != nullptr && yawStr != nullptr) {
-            const int vx = atoi(vxStr);
-            const int vy = atoi(vyStr);
-            const int yaw = atoi(yawStr);
-            driveFieldCentricWithYawCorrection(vx, vy, yaw);
-            if (!fromMasterUart) out.printf("KN: vx=%d vy=%d yaw=%d\n", vx, vy, yaw);
-        } else {
-            if (!fromMasterUart) out.println("Format: kn <vx> <vy> <yawDeg>");
-        }
-    } else if (strcmp(token, "goto") == 0) {
-        char* xStr    = strtok(nullptr, " ");
-        char* yStr    = strtok(nullptr, " ");
-        char* yawStr  = strtok(nullptr, " ");
-        char* spdStr  = strtok(nullptr, " ");  // opsional
-        if (xStr != nullptr && yStr != nullptr && yawStr != nullptr) {
-            const float x_cm   = atof(xStr);
-            const float y_cm   = atof(yStr);
-            const float yaw    = atof(yawStr);
-            const float speed  = (spdStr != nullptr) ? atof(spdStr) : wpMaxSpeed;
-
-            // ponytail: skip startWaypoint saat RUNNING — master spam goto tidak reset progress
-            testYawMode = false;
-            startWaypoint(x_cm, y_cm, yaw, speed);
-            if (!fromMasterUart) out.printf("WP set: x=%.0fcm y=%.0fcm yaw=%.1fdeg speed=%.0f rpm\n", x_cm, y_cm, yaw, speed);
-        } else {
-            if (!fromMasterUart) out.println("Format: goto <x_cm> <y_cm> <yaw_deg> [speed_rpm]");
-        }
     } else if (strcmp(token, "wp") == 0) {
         char* arg = strtok(nullptr, " ");
         if (arg != nullptr && strcmp(arg, "cancel") == 0) {
@@ -176,9 +187,9 @@ void parseAndExecuteCommand(char* cmd, Print& out, bool fromMasterUart) {
         // Master poll → balas ke UART peminta (Serial1 saat dari master)
         out.printf("odomToMaster %.3f %.3f %.1f\n", odomX, odomY, odomTheta);
         // ponytail: skip jika UART TX penuh
-        if (Serial1.availableForWrite() >= 64) {
-            Serial1.printf("odomToMaster %.3f %.3f %.1f\n", odomX, odomY, odomTheta);
-        }
+        // if (Serial1.availableForWrite() >= 64) {
+        //     Serial1.printf("odomToMaster %.3f %.3f %.1f\n", odomX, odomY, odomTheta);
+        // }
     } else if (strcmp(token, "odomreset") == 0) {
         resetOdometry();
         if (!fromMasterUart) out.println("Odometri direset ke (0,0,0).");
@@ -267,9 +278,13 @@ void executeBinaryCmd(const SerialMotionCmd& cmd) {
             
             // Panggil startWaypoint HANYA jika target berubah
             testYawMode = false;
-            startWaypoint(x_cm, y_cm, yaw, speed);
+            startWaypoint(x_cm, y_cm, yaw, 100);
         }
     } else if (cmd.type == 2) { // KN
+        if (isWaypointActive()) {
+            if (cmd.x != 0 || cmd.y != 0) cancelWaypoint();
+            else return; // Ignore idle KN
+        }
         driveFieldCentricWithYawCorrection(cmd.x, cmd.y, cmd.yaw);
     }
 }

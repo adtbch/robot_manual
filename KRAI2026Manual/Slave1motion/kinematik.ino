@@ -65,7 +65,8 @@ void driveFieldCentric(int vx, int vy, int vtheta) {
 void driveFieldCentricWithYawCorrection(int vx, int vy, int yawTarget) {
     static uint32_t lastCallMs = 0;
     uint32_t nowMs = millis();
-    float dt = (lastCallMs == 0) ? 0.04f : (nowMs - lastCallMs) * 0.001f;
+    // ponytail: cegah pembagian dt=0 jika fungsi ini dispam 2x dalam 1ms
+    float dt = (nowMs <= lastCallMs) ? 0.001f : (nowMs - lastCallMs) * 0.001f;
     lastCallMs = nowMs;
 
     float currentYaw = getYaw();

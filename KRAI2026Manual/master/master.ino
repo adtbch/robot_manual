@@ -90,7 +90,7 @@ void setup() {
     setupAlliance();
     initForestDest();
     initOdomRec();
-
+    setServoHoming();
     // setHomingAll();
     Serial.println("Setup zone1: limit Y/X + motor Y lv0 + motor X enc0");
 }

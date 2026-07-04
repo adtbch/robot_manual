@@ -125,12 +125,12 @@ void loop() {
         // updateYaw() sudah pindah ke I2cTask di Core 0
         if (getWaypointState() != WaypointState::IDLE) {
             waypointTick(wpTargetX_m, wpTargetY_m, wpTargetYaw_deg, wpMaxSpeed);
-        } else if (testYawMode) {
+        } 
+        if (testYawMode) {
             static Jeda jedaYawTest;
             if (jedaYawTest.check(20)) {
                 driveFieldCentricWithYawCorrection(0, 0, testYawTarget);
             }
         }
     }
-    updateOLED();
 }

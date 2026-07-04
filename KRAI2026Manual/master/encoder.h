@@ -21,7 +21,7 @@ constexpr uint8_t ENCODER1_PIN_B = 40;
 
 // Encoder 'y' (axis Y / motor2)
 constexpr uint8_t ENCODER2_PIN_A = 38;
-constexpr uint8_t ENCODER2_PIN_B = 37;
+constexpr uint8_t ENCODER2_PIN_B = 3;
 
 // =====================================================================
 //  JUMLAH ENCODER

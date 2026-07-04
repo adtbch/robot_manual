@@ -163,14 +163,16 @@ static void sendBinaryMotionCmd(uint8_t type, int16_t x, int16_t y, int16_t yaw,
 }
 
 void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
-    // ponytail: skip jika UART TX buffer penuh — cegah blocking cascade
-    if (slave1Serial.availableForWrite() >= 32) {
-        slave1Serial.printf("kn %d %d %d\n", vx, vy, yawTarget);
+    // ponytail: Binary (9 bytes) > text (~20 bytes) — lebih kecil, ga kena guard availableForWrite
+    if (slave1Serial.availableForWrite() >= (int)sizeof(SerialMotionCmd)) {
+        sendBinaryMotionCmd(2, vx, vy, yawTarget, 0);
     }
 }
 
 void sendGotoCommand(float x_cm, float y_cm, int16_t yawTarget, int16_t speedRpm) {
-    slave1Serial.printf("goto %.3f %.3f %d 0\n", x_cm , y_cm , yawTarget);
+    if (slave1Serial.availableForWrite() >= (int)sizeof(SerialMotionCmd)) {
+        sendBinaryMotionCmd(1, (int16_t)x_cm, (int16_t)y_cm, yawTarget, speedRpm);
+    }
 }
 
 void sendShowOdomCommand() {

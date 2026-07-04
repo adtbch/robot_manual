@@ -34,7 +34,7 @@ void setMotorHoming() {
     motorXStop();
     motorYStop();
 
-    pwmMotor('y', HOMING_PWM);
+    pwmMotor('y', -HOMING_PWM);
     while (!readLimitSwitch(LIMIT_Y_BAWAH)) {
         delay(2);
     }
@@ -42,7 +42,7 @@ void setMotorHoming() {
     resetEncoderCount('y');
     gripperMotorYSetLevel(0);
     
-    pwmMotor('x', HOMING_PWM);
+    pwmMotor('x', -HOMING_PWM);
     while (!readLimitSwitch(LIMIT_X_MUNDUR)) {
         delay(2);
     }
@@ -55,9 +55,14 @@ void setHomingAll() {
     setMotorHoming();
     delay(2000);
     setServoHoming();
+    setArmHoming();
 }
 
 void setArmHoming() {
     motorKSetDirection(-1);
     sendSlave2Command("motor k -255");
+    while (!readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
+        delay(2);
+    }
+    sendSlave2Command("motor k 0");
 }
