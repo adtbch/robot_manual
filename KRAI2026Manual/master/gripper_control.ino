@@ -267,7 +267,7 @@ void handleFlashTrigger(const ControlPacket &pkt) {
 // ── L2 + Triangle (mode manual) → user-defined action ────────────
 
 void handleL2TriangleManual(const ControlPacket &pkt) {
-    if (pkt.mode != 0) return;
+    if (gControllerMode != 0) return;
     if (!isComboEdge(pkt.buttons, gPrevButtons, BTN_L2, BTN_TRIANGLE)) return;
 
     if (gGripperState == IDLE) {

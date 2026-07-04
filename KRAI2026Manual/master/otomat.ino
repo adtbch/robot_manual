@@ -62,7 +62,7 @@ void armBoxStartGrab(char side) {
 void setupZone1() {
     setServoHoming();
     setServoAngle('t', 80);
-    if (gLastRxPacket.mode == 1) {
+    if (gControllerMode == 1) {
         odomGoto(1);
     }
     gripperMotorYSetLevel(0);
@@ -77,7 +77,7 @@ void gripperZone1() {
     switch (gGripperState) {
 
         case IDLE:
-            if (readProximity() && gLastRxPacket.mode == 1) {
+            if (readProximity() && gControllerMode == 1) {
                 setServoAngle('d', 90);
                 gGripperState = CLOSING;
             }
@@ -95,7 +95,7 @@ void gripperZone1() {
         case UP:
             if (motorYAtLevel(1)) {
                 motorXSetTarget(0);
-                if (gLastRxPacket.mode == 1) {
+                if (gControllerMode == 1) {
                     odomGoto(2);
                 }
                 gGripperState = STRAIGHTEN;
@@ -103,7 +103,7 @@ void gripperZone1() {
             break;
 
         case STRAIGHTEN:
-            if (!gMotionWaypointMode && gLastRxPacket.mode == 1) {
+            if (!gMotionWaypointMode && gControllerMode == 1) {
                 gripperReadytoStab();
                 odomGoto(3);
             }
@@ -134,7 +134,7 @@ void armBoxTick() {
     // ── Sisi R ─────────────────────────────────────────────────
     switch (gArmBoxR) {
         case ARMBOX_IDLE:
-            if (slave2ProxR() && gLastRxPacket.mode == 1) {
+            if (slave2ProxR() && gControllerMode == 1) {
                 sendSlave2Command("pne r on");
                 gArmBoxR = ARMBOX_WAIT;
             }
@@ -158,7 +158,7 @@ void armBoxTick() {
     // ── Sisi L ─────────────────────────────────────────────────
     switch (gArmBoxL) {
         case ARMBOX_IDLE:
-            if (slave2ProxL() && gLastRxPacket.mode == 1) {
+            if (slave2ProxL() && gControllerMode == 1) {
                 sendSlave2Command("pne l on");
                 gArmBoxL = ARMBOX_WAIT;
             }

@@ -192,5 +192,6 @@ extern bool    modeKinematics;   // false=goto, true=kn
 extern uint8_t zoneState;
 
 extern ControlPacket gLastRxPacket;
+extern uint8_t gControllerMode;  // update saat connected, tahan saat disconnect
 
 #endif // CONFIG_H
