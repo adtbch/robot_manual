@@ -194,4 +194,9 @@ extern uint8_t zoneState;
 extern ControlPacket gLastRxPacket;
 extern uint8_t gControllerMode;  // update saat connected, tahan saat disconnect
 
+// ── Combo helpers (shared across .ino files) ──────────────────────
+inline bool isComboEdge(uint32_t now, uint32_t prev, uint32_t a, uint32_t b) {
+    return (now & a) && (now & b) && !((prev & a) && (prev & b));
+}
+
 #endif // CONFIG_H

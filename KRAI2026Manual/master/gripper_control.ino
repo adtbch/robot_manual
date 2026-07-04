@@ -113,10 +113,6 @@ bool isR2Held(uint32_t buttons) {
     return (buttons & BTN_R2) && !(buttons & BTN_L2);
 }
 
-bool isComboEdge(uint32_t now, uint32_t prev, uint32_t a, uint32_t b) {
-    return (now & a) && (now & b) && !((prev & a) && (prev & b));
-}
-
 template <typename T>
 T pickSpeedStep(uint32_t buttons, T normal, T slow, T fast) {
     if (buttons & BTN_R1) return fast;
