@@ -205,11 +205,7 @@ int servoBMoveDir(const ControlPacket &pkt) {
 
 void handleGripperButtons(const ControlPacket &pkt) {
     if (isPressed(pkt.buttons, BTN_OPTIONS)) {
-        if (zoneState == 1) {
-            setupZone1();
-        } else if (zoneState == 2) {
-            modeKinematics = !modeKinematics;
-        }
+        setupZone1();
         return;
     }
     if (isPressed(pkt.buttons, BTN_CROSS)) {
