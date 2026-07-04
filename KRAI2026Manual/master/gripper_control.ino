@@ -216,7 +216,7 @@ void handleGripperButtons(const ControlPacket &pkt) {
 }
 
 void handleManualServoB(const ControlPacket &pkt) {
-    if (gGripperState != READY_TO_STAB || !(pkt.buttons & BTN_TRIANGLE)) return;
+    if (gGripperState != READY_TO_STAB || !(pkt.buttons & BTN_TRIANGLE || gGripperState != STRAIGHTEN)) return;
 
     const int dir = servoBMoveDir(pkt);
     if (dir == 0) return;
@@ -264,6 +264,20 @@ void handleFlashTrigger(const ControlPacket &pkt) {
     }
 }
 
+// ── L2 + Triangle (mode manual) → user-defined action ────────────
+
+void handleL2TriangleManual(const ControlPacket &pkt) {
+    if (pkt.mode != 0) return;
+    if (!isComboEdge(pkt.buttons, gPrevButtons, BTN_L2, BTN_TRIANGLE)) return;
+
+    if (gGripperState == IDLE) {
+        setServoAngle('d', 90);
+        gGripperState = CLOSING;
+    } else if (gGripperState == STRAIGHTEN) {
+        gripperReadytoStab();
+    }
+}
+
 } // anonymous namespace
 
 void gripperMotorYSetLevel(uint8_t level) {
@@ -292,5 +306,6 @@ void gripperControlTick(const ControlPacket &pkt) {
     handleGripperMotors(pkt);
     handleArmBoxYEnc(pkt);
     handleFlashTrigger(pkt);
+    handleL2TriangleManual(pkt);
     gPrevButtons = pkt.buttons;
 }

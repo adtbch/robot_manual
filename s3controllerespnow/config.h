@@ -53,6 +53,12 @@ constexpr uint16_t kPacketMagic = 0xA5B4;
 // Interval kirim data (ms) — 50ms = 20 Hz
 constexpr uint32_t kSendIntervalMs = 50;
 
+// Boot button & LED
+constexpr uint8_t  kBootPin          = 0;
+constexpr uint8_t  kLedPin           = 48;   // WS2812 built-in RGB
+constexpr uint32_t kDoublePressMs    = 200;  // jarak max double-press
+constexpr uint32_t kDebounceMs       = 50;   // debounce boot button
+
 // =====================================================================
 //  STRUCT PAKET KONTROL
 //  __attribute__((packed)) = larang compiler menambah padding bytes.
@@ -98,6 +104,7 @@ struct __attribute__((packed)) ControlPacket {
     // --- Metadata paket ---
     uint16_t seq;         // Nomor urut (packet loss detection)
     uint8_t  connected;   // 1 = gamepad aktif, 0 = disconnect
+    uint8_t  mode;        // 0 = manual, 1 = otomatis
 };
 
 // =====================================================================
@@ -109,5 +116,8 @@ extern uint16_t nomor_urut_paket;
 
 // Status inisialisasi ESP-NOW
 extern bool espnow_siap;
+
+// Mode: 0 = manual, 1 = otomatis (toggle via boot double-press)
+extern uint8_t gControllerMode;
 
 #endif // CONFIG_H

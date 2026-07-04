@@ -37,6 +37,7 @@
 // =====================================================================
 
 uint8_t zoneState = 1;
+ControlPacket gLastRxPacket = {};
 
 // =====================================================================
 //  BOX STATE — tracking motor Y untuk kirim "box done" ke slave2
@@ -108,7 +109,6 @@ void loop() {
 
     // ESP-NOW receiver
     espNowControlTick();
-    static ControlPacket gLastRxPacket = {};
     espNowControlReadPacket(gLastRxPacket);
     gripperControlTick(gLastRxPacket);
     motionControlTick(gLastRxPacket);
