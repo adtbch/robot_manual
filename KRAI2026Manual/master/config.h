@@ -58,6 +58,7 @@ struct __attribute__((packed)) ControlPacket {
     // --- Metadata ---
     uint16_t seq;
     uint8_t  connected;
+    uint8_t  mode;        // 0 = manual, 1 = otomatis (dari controller boot)
 };
 
 // =====================================================================
@@ -189,5 +190,7 @@ extern bool  gOdomValid;
 
 extern bool    modeKinematics;   // false=goto, true=kn
 extern uint8_t zoneState;
+
+extern ControlPacket gLastRxPacket;
 
 #endif // CONFIG_H

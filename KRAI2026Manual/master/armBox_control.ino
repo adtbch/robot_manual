@@ -24,6 +24,7 @@
 // armBox.ino
 void armBoxDone(char side);
 void armBoxFBToggle(char side);
+void armBoxStartGrab(char side);
 
 namespace {
 
@@ -80,20 +81,73 @@ void runArmBoxInputAction(ArmBoxInputDir dir) {
 
 } // anonymous namespace
 
+// ── L2 + Square (mode manual) → user-defined action ──────────────
+
+namespace {
+
+uint32_t gArmBoxPrevButtons = 0;
+
+} // anonymous namespace
+
+void handleL2SquareManual(const ControlPacket &pkt) {
+    if (pkt.mode != 0) return;
+    if (!isComboEdge(pkt.buttons, gArmBoxPrevButtons, BTN_L2, BTN_SQUARE)) return;
+
+    gripperMotorYSetLevel(4);
+    armBoxFBbySpeed('l', -255);
+    sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
+    armBoxFBbySpeed('r', -255);
+}
+
+// ── L2 + Circle + analog kiri (mode manual) → pne R/L ────────────
+
+constexpr int8_t LX_DIRECTION_THRESHOLD = 100;
+
+void handleL2CircleLxManual(const ControlPacket &pkt) {
+    if (pkt.mode != 0) return;
+    if (!(pkt.buttons & BTN_L2)) return;
+    if (!(pkt.buttons & BTN_CIRCLE)) return;
+
+    const int8_t lx = pkt.lx;
+    if (abs(lx) <= LX_DIRECTION_THRESHOLD) return;
+
+    if (lx > 0) {
+        armBoxStartGrab('r');
+    } else {
+        armBoxStartGrab('l');
+    }
+}
+
 void armBoxControlTick(const ControlPacket &pkt) {
     if (odomIsModeSave()) return;
+
+    handleL2SquareManual(pkt);
+    handleL2CircleLxManual(pkt);
+
+    // Skip Circle+arah jika L2 hold (sudah ditangani handleL2CircleLxManual)
+    if (pkt.buttons & BTN_L2) {
+        gArmBoxPrevButtons = pkt.buttons;
+        return;
+    }
+
     if (!(pkt.buttons & BTN_CIRCLE)) {
         gArmBoxPrevDir = ARMBOX_DIR_NONE;
+        gArmBoxPrevButtons = pkt.buttons;
         return;
     }
 
     const ArmBoxInputDir dir = readArmBoxInputDir(pkt);
     if (dir == ARMBOX_DIR_NONE) {
         gArmBoxPrevDir = ARMBOX_DIR_NONE;
+        gArmBoxPrevButtons = pkt.buttons;
         return;
     }
-    if (dir == gArmBoxPrevDir) return;
+    if (dir == gArmBoxPrevDir) {
+        gArmBoxPrevButtons = pkt.buttons;
+        return;
+    }
 
     gArmBoxPrevDir = dir;
+    gArmBoxPrevButtons = pkt.buttons;
     runArmBoxInputAction(dir);
 }

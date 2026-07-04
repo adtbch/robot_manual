@@ -135,6 +135,7 @@ void isi_paket_dari_gamepad(ControlPacket &paket, const GamepadState &gp) {
     nomor_urut_paket++;
     paket.seq       = nomor_urut_paket;
     paket.connected = 1;
+    paket.mode      = gControllerMode;
 
     // --- Checksum (terakhir, setelah semua field terisi) ---
     terapkan_checksum(paket);
@@ -156,6 +157,7 @@ void buat_paket_stop(ControlPacket &paket) {
     paket           = {};
     paket.magic     = kPacketMagic;
     paket.connected = 0;
+    paket.mode      = gControllerMode;
 
     nomor_urut_paket++;
     paket.seq = nomor_urut_paket;

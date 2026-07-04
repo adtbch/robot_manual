@@ -12,6 +12,7 @@
 #include "odom.h"
 
 void forestControlTick(const ControlPacket& pkt) {
+    if (gLastRxPacket.mode != 1) return;
     if (odomIsModeSave()) return;
     static uint32_t prevButtons = 0;
 
@@ -31,7 +32,9 @@ void forestControlTick(const ControlPacket& pkt) {
 
     if ((nowDpad & BTN_UP) && !(prevDpad & BTN_UP)) {
         gripperMotorYSetLevel(4);
+        armBoxFBbySpeed('l', -255);
         sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
+        armBoxFBbySpeed('r', -255);
         forestGotoSlot(1);
 
     } else if ((nowDpad & BTN_LEFT) && !(prevDpad & BTN_LEFT)) {

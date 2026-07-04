@@ -31,7 +31,7 @@
 // Baris pertama = master utama, baris kedua = spare (isi MAC cadangan).
 // Controller coba semua, ESP-NOW kirim ke yang aktif.
 constexpr uint8_t kEspNowTargetMacs[][6] = {
-    {0x74, 0x4D, 0xBD, 0x9A, 0xF1, 0x80}, // Master utama A4:CB:8F:F7:90:68
+    {0x94, 0xA9, 0x90, 0xD2, 0x43, 0x80}, // Master utama A4:CB:8F:F7:90:68
     {0xC0, 0x4E, 0x30, 0x0A, 0xF3, 0x18}, // Spare — isi MAC Master cadangan
 };
 constexpr uint8_t kEspNowTargetCount = sizeof(kEspNowTargetMacs) / 6;
@@ -52,6 +52,12 @@ constexpr uint16_t kPacketMagic = 0xA5B4;
 
 // Interval kirim data (ms) — 50ms = 20 Hz
 constexpr uint32_t kSendIntervalMs = 50;
+
+// Boot button & LED
+constexpr uint8_t  kBootPin          = 0;
+constexpr uint8_t  kLedPin           = 48;   // WS2812 built-in RGB
+constexpr uint32_t kDoublePressMs    = 200;  // jarak max double-press
+constexpr uint32_t kDebounceMs       = 50;   // debounce boot button
 
 // =====================================================================
 //  STRUCT PAKET KONTROL
@@ -98,6 +104,7 @@ struct __attribute__((packed)) ControlPacket {
     // --- Metadata paket ---
     uint16_t seq;         // Nomor urut (packet loss detection)
     uint8_t  connected;   // 1 = gamepad aktif, 0 = disconnect
+    uint8_t  mode;        // 0 = manual, 1 = otomatis
 };
 
 // =====================================================================
@@ -109,5 +116,8 @@ extern uint16_t nomor_urut_paket;
 
 // Status inisialisasi ESP-NOW
 extern bool espnow_siap;
+
+// Mode: 0 = manual, 1 = otomatis (toggle via boot double-press)
+extern uint8_t gControllerMode;
 
 #endif // CONFIG_H

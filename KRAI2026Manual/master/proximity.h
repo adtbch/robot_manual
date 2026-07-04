@@ -16,6 +16,7 @@
 //  PIN PROXIMITY — berdasarkan schematic KRAI 2026
 // =====================================================================
 constexpr uint8_t PROXIMITY_1_PIN = 14;
+constexpr uint16_t PROX_THRESHOLD = 512;  // ADC: idle~1241, detect~0
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS

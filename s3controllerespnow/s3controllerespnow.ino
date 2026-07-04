@@ -32,6 +32,8 @@
 #include "usb_host.h"
 #include "config.h"
 #include <esp_mac.h>
+#include <Adafruit_NeoPixel.h>
+#include <Preferences.h>
 
 // =====================================================================
 //  DEFINISI VARIABEL GLOBAL (extern di config.h)
@@ -39,6 +41,7 @@
 
 uint16_t nomor_urut_paket = 0;
 bool     espnow_siap      = false;
+uint8_t  gControllerMode  = 1;  // default: otomatis
 
 // =====================================================================
 //  OBJEK GLOBAL
@@ -46,6 +49,7 @@ bool     espnow_siap      = false;
 
 GamepadState gp;
 GamepadHost  usb;
+Adafruit_NeoPixel strip(1, kLedPin, NEO_GRB + NEO_KHZ800);
 
 // =====================================================================
 //  SETUP
@@ -58,6 +62,20 @@ void setup() {
     Serial.printf("%02X:%02X:%02X:%02X:%02X:%02X\n",
         mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     Serial.println("=== ESP32-S3 USB Gamepad + ESP-NOW ===");
+
+    // Boot button — input pullup, active LOW
+    pinMode(kBootPin, INPUT_PULLUP);
+
+    // Load last mode from NVS
+    Preferences prefs;
+    prefs.begin("ctrl", true);
+    gControllerMode = prefs.getUChar("mode", 0);
+    prefs.end();
+
+    // LED strip init
+    strip.begin();
+    strip.setBrightness(50);
+    updateLedMode();
 
     // 1. ESP-NOW (WiFi) — harus init SEBELUM USB Host
     espnow_siap = espnow_init();
@@ -74,6 +92,9 @@ void setup() {
 // =====================================================================
 
 void loop() {
+    // Boot button double-press (non-blocking)
+    bootButtonTick();
+
     // Proses event USB Host (enumerate, data, disconnect)
     usb.task();
 
@@ -118,4 +139,53 @@ void loop() {
 
     // // Minimal delay agar task lain bisa jalan
     // delay(1);
+}
+
+// =====================================================================
+//  BOOT BUTTON — double-press toggle mode
+// =====================================================================
+
+void updateLedMode() {
+    if (gControllerMode == 1) {
+        strip.setPixelColor(0, strip.Color(255, 255, 255));  // putih = auto
+    } else {
+        strip.setPixelColor(0, strip.Color(165, 42, 42));    // coklat = manual
+    }
+    strip.show();
+}
+
+void bootButtonTick() {
+    static uint32_t lastPressMs   = 0;
+    static uint32_t lastDebounceMs = 0;
+    static bool     lastStable     = HIGH;
+
+    const bool raw = digitalRead(kBootPin);
+
+    // debounce — skip jika < 50ms dari perubahan terakhir
+    if (raw != lastStable) {
+        lastDebounceMs = millis();
+        lastStable     = raw;
+        return;
+    }
+    if ((millis() - lastDebounceMs) < kDebounceMs) return;
+
+    // deteksi falling edge (tekan)
+    static bool prevStable = HIGH;
+    if (raw == LOW && prevStable == HIGH) {
+        const uint32_t now = millis();
+        if ((now - lastPressMs) < kDoublePressMs) {
+            // double-press terdeteksi → toggle
+            gControllerMode = (gControllerMode == 1) ? 0 : 1;
+            Preferences prefs;
+            prefs.begin("ctrl", false);
+            prefs.putUChar("mode", gControllerMode);
+            prefs.end();
+            updateLedMode();
+            Serial.printf("[Boot] mode → %s\n", gControllerMode ? "AUTO" : "MANUAL");
+            lastPressMs = 0;  // reset supaya triple-press tidak trigger 2x
+        } else {
+            lastPressMs = now;
+        }
+    }
+    prevStable = raw;
 }
