@@ -99,14 +99,14 @@ void handleL2SquareManual(const ControlPacket &pkt) {
     armBoxFBbySpeed('r', -255);
 }
 
-// ── L2 + Cross + analog kiri (mode manual) → pne R/L ─────────────
+// ── L2 + Circle + analog kiri (mode manual) → pne R/L ────────────
 
 constexpr int8_t LX_DIRECTION_THRESHOLD = 100;
 
-void handleL2CrossRxManual(const ControlPacket &pkt) {
+void handleL2CircleLxManual(const ControlPacket &pkt) {
     if (pkt.mode != 0) return;
     if (!(pkt.buttons & BTN_L2)) return;
-    if (!(pkt.buttons & BTN_CROSS)) return;
+    if (!(pkt.buttons & BTN_CIRCLE)) return;
 
     const int8_t lx = pkt.lx;
     if (abs(lx) <= LX_DIRECTION_THRESHOLD) return;
@@ -122,7 +122,13 @@ void armBoxControlTick(const ControlPacket &pkt) {
     if (odomIsModeSave()) return;
 
     handleL2SquareManual(pkt);
-    handleL2CrossRxManual(pkt);
+    handleL2CircleLxManual(pkt);
+
+    // Skip Circle+arah jika L2 hold (sudah ditangani handleL2CircleLxManual)
+    if (pkt.buttons & BTN_L2) {
+        gArmBoxPrevButtons = pkt.buttons;
+        return;
+    }
 
     if (!(pkt.buttons & BTN_CIRCLE)) {
         gArmBoxPrevDir = ARMBOX_DIR_NONE;
