@@ -14,7 +14,9 @@
 // =====================================================================
 
 void setupProximity() {
-    pinMode(PROXIMITY_1_PIN, INPUT_PULLUP);
+    analogReadResolution(12);
+    analogSetAttenuation(ADC_11db);  // full range 0-3.3V
+    pinMode(PROXIMITY_1_PIN, INPUT);
 }
 
 // =====================================================================
@@ -22,5 +24,5 @@ void setupProximity() {
 // =====================================================================
 
 bool readProximity() {
-    return (digitalRead(PROXIMITY_1_PIN) == LOW);  // active LOW
+    return (analogRead(PROXIMITY_1_PIN) < PROX_THRESHOLD);  // < threshold = detect (0V)
 }

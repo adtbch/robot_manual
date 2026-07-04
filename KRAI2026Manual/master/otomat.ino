@@ -77,7 +77,7 @@ void gripperZone1() {
     switch (gGripperState) {
 
         case IDLE:
-            if (readProximity()) {
+            if (readProximity() && gLastRxPacket.mode == 1) {
                 setServoAngle('d', 90);
                 gGripperState = CLOSING;
             }
@@ -134,7 +134,7 @@ void armBoxTick() {
     // ── Sisi R ─────────────────────────────────────────────────
     switch (gArmBoxR) {
         case ARMBOX_IDLE:
-            if (slave2ProxR()) {
+            if (slave2ProxR() && gLastRxPacket.mode == 1) {
                 sendSlave2Command("pne r on");
                 gArmBoxR = ARMBOX_WAIT;
             }
@@ -158,7 +158,7 @@ void armBoxTick() {
     // ── Sisi L ─────────────────────────────────────────────────
     switch (gArmBoxL) {
         case ARMBOX_IDLE:
-            if (slave2ProxL()) {
+            if (slave2ProxL() && gLastRxPacket.mode == 1) {
                 sendSlave2Command("pne l on");
                 gArmBoxL = ARMBOX_WAIT;
             }
