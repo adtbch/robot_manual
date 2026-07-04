@@ -18,8 +18,7 @@ bool         gOdomModeSave = false;
 
 namespace {
 
-constexpr uint32_t BTN_ENTER_COMBO = BTN_TOUCHPAD | BTN_SHARE;
-constexpr uint32_t BTN_EXIT_COMBO  = BTN_R3 | BTN_L3;
+constexpr uint32_t BTN_ENTER_COMBO = BTN_R3 | BTN_L3;
 constexpr const char* ODOM_NVS_NS    = "odom_rec";
 
 struct RecCombo {
@@ -45,9 +44,6 @@ constexpr RecCombo REC_COMBOS[] = {
 uint32_t      gOdomPrevButtons   = 0;
 bool          gOdomRecordPending = false;
 OdomRecTarget gOdomPendingTarget = OdomRecTarget::NONE;
-bool          gOdomComboHeld     = false;
-bool          gOdomHoldFired     = false;
-uint32_t      gOdomHoldStartMs   = 0;
 
 char allianceNvsChar(AllianceColor c) {
     return (c == AllianceColor::BLUE) ? 'b' : 'r';
@@ -232,27 +228,9 @@ void odomRecordTick(const ControlPacket& pkt) {
 
     const uint32_t btn = pkt.buttons;
 
-    if (comboPressed(btn, gOdomPrevButtons, BTN_EXIT_COMBO) && gOdomModeSave) {
-        gOdomModeSave = false;
-        Serial.println("[OdomRecord] mode OFF");
-    }
-
-    if (!gOdomModeSave && comboPressed(btn, gOdomPrevButtons, BTN_ENTER_COMBO)) {
-        gOdomComboHeld   = true;
-        gOdomHoldFired   = false;
-        gOdomHoldStartMs = millis();
-    }
-
-    if (gOdomComboHeld && comboHeld(btn, BTN_ENTER_COMBO)) {
-        if (!gOdomHoldFired && (millis() - gOdomHoldStartMs) >= ODOM_MODE_HOLD_MS) {
-            gOdomHoldFired = true;
-            odomEnterModeSave();
-        }
-    }
-
-    if (!comboHeld(btn, BTN_ENTER_COMBO) && gOdomComboHeld) {
-        gOdomComboHeld = false;
-        gOdomHoldFired = false;
+    if (comboPressed(btn, gOdomPrevButtons, BTN_ENTER_COMBO)) {
+        gOdomModeSave = !gOdomModeSave;
+        Serial.printf("[OdomRecord] mode %s\n", gOdomModeSave ? "ON" : "OFF");
     }
 
     if (gOdomModeSave && !gOdomRecordPending) {

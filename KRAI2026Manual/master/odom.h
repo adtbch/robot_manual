@@ -15,7 +15,6 @@
 
 constexpr size_t  ODOM_WP_COUNT = 4;
 constexpr int16_t ODOM_WP_DEFAULT_SPEED_RPM = 70;
-constexpr uint32_t ODOM_MODE_HOLD_MS = 5000;
 
 enum class OdomRecTarget : uint8_t {
     NONE = 0,
