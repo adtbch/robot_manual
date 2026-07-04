@@ -56,6 +56,8 @@ constexpr const char* NVS_KEY_COLOR    = "color";
 
 // BOOT button
 constexpr uint8_t BOOT_BTN_PIN = 0;
+constexpr uint32_t BOOT_DOUBLE_PRESS_MS = 200;
+constexpr uint32_t BOOT_DEBOUNCE_MS = 50;
 bool gBootBtnPrev = false;
 
 // RGB LED (WS2812B NeoPixel)
@@ -131,9 +133,28 @@ void setupAlliance() {
 // =====================================================================
 
 void allianceTick() {
-    const bool btnNow = (digitalRead(BOOT_BTN_PIN) == LOW);
-    if (btnNow && !gBootBtnPrev) {
-        toggleAllianceColor();
+    static uint32_t lastPressMs   = 0;
+    static uint32_t lastDebounceMs = 0;
+    static bool     lastStable     = HIGH;
+
+    const bool raw = (digitalRead(BOOT_BTN_PIN) == LOW);
+
+    if (raw != lastStable) {
+        lastDebounceMs = millis();
+        lastStable     = raw;
+        return;
     }
-    gBootBtnPrev = btnNow;
+    if ((millis() - lastDebounceMs) < BOOT_DEBOUNCE_MS) return;
+
+    static bool prevStable = HIGH;
+    if (raw == LOW && prevStable == HIGH) {
+        const uint32_t now = millis();
+        if ((now - lastPressMs) < BOOT_DOUBLE_PRESS_MS) {
+            toggleAllianceColor();
+            lastPressMs = 0;
+        } else {
+            lastPressMs = now;
+        }
+    }
+    prevStable = raw;
 }
