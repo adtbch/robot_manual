@@ -216,7 +216,7 @@ void handleGripperButtons(const ControlPacket &pkt) {
 }
 
 void handleManualServoB(const ControlPacket &pkt) {
-    if (gGripperState != READY_TO_STAB || !(pkt.buttons & BTN_TRIANGLE || gGripperState != STRAIGHTEN)) return;
+    if (!(pkt.buttons & BTN_TRIANGLE)) return;
 
     const int dir = servoBMoveDir(pkt);
     if (dir == 0) return;
