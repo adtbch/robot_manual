@@ -364,9 +364,6 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
     // ── STOP ────────────────────────────────────────────────────
     else if (strcmp(token, "stop") == 0) {
         motorStopAll();
-        setServoAngle('d', 90);
-        setServoAngle('t', 90);
-        setServoAngle('b', 90);
         out.println("Semua motor STOP, servo tengah (90)");
     }
 

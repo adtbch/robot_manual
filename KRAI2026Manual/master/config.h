@@ -116,7 +116,7 @@ struct Jeda {
 //  SHARED STATE — GripperState (akses dari gripper.ino & gripper_control.ino)
 // =====================================================================
 
-enum GripperState { IDLE, CLOSING, UP, STRAIGHTEN, READY_TO_STAB };
+enum GripperState { IDLE, OPENING, CLOSING, UP, STRAIGHTEN, READY_TO_STAB };
 extern GripperState gGripperState;
 
 // =====================================================================

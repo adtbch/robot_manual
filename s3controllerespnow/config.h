@@ -32,7 +32,7 @@
 // Controller coba semua, ESP-NOW kirim ke yang aktif.
 constexpr uint8_t kEspNowTargetMacs[][6] = {
     {0x94, 0xA9, 0x90, 0xD2, 0x43, 0x80}, // Master utama A4:CB:8F:F7:90:68
-    {0xC0, 0x4E, 0x30, 0x0A, 0xF3, 0x18}, // Spare — isi MAC Master cadangan
+    {0xA4, 0xCB, 0x8F, 0xD9, 0x25, 0x0C}, // Spare — isi MAC Master cadangan A4:CB:8F:D9:25:0C
 };
 constexpr uint8_t kEspNowTargetCount = sizeof(kEspNowTargetMacs) / 6;
 

@@ -68,7 +68,7 @@ void setup() {
     delay(8000);
     Serial.begin(115200);
     Serial.println("=== KRAI 2026 Master Board ===");
-
+    
     // Init ESP-NOW receiver
     bool espNowReady = espNowControlInit();
     // Init motors
@@ -78,22 +78,22 @@ void setup() {
     setupEncoders();
     // Init limit switches
     setupLimits();
-    // Init servos
-    setupServos();
     // Init relay
     setupRelay();
     // Init proximity
     setupProximity();
     // Init serial (UART1 + UART2)
     setupSerial();
+    // Init servos
+    setupServos();
     // Init serial command handler
     setupSerialCommand();
     // Init alliance color (BOOT button + RGB LED + NVS)
     setupAlliance();
     initForestDest();
     initOdomRec();
-    setServoHoming();
-    // setHomingAll();
+
+    setHomingAll();
     Serial.println("Setup zone1: limit Y/X + motor Y lv0 + motor X enc0");
 }
 

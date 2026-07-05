@@ -47,6 +47,8 @@ ArmBoxState gArmBoxR = ARMBOX_IDLE;
 ArmBoxState gArmBoxL = ARMBOX_IDLE;
 Jeda jedaArmBoxR;
 Jeda jedaArmBoxL;
+Jeda jeda;
+Jeda jedaOpening;
 } // anonymous namespace
 
 void armBoxStartGrab(char side) {
@@ -61,12 +63,13 @@ void armBoxStartGrab(char side) {
 
 void setupZone1() {
     setServoHoming();
-    setServoAngle('t', 80);
     if (gControllerMode == 1) {
         odomGoto(1);
     }
     gripperMotorYSetLevel(0);
-    motorXSetTarget(1500);
+    motorXSetTarget(2000);
+    gGripperState = IDLE;
+    jeda.reset();
 }
 
 // =====================================================================
@@ -77,16 +80,25 @@ void gripperZone1() {
     switch (gGripperState) {
 
         case IDLE:
-            if (readProximity() && gControllerMode == 1) {
-                setServoAngle('d', 90);
+            setServoAngle('t', 82);
+            if (jeda.check(300)) {
+                setServoAngle('d', 0);
+                gGripperState = OPENING;
+                jedaOpening.reset();
+            }
+            break;
+        case OPENING:
+            if (jedaOpening.check(300)) {
+                if (readProximity()) {
+                setServoAngle('d', 75);
                 gGripperState = CLOSING;
+                gJedaGripper.reset();
+                }
             }
             break;
 
         case CLOSING:
-            gJedaGripper.reset();
             if (gJedaGripper.check(300)) {
-                setServoAngle('t', 90);
                 gripperMotorYSetLevel(1);
                 gGripperState = UP;
             }
@@ -94,19 +106,19 @@ void gripperZone1() {
 
         case UP:
             if (motorYAtLevel(1)) {
-                motorXSetTarget(0);
+                gripperReadytoStab();
                 if (gControllerMode == 1) {
                     odomGoto(2);
                 }
-                gGripperState = STRAIGHTEN;
             };
             break;
 
         case STRAIGHTEN:
             if (!gMotionWaypointMode && gControllerMode == 1) {
-                gripperReadytoStab();
                 odomGoto(3);
             }
+            motorXSetTarget(0);
+            gGripperState = READY_TO_STAB;
             break;
         case READY_TO_STAB:
             break;
@@ -114,9 +126,9 @@ void gripperZone1() {
 }
 
 void gripperReadytoStab() {
-    if (gGripperState == STRAIGHTEN) {
+    if (gGripperState == UP) {
         setServoAngle('t', 0);
-        gGripperState = READY_TO_STAB;
+        gGripperState = STRAIGHTEN;
     }
 }
 
@@ -137,11 +149,11 @@ void armBoxTick() {
             if (slave2ProxR() && gControllerMode == 1) {
                 sendSlave2Command("pne r on");
                 gArmBoxR = ARMBOX_WAIT;
+                jedaArmBoxR.reset();
             }
             break;
             
         case ARMBOX_WAIT:
-            jedaArmBoxR.reset();
             if (!jedaArmBoxR.check(300)) break;
             sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
             armBoxFBbySpeed('r', -255);
@@ -161,11 +173,11 @@ void armBoxTick() {
             if (slave2ProxL() && gControllerMode == 1) {
                 sendSlave2Command("pne l on");
                 gArmBoxL = ARMBOX_WAIT;
+                jedaArmBoxL.reset();
             }
             break;
             
         case ARMBOX_WAIT:
-            jedaArmBoxL.reset();
             if (!jedaArmBoxL.check(300)) break;
             motorYSetTarget(gMotorYLevelEnc[4]);
             armBoxFBbySpeed('l', -255);

@@ -123,9 +123,9 @@ void loop() {
     // Waypoint dan TestYaw mutex - waypoint lebih prioritas
     if (!isAutoTunerRunning()) {
         // updateYaw() sudah pindah ke I2cTask di Core 0
-        if (getWaypointState() != WaypointState::IDLE) {
-            waypointTick(wpTargetX_m, wpTargetY_m, wpTargetYaw_deg, wpMaxSpeed);
-        } 
+        // if (getWaypointState() != WaypointState::IDLE) {
+        //     waypointTick(wpTargetX_m, wpTargetY_m, wpTargetYaw_deg, wpMaxSpeed);
+        // } 
         if (testYawMode) {
             static Jeda jedaYawTest;
             if (jedaYawTest.check(20)) {

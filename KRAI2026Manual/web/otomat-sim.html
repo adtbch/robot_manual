@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KRAI 2026 — Simulasi Otomat</title>
+<style>
+:root{--bg:#0f1117;--bg2:#1a1d27;--bg3:#252833;--bg4:#2a2d3a;--bd:#2e3140;--bdf:#4a6cf7;--tx:#e4e6f0;--txd:#8b8fa3;--ac:#4a6cf7;--acd:#3a56d4;--gn:#34d399;--rd:#f87171;--or:#fb923c;--yw:#fbbf24;--r:8px;--rl:12px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',-apple-system,sans-serif;background:var(--bg);color:var(--tx);line-height:1.55;min-height:100vh;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid var(--bd);background:var(--bg2);position:sticky;top:0;z-index:100}
+.hl h1{font-size:1.15rem;font-weight:700}.hl .ac{color:var(--ac)}
+.sub{font-size:.75rem;color:var(--txd);margin-top:2px}
+.play-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 20px;background:linear-gradient(180deg,#1e2438,var(--bg2));border-bottom:1px solid var(--bd);position:sticky;top:58px;z-index:98}
+.play-bar select{padding:8px 10px;border:1px solid var(--bd);border-radius:var(--r);background:var(--bg3);color:var(--tx);font-size:.82rem;min-width:220px}
+.btn-play{padding:9px 22px;border:none;border-radius:var(--r);background:var(--gn);color:#0a1a12;font-size:.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 0 20px rgba(52,211,153,.25)}
+.btn-play:hover{filter:brightness(1.08)}.btn-play.running{background:var(--yw);color:#1a1400;box-shadow:0 0 20px rgba(251,191,36,.3)}
+.play-status{font-size:.8rem;color:var(--txd);margin-left:auto}
+.play-status.run{color:var(--gn)}.play-status.wait{color:var(--yw);font-weight:600}.play-status.done{color:var(--ac)}
+.nav{display:flex;flex-wrap:wrap;background:var(--bg2);border-bottom:1px solid var(--bd);padding:0 12px;position:sticky;top:108px;z-index:97;gap:2px}
+.ni{padding:9px 14px;border:none;background:0;color:var(--txd);font-size:.8rem;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s}
+.ni:hover{color:var(--tx);background:var(--bg4)}.ni.on{color:var(--ac);border-bottom-color:var(--ac)}
+main{flex:1;display:grid;grid-template-columns:1fr 300px;gap:14px;padding:14px 20px;max-width:1400px;width:100%;margin:0 auto}
+@media(max-width:960px){main{grid-template-columns:1fr}}
+.pg{display:none;flex-direction:column;gap:12px}.pg.on{display:flex}
+.cd{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden}
+.ch{padding:11px 14px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+.ch h2{font-size:.88rem;font-weight:600}
+.cb{padding:12px 14px}
+.btn{padding:7px 12px;border:1px solid var(--bd);border-radius:var(--r);background:var(--bg3);color:var(--tx);font-size:.78rem;cursor:pointer;transition:.15s}
+.btn:hover{background:var(--bg4)}.btn:active{transform:scale(.97)}
+.bp{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+.bdn{background:var(--rd);border-color:var(--rd);color:#fff}
+.badge{padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:600}
+.b-idle{background:rgba(139,143,163,.2);color:var(--txd)}
+.b-run{background:rgba(74,108,247,.2);color:var(--ac)}
+.b-done{background:rgba(52,211,153,.2);color:var(--gn)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.kv div{background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;font-size:.75rem}
+.kv span{display:block;color:var(--txd);font-size:.65rem;text-transform:uppercase;margin-bottom:2px}
+.kv strong{font-family:monospace;font-size:.8rem}
+.log-panel{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rl);display:flex;flex-direction:column;max-height:calc(100vh - 130px);position:sticky;top:150px}
+.log-hdr{padding:11px 14px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+.log-box{flex:1;overflow-y:auto;padding:10px 12px;font-family:monospace;font-size:.7rem;line-height:1.7;min-height:180px}
+.ll{color:var(--txd)}.ll.act{color:var(--ac)}.ll.hw{color:var(--gn)}.ll.btn{color:var(--or)}.ll.play{color:var(--yw)}
+.flow{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:.72rem;margin:8px 0}
+.flow .step{padding:4px 9px;border-radius:16px;border:1px solid var(--bd);background:var(--bg3);color:var(--txd)}
+.flow .step.cur{border-color:var(--ac);background:rgba(74,108,247,.15);color:var(--ac);font-weight:600}
+.flow .step.done{border-color:var(--gn);color:var(--gn)}
+.sep{color:var(--txd);font-size:.65rem}
+.hint{font-size:.72rem;color:var(--txd)}
+.tbl{width:100%;border-collapse:collapse;font-size:.76rem}
+.tbl th,.tbl td{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left}
+.tbl th{color:var(--txd);font-size:.65rem;text-transform:uppercase}
+/* Illustration */
+.illus-card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden}
+.illus-hdr{padding:10px 14px;border-bottom:1px solid var(--bd);font-size:.82rem;font-weight:600;display:flex;justify-content:space-between}
+.illus-body{padding:12px;background:radial-gradient(ellipse at 50% 80%,#1a2040 0%,var(--bg) 70%)}
+.illus-body svg{width:100%;height:auto;display:block}
+.illus-caption{text-align:center;font-size:.72rem;color:var(--txd);padding:8px 12px;border-top:1px solid var(--bd)}
+.motor-carriage{transition:transform .35s ease}
+.motor-carriage.active{filter:drop-shadow(0 0 6px rgba(74,108,247,.85))}
+.motor-arrow{animation:bob .5s ease infinite}
+@keyframes bob{0%,100%{opacity:1}50%{opacity:.35}}
+.limit-hit{fill:#34d399!important;stroke:#34d399!important}
+.pne-rod{transition:height .3s ease,y .3s ease}
+.forest-bot{transition:cx .55s ease,cy .55s ease}
+.board-label{font-size:10px;font-weight:700;fill:#8b8fa3}
+/* Action dock — muncul saat pause */
+.action-dock{display:none;margin-bottom:12px;padding:16px;border-radius:var(--rl);border:2px solid var(--yw);background:rgba(251,191,36,.08);animation:pulse 1.5s ease infinite}
+.action-dock.show{display:block}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.3)}50%{box-shadow:0 0 24px 4px rgba(251,191,36,.15)}}
+.action-prompt{font-size:.85rem;font-weight:600;color:var(--yw);margin-bottom:10px}
+.btn-action{padding:14px 24px;width:100%;border:none;border-radius:var(--r);background:var(--yw);color:#1a1400;font-size:.95rem;font-weight:700;cursor:pointer}
+.btn-action:hover{filter:brightness(1.06)}
+.tick-bar{padding:8px 12px;border-top:1px solid var(--bd);font-size:.72rem;color:var(--txd)}
+input[type=number],select.i{padding:6px 8px;border:1px solid var(--bd);border-radius:5px;background:var(--bg3);color:var(--tx)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hl">
+    <h1>KRAI 2026 <span class="ac">Simulasi Otomat</span></h1>
+    <div class="sub">Tekan ▶ Play — otomatis jalan, berhenti hanya saat butuh tombol controller</div>
+  </div>
+  <div class="row">
+    <select id="allianceSel" class="i" onchange="sim.setAlliance(this.value)"><option>RED</option><option>BLUE</option></select>
+    <select id="zoneSel" class="i" onchange="sim.zoneState=+this.value"><option value="1">Zone 1</option><option value="2">Zone 2</option></select>
+  </div>
+</header>
+
+<div class="play-bar">
+  <select id="scenarioSel">
+    <option value="zone1_gripper">Zone1 + Gripper Auto</option>
+    <option value="homing">Homing (Master + Slave2)</option>
+    <option value="armbox_r">Arm Box — sisi R</option>
+    <option value="armbox_l">Arm Box — sisi L</option>
+    <option value="forest_1">Forest Slot 1</option>
+    <option value="forest_1_2">Forest Slot 1 → 2</option>
+    <option value="forest_exit">Forest Exit</option>
+  </select>
+  <button class="btn-play" id="btnPlay" onclick="sim.playToggle()">▶ Play</button>
+  <button class="btn" id="btnReset" onclick="sim.playReset()">↺ Reset</button>
+  <span class="play-status" id="playStatus">Pilih skenario lalu tekan Play</span>
+</div>
+
+<nav class="nav" id="nav">
+  <button class="ni on" data-p="play">▶ Play & Ilustrasi</button>
+  <button class="ni" data-p="gripper">Gripper</button>
+  <button class="ni" data-p="armbox">Arm Box</button>
+  <button class="ni" data-p="forest">Forest</button>
+  <button class="ni" data-p="debug">Debug Manual</button>
+</nav>
+
+<main>
+<div id="pages">
+
+<!-- PLAY + ILLUSTRATION -->
+<div class="pg on" id="pg-play">
+
+  <div class="action-dock" id="actionDock">
+    <div class="action-prompt" id="actionPrompt">⏸ Menunggu tombol controller…</div>
+    <button class="btn-action" id="btnAction" onclick="sim.doWaitAction()"></button>
+  </div>
+
+  <div class="illus-card">
+    <div class="illus-hdr"><span id="illusTitle">Ilustrasi Gripper</span><span class="badge b-idle" id="illusBadge">IDLE</span></div>
+    <div class="illus-body" id="illusBody"></div>
+    <div class="illus-caption" id="illusCaption">—</div>
+  </div>
+
+  <div class="cd">
+    <div class="ch"><h2>Progress</h2></div>
+    <div class="cb">
+      <div class="flow" id="mainFlow"></div>
+      <div class="kv" style="margin-top:10px" id="globalKv"></div>
+    </div>
+  </div>
+</div>
+
+<div class="pg" id="pg-gripper">
+  <div class="cd"><div class="ch"><h2>gripperZone1()</h2><span class="badge b-idle" id="gripBadge">IDLE</span></div>
+  <div class="cb"><div class="flow" id="gripFlow"></div><div class="kv" id="gripKv" style="margin-top:10px"></div></div></div>
+</div>
+
+<div class="pg" id="pg-armbox">
+  <div class="cd"><div class="ch"><h2>Arm Box R / L</h2></div>
+  <div class="cb"><table class="tbl"><thead><tr><th>Sisi</th><th>State</th></tr></thead><tbody id="armboxTbl"></tbody></table></div></div>
+</div>
+
+<div class="pg" id="pg-forest">
+  <div class="cd"><div class="ch"><h2>Forest</h2><span class="badge b-idle" id="forestBadge">IDLE</span></div>
+  <div class="cb">
+    <div class="row" style="margin-bottom:8px">
+      <label class="hint">Dest1</label><input type="number" id="dest1" min="1" max="12" value="2" style="width:50px">
+      <label class="hint">Dest2</label><input type="number" id="dest2" min="1" max="12" value="4" style="width:50px">
+      <button class="btn" onclick="sim.forestSetDest()">Set</button>
+    </div>
+    <div class="kv" id="forestKv"></div><div class="flow" id="forestFlow" style="margin-top:8px"></div>
+  </div></div>
+</div>
+
+<div class="pg" id="pg-debug">
+  <div class="cd"><div class="ch"><h2>Trigger manual (debug)</h2></div>
+  <div class="cb">
+    <div class="row">
+      <button class="btn" onclick="sim.pressBtn('OPTIONS')">OPTIONS</button>
+      <button class="btn" onclick="sim.playAction('SQUARE_UP')">Square+↑</button>
+      <button class="btn" onclick="sim.playAction('SQUARE_LEFT')">Square+←</button>
+      <button class="btn" onclick="sim.playAction('SQUARE_DOWN')">Square+↓</button>
+      <button class="btn" onclick="sim.playAction('ARMBOX_DONE_L')">Circle+↑ done L</button>
+      <button class="btn" onclick="sim.playAction('ARMBOX_DONE_R')">Circle+↓ done R</button>
+      <button class="btn" onclick="sim.setProx(true)">Prox ON</button>
+      <button class="btn" onclick="sim.completeOdomGoto()">WP selesai</button>
+      <button class="btn" onclick="sim.motorYIdle()">Motor Y idle</button>
+    </div>
+  </div></div>
+</div>
+
+</div>
+
+<aside class="log-panel">
+  <div class="log-hdr"><h2>Log</h2><button class="btn" style="padding:3px 8px;font-size:.68rem" onclick="sim.clearLog()">Clear</button></div>
+  <div class="log-box" id="logBox"></div>
+  <div class="tick-bar">Tick <strong id="tickN">0</strong> · <strong id="simMs">0</strong>ms</div>
+</aside>
+</main>
+
+<script>
+'use strict';
+
+const BTN={CROSS:1<<0,CIRCLE:1<<1,TRIANGLE:1<<2,SQUARE:1<<3,UP:1<<10,DOWN:1<<11,LEFT:1<<12,RIGHT:1<<13,OPTIONS:1<<15};
+const GRIP=['IDLE','CLOSING','UP','STRAIGHTEN','READY_TO_STAB'];
+const ARM=['ARMBOX_IDLE','ARMBOX_WAIT','ARMBOX_GRAB','ARMBOX_DONE','ARMBOX_BACK'];
+const FPHASE=['COMPUTE','APPROACH_MOVE','APPROACH_YAW','FOREST_MOVE','FOREST_ARM_Y','FOREST_ARM_DEPLOY'];
+const MOTOR_Y_ENC=[0,300,600,900,1200,1500];
+const CELL=120, GRID_CX=180, FOREST_EXIT=255;
+const FOREST10A_IDX=10, FOREST10B_IDX=0, FOREST10A_AP=0, FOREST10B_AP=3;
+
+const FOREST_WP=[
+  {x:0,y:0,h:2,v:1},{x:0,y:0,h:3,v:1},{x:120,y:0,h:2,v:1},{x:0,y:0,h:3,v:1},{x:0,y:0,h:2,v:1},
+  null,{x:240,y:120,h:4,v:1},{x:0,y:240,h:3,v:1},null,{x:0,y:0,h:3,v:1},
+  {x:0,y:0,h:2,v:1},{x:120,y:360,h:3,v:1},{x:0,y:0,h:2,v:1}
+];
+
+const SCENARIOS={
+  homing:{name:'Homing (Master + Slave2)',steps:['M:Y↓','M:X←','M:Servo','S2:Y↓','S2:X←','Selesai'],illus:'homing'},
+  zone1_gripper:{name:'Zone1 + Gripper',steps:['OPTIONS','Prox','Tutup','Naik Y','WP Prepare','Luruskan','WP Stab','READY'],illus:'gripper'},
+  armbox_r:{name:'Arm Box R',steps:['Prox R','Pne ON','Grab','Done×3','IDLE'],illus:'armbox'},
+  armbox_l:{name:'Arm Box L',steps:['Prox L','Pne ON','Grab','Done×3','IDLE'],illus:'armbox'},
+  forest_1:{name:'Forest Slot 1',steps:['Square+↑','Approach','Forest WP','Arm deploy','Selesai'],illus:'forest'},
+  forest_1_2:{name:'Forest 1→2',steps:['Slot 1','Slot 2','Selesai'],illus:'forest'},
+  forest_exit:{name:'Forest Exit',steps:['Square+↓','Exit path','Selesai'],illus:'forest'}
+};
+
+const MOTOR_AUTO_MS=450, WP_AUTO_MS=650, HOMING_AUTO_MS=500, ENC_STEP=28;
+const ENC_Y_MAX=1500, ENC_X_MAX=2500, S2_ENC_Y_MAX=5000;
+
+class Jeda{
+  constructor(){this.lastMs=0}
+  reset(ms){this.lastMs=ms}
+  check(iv,now){if(now-this.lastMs<iv)return false;this.lastMs=now;return true}
+}
+
+const sim={
+  simMs:0,tickN:0,zoneState:1,alliance:'RED',
+  proximity:false,slave2ProxR:false,slave2ProxL:false,
+  servo:{t:80,b:0,d:0},motorYLevel:0,motorYTarget:0,motorYActive:false,
+  motorXTarget:null,motorYSince:0,wpSince:0,
+  encY:600,encX:400,encYTarget:600,encXTarget:400,
+  motorYDir:'idle',motorXDir:'idle',motorXActive:false,
+  s2EncY:1500,s2EncYTarget:1500,s2EncX:80,s2MotorYActive:false,
+  s2MotorXPwm:0,s2MotorKPwm:0,s2PneR:false,s2PneL:false,
+  homingMaster:'idle',homingSlave2:'idle',homingMode:null,
+  homingMasterSince:0,homingSlave2Since:0,
+  illusType:null,forestBotX:160,forestBotY:230,
+  gMotionWaypointMode:false,gYawTarget:0,gTargetX:0,gTargetY:0,gTargetSpeed:100,
+  gGripperState:0,gJedaGripper:new Jeda(),
+  gArmBoxR:0,gArmBoxL:0,jedaR:new Jeda(),jedaL:new Jeda(),
+  gForestWp:FOREST_WP.map(w=>w?{...w}:null),
+  gForestApproach:[{has_pre:false,yaw:-90,has_yaw:true},{has_pre:false,yaw:90,has_yaw:true},{has_pre:false,yaw:180,has_yaw:true},{has_pre:false,yaw:180,has_yaw:true}],
+  gForestDest1:2,gForestDest2:4,gForestDest1Done:false,
+  gLastApproachedCol:-1,gLastForestId:0,gForestArmSide:'',
+  sTarget:0,sActiveForestId:0,sSeq:[-1,-1,-1,-1],sSeqStep:0,sPhase:0,
+  sApX:0,sApY:0,sApYaw:0,sExitMode:false,sActiveSlotMission:0,
+  buttons:0,prevButtons:0,log:[],
+  play:{running:false,paused:false,scenario:null,flags:{},wait:null,done:false},
+
+  act(m,c='act'){this.log.unshift({t:`[${(this.simMs/1000).toFixed(2)}s] ${m}`,c});if(this.log.length>300)this.log.pop();this.renderLog()},
+  hw(m){this.act('HW: '+m,'hw')},btn(m){this.act('BTN: '+m,'btn')},pl(m){this.act('▶ '+m,'play')},
+  clearLog(){this.log=[];this.renderLog()},
+  renderLog(){document.getElementById('logBox').innerHTML=this.log.map(l=>`<div class="ll ${l.c}">${esc(l.t)}</div>`).join('')},
+
+  lerpEnc(enc,min,max,pxA,pxB){const t=Math.max(0,Math.min(1,(enc-min)/(max-min)));return pxA+(pxB-pxA)*t},
+  stepEnc(cur,tgt,step){if(cur===tgt)return cur;return cur<tgt?Math.min(cur+step,tgt):Math.max(cur-step,tgt)},
+  tickEncInterp(){
+    if(this.play.paused)return;
+    const s=ENC_STEP;
+    if(this.motorYActive||this.encY!==this.encYTarget){
+      this.encY=this.stepEnc(this.encY,this.encYTarget,s);
+      if(this.encY===this.encYTarget){this.motorYActive=false;this.motorYDir='idle'}
+      else this.motorYDir=this.encYTarget>this.encY?'up':this.encYTarget<this.encY?'down':'idle';
+    }
+    if(this.motorXActive||this.encX!==this.encXTarget){
+      this.encX=this.stepEnc(this.encX,this.encXTarget,s);
+      this.motorXDir=this.encXTarget>this.encX?'right':this.encXTarget<this.encX?'left':'idle';
+      if(this.encX===this.encXTarget)this.motorXActive=false;
+    }
+    if(this.s2MotorYActive||this.s2EncY!==this.s2EncYTarget){
+      this.s2EncY=this.stepEnc(this.s2EncY,this.s2EncYTarget,s);
+      if(this.s2EncY===this.s2EncYTarget)this.s2MotorYActive=false;
+    }
+    if(this.s2MotorXPwm){
+      const d=this.s2MotorXPwm>0?3:-3;
+      this.s2EncX=Math.max(0,Math.min(100,this.s2EncX+d));
+    }
+    if(this.s2MotorKPwm){
+      const d=this.s2MotorKPwm>0?3:-3;
+      this.encX=Math.max(0,Math.min(ENC_X_MAX,this.encX+d));
+    }
+    if(this.homingMaster==='y_run'){this.encY=this.stepEnc(this.encY,0,s+10);this.motorYDir='down'}
+    if(this.homingMaster==='x_run'){this.encX=this.stepEnc(this.encX,0,s+10);this.motorXDir='left'}
+    if(this.homingSlave2==='y_run'){this.s2EncY=this.stepEnc(this.s2EncY,0,s+10)}
+    if(this.homingSlave2==='x_run'){this.s2EncX=this.stepEnc(this.s2EncX,0,s+10)}
+  },
+
+  // ── PLAY ENGINE ──────────────────────────────────────────────────
+  playToggle(){
+    if(this.play.running){this.play.running=false;this.play.paused=false;this.updatePlayUI();return}
+    this.playReset(false);
+    this.play.scenario=document.getElementById('scenarioSel').value;
+    this.play.running=true;this.play.paused=false;this.play.done=false;
+    this.play.flags={};
+    this.pl(`Mulai: ${SCENARIOS[this.play.scenario].name}`);
+    if(this.play.scenario==='homing') this.homingStart('all');
+    if(this.play.scenario.startsWith('forest')) this.forestSetDest();
+    if(this.play.scenario==='forest_1_2') this.play.flags.needSlot2=true;
+    if(this.play.scenario==='forest_exit'){this.gForestDest1Done=true;this.sActiveForestId=2;this.gLastForestId=2;this.gLastApproachedCol=2}
+    this.updatePlayUI();
+  },
+  playReset(log=true){
+    this.play={running:false,paused:false,scenario:null,flags:{},wait:null,done:false};
+    this.simMs=0;this.tickN=0;
+    this.proximity=false;this.slave2ProxR=false;this.slave2ProxL=false;
+    this.servo={t:80,b:0,d:0};this.motorYLevel=0;this.motorYActive=false;this.motorXTarget=null;
+    this.encY=600;this.encX=400;this.encYTarget=600;this.encXTarget=400;
+    this.motorYDir='idle';this.motorXDir='idle';this.motorXActive=false;
+    this.s2EncY=1500;this.s2EncYTarget=1500;this.s2EncX=80;this.s2MotorYActive=false;
+    this.s2MotorXPwm=0;this.s2MotorKPwm=0;this.s2PneR=false;this.s2PneL=false;
+    this.homingMaster='idle';this.homingSlave2='idle';this.illusType=null;
+    this.forestBotX=160;this.forestBotY=230;
+    this.gMotionWaypointMode=false;this.gGripperState=0;
+    this.gArmBoxR=0;this.gArmBoxL=0;
+    this.sTarget=0;this.sActiveForestId=0;this.sSeq=[-1,-1,-1,-1];this.sSeqStep=0;this.sPhase=0;
+    this.sExitMode=false;this.gForestDest1Done=false;this.gLastForestId=0;this.gLastApproachedCol=-1;
+    this.forestDeriveWp();
+    if(log) this.pl('Reset');
+    this.hideActionDock();this.updatePlayUI();this.renderAll();
+  },
+  playResume(){this.play.paused=false;this.play.wait=null;this.hideActionDock();this.updatePlayUI()},
+  playPauseWait(wait){
+    if(this.play.paused&&this.play.wait?.id===wait.id)return;
+    this.play.paused=true;this.play.wait=wait;
+    this.showActionDock(wait);this.updatePlayUI();
+  },
+  showActionDock(w){
+    const d=document.getElementById('actionDock');
+    document.getElementById('actionPrompt').textContent='⏸ Menunggu — '+w.label;
+    document.getElementById('btnAction').textContent=w.btnLabel||w.label;
+    d.classList.add('show');
+  },
+  hideActionDock(){document.getElementById('actionDock').classList.remove('show')},
+  doWaitAction(){if(this.play.wait)this.playAction(this.play.wait.id,true)},
+  playAction(id,fromDock=false){
+    const A={
+      OPTIONS:()=>{this.pressBtn('OPTIONS');this.play.flags.zone1Done=true},
+      SQUARE_UP:()=>{this.buttons|=BTN.SQUARE;this.forestControlOnce(BTN.UP);this.buttons&=~BTN.SQUARE;this.play.flags.forest1Done=true},
+      SQUARE_LEFT:()=>{this.buttons|=BTN.SQUARE;this.forestControlOnce(BTN.LEFT);this.buttons&=~BTN.SQUARE;this.play.flags.forest2Done=true},
+      SQUARE_DOWN:()=>{this.buttons|=BTN.SQUARE;this.forestControlOnce(BTN.DOWN);this.buttons&=~BTN.SQUARE;this.play.flags.forestExitDone=true},
+      ARMBOX_DONE_L:()=>{this.buttons|=BTN.CIRCLE;this.armBoxControlOnce(BTN.UP);this.buttons&=~BTN.CIRCLE},
+      ARMBOX_DONE_R:()=>{this.buttons|=BTN.CIRCLE;this.armBoxControlOnce(BTN.DOWN);this.buttons&=~BTN.CIRCLE},
+    };
+    if(A[id]){A[id]();if(fromDock)this.playResume();this.btn(id+(fromDock?' ✓':''))}
+    this.renderAll();
+  },
+  forestControlOnce(dpad){
+    const prev=this.prevButtons;
+    this.buttons|=dpad;
+    this.forestControlTick();
+    this.prevButtons=prev;
+    this.buttons&=~dpad;
+  },
+  armBoxControlOnce(dpad){
+    const prev=this.prevButtons; this.armBoxPrevDir=-1;
+    this.buttons|=dpad;
+    this.armBoxControlTick();
+    this.prevButtons=prev;
+    this.buttons&=~dpad;
+  },
+
+  getPlayWait(){
+    if(!this.play.running||this.play.done)return null;
+    const s=this.play.scenario,f=this.play.flags;
+    if(s==='zone1_gripper'&&!f.zone1Done) return{id:'OPTIONS',label:'Tekan OPTIONS untuk setupZone1()',btnLabel:'▶ OPTIONS'};
+    if(s==='forest_1'&&!f.forest1Done&&!this.sActiveForestId&&!this.sExitMode) return{id:'SQUARE_UP',label:'Square + ↑ — Forest Slot 1',btnLabel:'▶ Square + ↑'};
+    if(s==='forest_1_2'){
+      if(!f.forest1Done&&!this.sActiveForestId) return{id:'SQUARE_UP',label:'Square + ↑ — Slot 1',btnLabel:'▶ Square + ↑'};
+      if(f.forest1Done&&!f.forest2Done&&this.gForestDest1Done&&!this.sActiveForestId) return{id:'SQUARE_LEFT',label:'Square + ← — Slot 2',btnLabel:'▶ Square + ←'};
+    }
+    if(s==='forest_exit'&&!f.forestExitDone&&!this.sExitMode) return{id:'SQUARE_DOWN',label:'Square + ↓ — Exit Forest',btnLabel:'▶ Square + ↓'};
+    if(s==='armbox_r'&&this.gArmBoxR>=2&&this.gArmBoxR<=4) return{id:'ARMBOX_DONE_R',label:`Circle + ↓ — armBoxDone(R) [${ARM[this.gArmBoxR]}]`,btnLabel:'▶ Circle + ↓ (done R)'};
+    if(s==='armbox_l'&&this.gArmBoxL>=2&&this.gArmBoxL<=4) return{id:'ARMBOX_DONE_L',label:`Circle + ↑ — armBoxDone(L) [${ARM[this.gArmBoxL]}]`,btnLabel:'▶ Circle + ↑ (done L)'};
+    return null;
+  },
+
+  isScenarioDone(){
+    const s=this.play.scenario,f=this.play.flags;
+    if(s==='homing') return this.homingMaster==='done'&&this.homingSlave2==='done';
+    if(s==='zone1_gripper') return this.gGripperState===4;
+    if(s==='armbox_r') return this.gArmBoxR===0&&f.hadGrabR;
+    if(s==='armbox_l') return this.gArmBoxL===0&&f.hadGrabL;
+    if(s==='forest_1') return f.forest1Done&&this.gForestDest1Done&&!this.sActiveForestId&&!this.gMotionWaypointMode&&!this.motorYActive;
+    if(s==='forest_1_2') return f.forest2Done&&!this.sActiveForestId&&!this.gMotionWaypointMode&&!this.motorYActive;
+    if(s==='forest_exit') return f.forestExitDone&&!this.sExitMode&&!this.sActiveForestId;
+    return false;
+  },
+
+  playAutoHw(){
+    const s=this.play.scenario,f=this.play.flags,now=this.simMs;
+    // homing limits auto
+    if(s==='homing'){
+      if(this.homingMaster==='y_run'&&now-this.homingMasterSince>=HOMING_AUTO_MS)this.homingMasterTriggerY();
+      else if(this.homingMaster==='x_run'&&now-this.homingMasterSince>=HOMING_AUTO_MS)this.homingMasterTriggerX();
+      if(this.homingSlave2==='y_run'&&now-this.homingSlave2Since>=HOMING_AUTO_MS+80)this.homingSlave2TriggerY();
+      else if(this.homingSlave2==='x_run'&&now-this.homingSlave2Since>=HOMING_AUTO_MS)this.homingSlave2TriggerX();
+      return;
+    }
+    // zone1 gripper: auto proximity, motors, waypoints
+    if(s==='zone1_gripper'&&f.zone1Done){
+      if(this.gGripperState===0&&!this.proximity){this.setProx(true);return}
+      if(this.motorYActive){if(!this.motorYSince)this.motorYSince=now;if(now-this.motorYSince>=MOTOR_AUTO_MS){this.motorYReachLevel(this.motorYLevel);this.motorYSince=0}}
+      if(this.gMotionWaypointMode){if(!this.wpSince)this.wpSince=now;if(now-this.wpSince>=WP_AUTO_MS){this.completeOdomGoto();this.wpSince=0}}
+    }
+    // armbox: auto prox + timer
+    if(s==='armbox_r'&&this.gArmBoxR===0&&!this.slave2ProxR) this.setSlave2Prox('r',true);
+    if(s==='armbox_l'&&this.gArmBoxL===0&&!this.slave2ProxL) this.setSlave2Prox('l',true);
+    if(s==='armbox_r'||s==='armbox_l'){
+      if(this.motorYActive||this.s2MotorYActive){if(!this.motorYSince)this.motorYSince=now;if(now-this.motorYSince>=MOTOR_AUTO_MS){this.motorYIdle();this.motorYSince=0}}
+    }
+    // forest: auto waypoints + motor
+    if(s.startsWith('forest')&&(f.forest1Done||f.forest2Done||f.forestExitDone||s==='forest_exit')){
+      if(this.gMotionWaypointMode){if(!this.wpSince)this.wpSince=now;if(now-this.wpSince>=WP_AUTO_MS){this.completeOdomGoto();this.wpSince=0}}
+      if(this.motorYActive){if(!this.motorYSince)this.motorYSince=now;if(now-this.motorYSince>=MOTOR_AUTO_MS){this.motorYIdle();this.motorYSince=0}}
+    }
+  },
+
+  playTick(){
+    if(!this.play.running)return;
+    if(this.isScenarioDone()){this.play.done=true;this.play.running=false;this.pl('Skenario selesai ✓');this.updatePlayUI();return}
+    const wait=this.getPlayWait();
+    if(wait){this.playPauseWait(wait);return}
+    if(!this.play.paused) this.playAutoHw();
+  },
+
+  updatePlayUI(){
+    const st=document.getElementById('playStatus');
+    const bp=document.getElementById('btnPlay');
+    if(this.play.done){st.textContent='✓ Selesai';st.className='play-status done';bp.textContent='▶ Play lagi';bp.classList.remove('running')}
+    else if(this.play.paused){st.textContent='⏸ Menunggu tombol controller…';st.className='play-status wait';bp.textContent='⏸ Pause';bp.classList.add('running')}
+    else if(this.play.running){st.textContent='▶ Berjalan otomatis…';st.className='play-status run';bp.textContent='⏹ Stop';bp.classList.add('running')}
+    else{st.textContent='Pilih skenario lalu tekan Play';st.className='play-status';bp.textContent='▶ Play';bp.classList.remove('running')}
+  },
+
+  // ── hardware helpers ─────────────────────────────────────────────
+  setAlliance(v){this.alliance=v;this.forestDeriveWp();this.renderAll()},
+  setServoAngle(id,a){this.servo[id]=a;this.hw(`setServoAngle('${id}',${a})`)},
+  setServoHoming(){this.setServoAngle('t',70);this.setServoAngle('b',0);this.setServoAngle('d',0);this.gGripperState=0},
+  motorYSetTarget(e){
+    this.motorYTarget=e;this.encYTarget=e;this.motorYActive=true;this.motorYSince=0;
+    this.motorYDir=e>this.encY?'up':e<this.encY?'down':'idle';
+    this.hw(`motorYSetTarget(${e})`);
+  },
+  gripperMotorYSetLevel(lv){lv=Math.max(0,Math.min(5,lv));this.motorYLevel=lv;this.motorYSetTarget(MOTOR_Y_ENC[lv])},
+  motorXSetTarget(e){
+    this.motorXTarget=e;this.encXTarget=e;this.motorXActive=true;
+    this.motorXDir=e>this.encX?'right':e<this.encX?'left':'idle';
+    this.hw(`motorXSetTarget(${e})`);
+  },
+  motorYReachLevel(lv){
+    this.motorYLevel=lv;this.encY=MOTOR_Y_ENC[lv];this.encYTarget=this.encY;
+    this.motorYActive=false;this.motorYDir='idle';
+    this.hw(`motorYAtLevel(${lv})`);
+  },
+  motorYIdle(){
+    this.motorYActive=false;this.s2MotorYActive=false;
+    this.encY=this.encYTarget;this.s2EncY=this.s2EncYTarget;
+    this.forestTick();
+  },
+  sendSlave2(c){
+    this.hw(`slave2: ${c}`);
+    const mt=c.match(/motortarget\s+(-?\d+)/);
+    if(mt){this.s2EncYTarget=+mt[1];this.s2MotorYActive=true}
+    const mx=c.match(/motor x\s+(-?\d+)/);
+    if(mx){this.s2MotorXPwm=+mx[1]}
+    const mk=c.match(/motor k\s+(-?\d+)/);
+    if(mk){this.s2MotorKPwm=+mk[1]}
+    if(c.includes('pne r on'))this.s2PneR=true;
+    if(c.includes('pne r off'))this.s2PneR=false;
+    if(c.includes('pne l on'))this.s2PneL=true;
+    if(c.includes('pne l off'))this.s2PneL=false;
+    if(c==='pneall'){this.s2PneR=false;this.s2PneL=false}
+  },
+  odomGoto(n){this.gMotionWaypointMode=true;this.wpSince=0;this.act(`odomGoto(${n})`)},
+  completeOdomGoto(){if(!this.gMotionWaypointMode)return;this.gMotionWaypointMode=false;this.wpSince=0;this.hw('goto selesai');this.forestTick()},
+  setProx(v){this.proximity=v;this.hw(`proximity=${v}`)},
+  setSlave2Prox(s,v){if(s==='r')this.slave2ProxR=v;else this.slave2ProxL=v;this.hw(`slave2Prox${s.toUpperCase()}=${v}`)},
+
+  homingStart(mode){
+    this.homingMode=mode;this.homingMasterSince=this.simMs;this.homingSlave2Since=this.simMs;
+    this.encY=900;this.encX=600;this.s2EncY=2800;this.s2EncX=90;
+    this.encYTarget=0;this.encXTarget=0;this.s2EncYTarget=0;this.s2EncXTarget=0;
+    if(mode==='servo'){this.setServoHoming();this.homingMaster='done';this.homingSlave2='done'}
+    else{
+      this.homingMaster='y_run';this.homingSlave2='y_run';
+      this.motorYDir='down';this.hw('homing Master Y↓ + Slave2 Y↓');
+    }
+  },
+  homingMasterTriggerY(){
+    if(this.homingMaster!=='y_run')return;
+    this.encY=0;this.encYTarget=0;this.homingMaster='x_run';
+    this.homingMasterSince=this.simMs;this.motorXDir='left';
+    this.hw('Master LIMIT_Y_BAWAH → homing X←');
+  },
+  homingMasterTriggerX(){
+    if(this.homingMaster!=='x_run')return;
+    this.encX=0;this.encXTarget=0;
+    if(this.homingMode==='all'){this.setServoHoming();this.homingMaster='done'}
+    else this.homingMaster='done';
+    this.hw('Master LIMIT_X_MUNDUR → servo homing');
+  },
+  homingSlave2TriggerY(){
+    if(this.homingSlave2!=='y_run')return;
+    this.s2EncY=0;this.s2EncYTarget=0;this.homingSlave2='x_run';
+    this.homingSlave2Since=this.simMs;
+    this.hw('Slave2 LIMIT_TURUN → homing X←');
+  },
+  homingSlave2TriggerX(){
+    if(this.homingSlave2!=='x_run')return;
+    this.s2EncX=0;this.homingSlave2='done';
+    this.hw('Slave2 LIMIT_BELAKANG → done');
+  },
+
+  setupZone1(){this.setServoHoming();this.odomGoto(1);this.gripperMotorYSetLevel(0);this.motorXSetTarget(200);this.act('setupZone1()')},
+
+  gripperZone1(){
+    const S=this.gGripperState;
+    if(S===0&&this.proximity){this.setServoAngle('d',90);this.gJedaGripper.reset(this.simMs);this.gGripperState=1;this.act('→ CLOSING')}
+    else if(S===1&&this.gJedaGripper.check(300,this.simMs)){this.setServoAngle('t',90);this.gripperMotorYSetLevel(1);this.gGripperState=2;this.act('→ UP')}
+    else if(S===2&&!this.motorYActive&&this.motorYLevel>=1){this.odomGoto(2);this.gGripperState=3;this.act('→ STRAIGHTEN')}
+    else if(S===3&&!this.gMotionWaypointMode){this.setServoAngle('t',0);this.gGripperState=4;this.odomGoto(3);this.act('→ READY_TO_STAB')}
+  },
+  gripperReset(){this.gGripperState=0},
+
+  armBoxTick(){
+    if(this.gArmBoxR===0&&this.slave2ProxR){this.sendSlave2('pne r on');this.jedaR.reset(this.simMs);this.gArmBoxR=1}
+    else if(this.gArmBoxR===1&&this.jedaR.check(300,this.simMs)){this.sendSlave2(`motortarget ${MOTOR_Y_ENC[4]}`);this.sendSlave2('motor x -255');this.gArmBoxR=2;this.play.flags.hadGrabR=true;this.act('ArmBox R → GRAB')}
+    if(this.gArmBoxL===0&&this.slave2ProxL){this.sendSlave2('pne l on');this.jedaL.reset(this.simMs);this.gArmBoxL=1}
+    else if(this.gArmBoxL===1&&this.jedaL.check(300,this.simMs)){this.motorYSetTarget(MOTOR_Y_ENC[4]);this.sendSlave2('motor k -255');this.gArmBoxL=2;this.play.flags.hadGrabL=true;this.act('ArmBox L → GRAB')}
+  },
+  armBoxDone(side){
+    if(side==='r'){
+      if(this.gArmBoxR===2){this.sendSlave2(`motortarget ${MOTOR_Y_ENC[5]}`);this.gArmBoxR=3}
+      else if(this.gArmBoxR===3){this.sendSlave2('pne r off');this.gArmBoxR=4}
+      else if(this.gArmBoxR===4) this.gArmBoxR=0;
+    }else{
+      if(this.gArmBoxL===2){this.motorYSetTarget(MOTOR_Y_ENC[5]);this.gArmBoxL=3}
+      else if(this.gArmBoxL===3){this.sendSlave2('pne l off');this.gArmBoxL=4}
+      else if(this.gArmBoxL===4) this.gArmBoxL=0;
+    }
+  },
+  armBoxReset(){this.sendSlave2('pneall');this.gArmBoxR=0;this.gArmBoxL=0},
+
+  // forest (port ringkas)
+  forestGroup(id){if(id<=3)return 0;if(id===4||id===7)return 1;if(id===6||id===9)return 2;if(id===10)return 4;return 3},
+  forestRow(id){return Math.floor((id-1)/3)},
+  getCurrentX(){if(this.gLastForestId>0)return this.gForestWp[this.gLastForestId].x;if(this.gLastApproachedCol===0||this.gLastApproachedCol===2)return -60;if(this.gLastApproachedCol===1||this.gLastApproachedCol===3)return 300;return GRID_CX},
+  forestDeriveWp(){
+    const f2=this.gForestWp[2],f6=this.gForestWp[6],f7=this.gForestWp[7],f11=this.gForestWp[11];
+    if(!f2||!f6||!f7||!f11)return;
+    const s=this.alliance==='BLUE'?-1:1,c=CELL;
+    Object.assign(this.gForestWp[1],{x:f2.x,y:f2.y+s*c});Object.assign(this.gForestWp[3],{x:f2.x,y:f2.y-s*c});
+    Object.assign(this.gForestWp[4],{x:f7.x-s*c,y:f7.y});Object.assign(this.gForestWp[9],{x:f6.x+s*c,y:f6.y});
+    Object.assign(this.gForestWp[10],{x:f7.x+s*c,y:f7.y});Object.assign(this.gForestWp[0],{x:f11.x,y:f11.y+s*c});
+    Object.assign(this.gForestWp[12],{x:f11.x,y:f11.y-s*c});
+  },
+  computeApproachSeq(tid){
+    const seq=[-1,-1,-1,-1];let k=0;const tg=this.forestGroup(tid);if(tg===0)return seq;
+    const lg=this.gLastForestId>0?this.forestGroup(this.gLastForestId):255;
+    if(lg===tg||tg===4&&(lg===1||lg===3)||tg===3&&lg===4)return seq;
+    const isLD=lg===1||lg===4,isRD=lg===2;
+    const at0=this.gLastForestId===0&&this.gLastApproachedCol===0,at1=this.gLastForestId===0&&this.gLastApproachedCol===1;
+    const at2=this.gLastForestId===0&&this.gLastApproachedCol===2,at3=this.gLastForestId===0&&this.gLastApproachedCol===3;
+    if(tg===1){if(isRD){if(this.forestRow(this.gLastForestId)<=1){seq[k++]=1;seq[k++]=0}else{seq[k++]=3;seq[k++]=2}}else if(!at0&&!isLD)seq[k++]=0}
+    else if(tg===2){if(isLD){if(this.forestRow(this.gLastForestId)<=1){seq[k++]=0;seq[k++]=1}else{seq[k++]=2;seq[k++]=3}}else if(!at1&&!isRD)seq[k++]=1}
+    else if(tg===4){if(at0||at3)return seq;if(isRD)seq[k++]=FOREST10B_AP;else if(!isLD)seq[k++]=FOREST10A_AP}
+    else{if(this.getCurrentX()<GRID_CX){if(isRD){seq[k++]=1;seq[k++]=0}else if(!at0&&!at2&&!isLD)seq[k++]=0;if(!at2)seq[k++]=2}
+    else{if(isLD){seq[k++]=0;seq[k++]=1}else if(!at1&&!at3&&!isRD)seq[k++]=1;if(!at3)seq[k++]=3}}
+    return seq;
+  },
+  computeExitSeq(){const seq=[-1,-1,-1,-1];let k=0;if(this.gLastApproachedCol===1){seq[k++]=3;seq[k++]=2}else seq[k++]=2;return seq},
+  forestWpIdx(id){if(id===10&&this.gLastApproachedCol===FOREST10B_AP)return FOREST10B_IDX;if(id===10)return FOREST10A_IDX;return id},
+  pickForestArmSide(){
+    const ap=this.gLastApproachedCol;
+    if(ap===0||ap===2)return this.alliance==='BLUE'?(this.slave2ProxR?'l':'r'):(this.slave2ProxL?'r':'l');
+    if(ap===1||ap===3)return this.alliance==='BLUE'?(this.slave2ProxL?'r':'l'):(this.slave2ProxR?'l':'r');
+    return 'l';
+  },
+  forestNavigate(){
+    while(true){
+      if(this.sPhase===0){
+        const ap=this.sSeq[this.sSeqStep];
+        if(ap===-1){
+          if(this.sExitMode){this.gLastForestId=0;this.gLastApproachedCol=2;this.sExitMode=false;this.sTarget=0;this.sPhase=0;return false}
+          const fid=this.sTarget;this.gLastForestId=fid;this.sActiveForestId=fid;this.sTarget=0;
+          const wp=this.gForestWp[this.forestWpIdx(fid)];
+          this.gTargetX=wp.x;this.gTargetY=wp.y;this.gTargetSpeed=wp.spd||100;
+          this.gMotionWaypointMode=true;this.sPhase=3;this.act(`→ FOREST_MOVE F${fid}`);return true;
+        }
+        const prev=this.sSeqStep>0?this.sSeq[this.sSeqStep-1]:-1;
+        let next=-1;if(this.sSeqStep+1<4){const n=this.sSeq[this.sSeqStep+1];if(n>=0&&n<=3)next=n}
+        const already=this.sSeqStep===0&&ap===this.gLastApproachedCol;
+        this.sSeqStep++;this.gLastApproachedCol=ap;
+        if(!this.gForestApproach[ap].has_pre)continue;
+        this.sApYaw=this.gForestApproach[ap].yaw;
+        if(this.sExitMode&&ap===2&&next===-1)this.sApYaw=180;
+        else if(already||ap===next)this.sApYaw=0;
+        else if(ap===2&&next===3)this.sApYaw=180;
+        else if(ap===3&&next===2)this.sApYaw=180;
+        this.gTargetX=0;this.gTargetY=0;this.gMotionWaypointMode=true;this.sPhase=1;
+        this.act(`→ APPROACH col${ap}`);return true;
+      }
+      if(this.sPhase===1){if(this.gMotionWaypointMode)return true;if(this.gForestApproach[this.gLastApproachedCol].has_yaw){this.gYawTarget=this.sApYaw;this.gMotionWaypointMode=true;this.sPhase=2;return true}this.sPhase=0;continue}
+      if(this.sPhase===2){if(this.gMotionWaypointMode)return true;this.sPhase=0;continue}
+      if(this.sPhase===3){if(this.gMotionWaypointMode)return true;if(!this.sExitMode&&this.sActiveForestId>0){const h=MOTOR_Y_ENC[this.gForestWp[this.forestWpIdx(this.sActiveForestId)].h];this.motorYSetTarget(h);this.sPhase=4;return true}this.sPhase=0;return false}
+      if(this.sPhase===4){if(this.motorYActive)return true;this.gForestArmSide=this.pickForestArmSide();const h=MOTOR_Y_ENC[this.gForestWp[this.forestWpIdx(this.sActiveForestId)].h];if(this.gForestArmSide==='l')this.motorYSetTarget(h);else this.sendSlave2(`motortarget ${h}`);if(this.gForestArmSide==='l'){this.sPhase=5;return true}this.onForestMissionDone();this.sActiveForestId=0;this.sPhase=0;return false}
+      if(this.sPhase===5){if(this.motorYActive)return true;this.onForestMissionDone();this.sActiveForestId=0;this.sPhase=0;return false}
+      return false;
+    }
+  },
+  onForestMissionDone(){if(!this.sExitMode&&this.sActiveSlotMission===1){this.gForestDest1Done=true;this.sendSlave2('forest evt dest1_done')}this.sActiveSlotMission=0},
+  goForest(id){
+    if(!id||id>12||!this.gForestWp[id]?.v)return false;
+    if(this.sExitMode||this.sActiveForestId!==id&&this.sTarget!==id){
+      this.sExitMode=false;this.sTarget=id;this.sActiveForestId=id;this.sSeqStep=0;this.sPhase=0;
+      this.sSeq=this.computeApproachSeq(id);this.act(`goForest(${id}) seq=[${this.sSeq}]`);
+    }
+    return this.forestNavigate();
+  },
+  forestTick(){
+    if(this.sExitMode||this.sTarget===FOREST_EXIT)return this.exitFromForest();
+    if(this.sActiveForestId>0||this.sTarget>0)return this.goForest(this.sActiveForestId||this.sTarget);
+    return false;
+  },
+  exitFromForest(){
+    if(this.sTarget!==FOREST_EXIT){this.sExitMode=true;this.sTarget=FOREST_EXIT;this.sSeqStep=0;this.sPhase=0;this.sSeq=this.computeExitSeq();this.act('exitFromForest()')}
+    return this.forestNavigate();
+  },
+  forestGotoSlot(slot){
+    if(slot===2&&!this.gForestDest1Done)return;
+    const id=slot===1?this.gForestDest1:this.gForestDest2;
+    if(id<1||id>12||!this.gForestWp[id]?.v)return;
+    this.sActiveSlotMission=slot;if(slot===1){this.gForestDest1Done=false;this.sendSlave2('forest evt dest1_reset')}
+    this.goForest(id);
+  },
+  forestTriggerExit(){this.exitFromForest()},
+  forestSetDest(){this.gForestDest1=+document.getElementById('dest1').value;this.gForestDest2=+document.getElementById('dest2').value},
+
+  forestControlTick(){
+    if(!(this.buttons&BTN.SQUARE)){this.prevButtons=this.buttons;return}
+    const kd=BTN.UP|BTN.DOWN|BTN.LEFT|BTN.RIGHT,pd=this.prevButtons&kd,nd=this.buttons&kd;
+    if((nd&BTN.UP)&&!(pd&BTN.UP)){this.gripperMotorYSetLevel(4);this.sendSlave2(`motortarget ${MOTOR_Y_ENC[4]}`);this.forestGotoSlot(1)}
+    else if((nd&BTN.LEFT)&&!(pd&BTN.LEFT)) this.forestGotoSlot(2);
+    else if((nd&BTN.DOWN)&&!(pd&BTN.DOWN)) this.forestTriggerExit();
+    this.prevButtons=this.buttons;
+  },
+  armBoxControlTick(){
+    if(!(this.buttons&BTN.CIRCLE)){this.armBoxPrevDir=-1;return}
+    let lx=0,ly=0;
+    if(this.buttons&BTN.RIGHT)lx=127;if(this.buttons&BTN.LEFT)lx=-127;
+    if(this.buttons&BTN.UP)ly=127;if(this.buttons&BTN.DOWN)ly=-127;
+    if(Math.abs(lx)<=30&&Math.abs(ly)<=30){this.armBoxPrevDir=-1;return}
+    const dir=Math.abs(lx)>=Math.abs(ly)?(lx>0?2:3):(ly>0?0:1);
+    if(dir===this.armBoxPrevDir)return;this.armBoxPrevDir=dir;
+    if(dir===0)this.armBoxDone('l');else if(dir===1)this.armBoxDone('r');
+  },
+  pressBtn(n){if(n==='OPTIONS'){this.buttons|=BTN.OPTIONS;if(this.zoneState===1)this.setupZone1();this.buttons&=~BTN.OPTIONS}},
+  armBoxPrevDir:-1,
+
+  loopBody(){this.gripperZone1();this.forestControlTick();this.armBoxControlTick();this.forestTick();this.armBoxTick()},
+  tick(){
+    if(this.play.running&&!this.play.paused)this.simMs+=50;
+    this.tickN++;
+    this.tickEncInterp();
+    this.loopBody();
+    if(this.play.running)this.playTick();
+    document.getElementById('tickN').textContent=this.tickN;
+    document.getElementById('simMs').textContent=this.simMs;
+    this.renderAll();
+  },
+
+  // ── ILLUSTRATIONS (persistent SVG + animasi) ─────────────────────
+  ensureIllus(type){
+    if(this.illusType===type)return;
+    this.illusType=type;
+    const b=document.getElementById('illusBody');
+    if(type==='gripper') b.innerHTML=`<svg id="illusSvg" viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="260" fill="#12151f"/>
+      <text x="200" y="18" class="board-label" text-anchor="middle">MASTER — Capit Senjata (side view)</text>
+      <rect x="30" y="200" width="340" height="8" fill="#2a3048"/>
+      <text x="200" y="230" fill="#5a5f78" font-size="8" text-anchor="middle">LIMIT Y bawah</text>
+      <rect id="gLimY" x="185" y="208" width="30" height="10" rx="2" fill="#3a3f55" stroke="#5a5f78"/>
+      <line x1="100" y1="195" x2="300" y2="195" stroke="#3a4466" stroke-width="3"/>
+      <text x="55" y="198" fill="#5a5f78" font-size="7">LIMIT X mundur</text>
+      <rect id="gLimX" x="95" y="188" width="10" height="14" rx="2" fill="#3a3f55"/>
+      <line x1="120" y1="40" x2="120" y2="200" stroke="#3a4466" stroke-width="4"/>
+      <line x1="280" y1="40" x2="280" y2="200" stroke="#3a4466" stroke-width="4"/>
+      <g id="gCarY" class="motor-carriage"><rect x="108" y="0" width="24" height="14" rx="3" fill="#4a6cf7"/>
+        <text id="gLblY" x="200" y="12" fill="#8b8fa3" font-size="8">Y enc</text></g>
+      <g id="gCarXY" class="motor-carriage"><line x1="120" y1="55" x2="280" y2="55" stroke="#6b7aab" stroke-width="4"/>
+        <g id="gCarX" class="motor-carriage"><rect x="-8" y="48" width="16" height="14" rx="2" fill="#6366f1"/>
+          <text id="gLblX" x="60" y="45" fill="#8b8fa3" font-size="7">X</text></g>
+        <g id="gArmT" transform="rotate(0 200 55)"><rect x="185" y="30" width="30" height="8" rx="2" fill="#fb923c"/>
+          <text id="gLblT" x="230" y="38" fill="#fb923c" font-size="7">T</text></g>
+        <g id="gJawD"><path id="gJawPath" d="M190 28 Q200 18 210 28" fill="none" stroke="#34d399" stroke-width="3"/>
+          <text id="gLblD" x="230" y="25" fill="#34d399" font-size="7">D</text></g>
+        <circle id="gProx" cx="215" cy="22" r="10" fill="none" stroke="#3a3f55" stroke-width="1.5" stroke-dasharray="3 2"/></g>
+      <text id="gArrowY" class="motor-arrow" x="145" y="70" fill="#fbbf24" font-size="14" opacity="0">↓</text>
+      <text id="gArrowX" class="motor-arrow" x="160" y="50" fill="#fbbf24" font-size="14" opacity="0">←</text>
+      <rect x="12" y="235" width="110" height="20" rx="4" fill="#1a1d27" stroke="#2e3140"/>
+      <text id="gStateLbl" x="67" y="248" fill="#e4e6f0" font-size="9" text-anchor="middle">IDLE</text>
+    </svg>`;
+    else if(type==='armbox') b.innerHTML=`<svg id="illusSvg" viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="240" fill="#12151f"/>
+      <text x="100" y="18" class="board-label" text-anchor="middle">SISI R — Slave2</text>
+      <text x="300" y="18" class="board-label" text-anchor="middle">SISI L — Master Y + S2 K</text>
+      <rect x="20" y="30" width="160" height="190" rx="6" fill="#1a1d27" stroke="#2e3140" id="rPanel"/>
+      <rect x="220" y="30" width="160" height="190" rx="6" fill="#1a1d27" stroke="#2e3140" id="lPanel"/>
+      <line x1="55" y1="50" x2="55" y2="200" stroke="#3a4466" stroke-width="3"/>
+      <line x1="55" y1="200" x2="145" y2="200" stroke="#3a4466" stroke-width="3"/>
+      <g id="rCarY" class="motor-carriage"><rect x="43" y="0" width="24" height="12" rx="2" fill="#4a6cf7"/></g>
+      <g id="rCarX" class="motor-carriage" transform="translate(80,195)"><rect x="0" y="-6" width="20" height="12" rx="2" fill="#6366f1"/></g>
+      <rect id="rPne" x="120" y="120" width="8" height="20" fill="#3a3f55" class="pne-rod"/>
+      <text id="rStLbl" x="100" y="42" fill="#8b8fa3" font-size="8" text-anchor="middle">IDLE</text>
+      <line x1="255" y1="50" x2="255" y2="200" stroke="#3a4466" stroke-width="3"/>
+      <line x1="255" y1="200" x2="345" y2="200" stroke="#3a4466" stroke-width="3"/>
+      <g id="lCarY" class="motor-carriage"><rect x="243" y="0" width="24" height="12" rx="2" fill="#4a6cf7"/></g>
+      <g id="lCarK" class="motor-carriage" transform="translate(290,195)"><rect x="0" y="-6" width="20" height="12" rx="2" fill="#a855f7"/></g>
+      <rect id="lPne" x="320" y="120" width="8" height="20" fill="#3a3f55" class="pne-rod"/>
+      <text id="lStLbl" x="300" y="42" fill="#8b8fa3" font-size="8" text-anchor="middle">IDLE</text>
+    </svg>`;
+    else if(type==='homing') b.innerHTML=`<svg id="illusSvg" viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="260" fill="#12151f"/>
+      <text x="100" y="18" class="board-label" text-anchor="middle">MASTER</text>
+      <text x="300" y="18" class="board-label" text-anchor="middle">SLAVE2 ARM</text>
+      <rect x="15" y="25" width="170" height="220" rx="6" fill="#1a1d27" stroke="#2e3140"/>
+      <rect x="215" y="25" width="170" height="220" rx="6" fill="#1a1d27" stroke="#2e3140"/>
+      <line x1="55" y1="45" x2="55" y2="195" stroke="#3a4466" stroke-width="3"/>
+      <rect id="mLimY" x="48" y="198" width="14" height="8" rx="2" fill="#3a3f55"/>
+      <g id="mCarY" class="motor-carriage"><rect x="43" y="0" width="24" height="12" rx="2" fill="#4a6cf7"/></g>
+      <text id="mLblY" x="100" y="100" fill="#8b8fa3" font-size="8" text-anchor="middle">Motor Y</text>
+      <line x1="40" y1="210" x2="160" y2="210" stroke="#3a4466" stroke-width="3"/>
+      <rect id="mLimX" x="38" y="205" width="8" height="12" rx="2" fill="#3a3f55"/>
+      <g id="mCarX" class="motor-carriage" transform="translate(90,205)"><rect x="0" y="-5" width="18" height="10" rx="2" fill="#6366f1"/></g>
+      <text id="mLblX" x="100" y="175" fill="#8b8fa3" font-size="8" text-anchor="middle">Motor X</text>
+      <text id="mLblSrv" x="100" y="225" fill="#8b8fa3" font-size="7" text-anchor="middle">Servo D/T/B</text>
+      <line x1="255" y1="45" x2="255" y2="195" stroke="#3a4466" stroke-width="3"/>
+      <rect id="s2LimY" x="248" y="198" width="14" height="8" rx="2" fill="#3a3f55"/>
+      <g id="s2CarY" class="motor-carriage"><rect x="243" y="0" width="24" height="12" rx="2" fill="#4a6cf7"/></g>
+      <text id="s2LblY" x="300" y="100" fill="#8b8fa3" font-size="8" text-anchor="middle">Motor Y</text>
+      <line x1="240" y1="210" x2="360" y2="210" stroke="#3a4466" stroke-width="3"/>
+      <rect id="s2LimX" x="238" y="205" width="8" height="12" rx="2" fill="#3a3f55"/>
+      <g id="s2CarX" class="motor-carriage" transform="translate(290,205)"><rect x="0" y="-5" width="18" height="10" rx="2" fill="#6366f1"/></g>
+      <text id="s2LblX" x="300" y="175" fill="#8b8fa3" font-size="8" text-anchor="middle">Motor X</text>
+    </svg>`;
+    else b.innerHTML=`<svg id="illusSvg" viewBox="0 0 340 280" xmlns="http://www.w3.org/2000/svg">
+      <rect width="340" height="280" fill="#12151f"/>
+      <text x="170" y="16" class="board-label" text-anchor="middle">FOREST GRID</text>
+      <g id="fCells"></g>
+      <circle id="fBot" class="forest-bot" cx="160" cy="230" r="9" fill="#34d399"/>
+      <text id="fBotLbl" x="160" y="234" fill="#0a1a12" font-size="7" text-anchor="middle">R</text>
+      <g id="fInset" opacity="0"><rect x="220" y="200" width="110" height="70" rx="4" fill="#1a1d27" stroke="#4a6cf7"/>
+        <text x="275" y="218" fill="#8b8fa3" font-size="7" text-anchor="middle">ARM DEPLOY</text>
+        <text id="fInsetSide" x="275" y="235" fill="#4a6cf7" font-size="9" text-anchor="middle">—</text></g>
+      <text id="fPhaseLbl" x="170" y="272" fill="#8b8fa3" font-size="8" text-anchor="middle">—</text>
+    </svg>`;
+    if(type==='forest') this.buildForestCells();
+  },
+  buildForestCells(){
+    const g=document.getElementById('fCells');if(!g)return;
+    const labels=['10b','1','2','4','','6','7','','9','10a','11','12'];
+    const ids=[0,1,2,4,0,6,7,0,9,10,11,12];
+    const rx=[0,1,2,0,1,2,0,1,2,0,1,2],ry=[0,0,0,1,1,1,2,2,2,3,3,3];
+    let h='';for(let i=0;i<12;i++){const id=ids[i];if(!id)continue;
+      const x=20+rx[i]*100,y=28+ry[i]*50;
+      h+=`<rect id="fCell${id}" x="${x}" y="${y}" width="88" height="42" rx="4" fill="#1e2235" stroke="#2e3140"/>
+      <text x="${x+44}" y="${y+18}" fill="#8b8fa3" font-size="9" text-anchor="middle">F${id}</text>
+      <text x="${x+44}" y="${y+32}" fill="#5a5f78" font-size="7" text-anchor="middle">${labels[i]}</text>`}
+    g.innerHTML=h;
+  },
+  setT(el,attr,val){if(el)el.setAttribute(attr,val)},
+  setTxt(id,t){const e=document.getElementById(id);if(e)e.textContent=t},
+  updateIllusDom(){
+    const t=this.illusType;if(!t)return;
+    if(t==='gripper'){
+      const yPx=this.lerpEnc(this.encY,0,ENC_Y_MAX,185,55);
+      const xPx=this.lerpEnc(this.encX,0,ENC_X_MAX,80,200);
+      const carY=document.getElementById('gCarY'),carX=document.getElementById('gCarX');
+      this.setT(carY,'transform',`translate(0,${yPx})`);
+      this.setT(carX,'transform',`translate(${xPx},0)`);
+      carY?.classList.toggle('active',this.motorYActive);
+      carX?.classList.toggle('active',this.motorXActive);
+      const armY=55+yPx;
+      this.setT(document.getElementById('gCarXY'),'transform',`translate(0,${yPx})`);
+      this.setT(document.getElementById('gArmT'),'transform',`rotate(${90-this.servo.t} 200 ${armY})`);
+      const jaw=this.servo.d, jy=armY-28+this.servo.d*0.15;
+      const jp=document.getElementById('gJawPath');
+      if(jp)jp.setAttribute('d',`M190 ${armY-8} Q200 ${jy} 210 ${armY-8}`);
+      const pr=document.getElementById('gProx');
+      if(pr){pr.setAttribute('stroke',this.proximity?'#34d399':'#3a3f55');pr.setAttribute('stroke-dasharray',this.proximity?'0':'3 2')}
+      this.setTxt('gLblY',`Y ${this.encY|0} lv${this.motorYLevel}`);
+      this.setTxt('gLblX',`X ${this.encX|0}`);
+      this.setTxt('gLblT',`T ${this.servo.t}°`);
+      this.setTxt('gLblD',`D ${this.servo.d}°`);
+      this.setTxt('gStateLbl',GRIP[this.gGripperState]);
+      const ay=document.getElementById('gArrowY'),ax=document.getElementById('gArrowX');
+      if(ay){ay.setAttribute('opacity',this.motorYActive?'1':'0');ay.textContent=this.motorYDir==='up'?'↑':'↓'}
+      if(ax){ax.setAttribute('opacity',this.motorXActive?'1':'0');ax.textContent=this.motorXDir==='left'?'←':'→'}
+    }else if(t==='armbox'){
+      const rYPx=this.lerpEnc(this.s2EncY,0,S2_ENC_Y_MAX,195,55);
+      const rXPx=this.lerpEnc(this.s2EncX,0,100,55,130);
+      const lYPx=this.lerpEnc(this.encY,0,ENC_Y_MAX,195,55);
+      const lKPw=this.s2MotorKPwm?this.lerpEnc(Math.abs(this.s2MotorKPwm),0,255,55,120):55;
+      this.setT(document.getElementById('rCarY'),'transform',`translate(0,${rYPx})`);
+      this.setT(document.getElementById('rCarX'),'transform',`translate(${rXPx},195)`);
+      this.setT(document.getElementById('lCarY'),'transform',`translate(0,${lYPx})`);
+      this.setT(document.getElementById('lCarK'),'transform',`translate(${lKPw},195)`);
+      document.getElementById('rCarY')?.classList.toggle('active',this.s2MotorYActive);
+      document.getElementById('lCarY')?.classList.toggle('active',this.motorYActive);
+      const rP=document.getElementById('rPne'),lP=document.getElementById('lPne');
+      if(rP){rP.setAttribute('height',this.s2PneR?45:20);rP.setAttribute('y',this.s2PneR?95:120);rP.setAttribute('fill',this.s2PneR?'#34d399':'#3a3f55')}
+      if(lP){lP.setAttribute('height',this.s2PneL?45:20);lP.setAttribute('y',this.s2PneL?95:120);lP.setAttribute('fill',this.s2PneL?'#34d399':'#3a3f55')}
+      const rc=['#3a3f55','#fbbf24','#4a6cf7','#fb923c','#34d399'];
+      document.getElementById('rPanel')?.setAttribute('stroke',rc[this.gArmBoxR]);
+      document.getElementById('lPanel')?.setAttribute('stroke',rc[this.gArmBoxL]);
+      this.setTxt('rStLbl',ARM[this.gArmBoxR]);this.setTxt('lStLbl',ARM[this.gArmBoxL]);
+    }else if(t==='homing'){
+      const mYPx=this.lerpEnc(this.encY,0,900,195,50);
+      const mXPx=this.lerpEnc(this.encX,0,600,40,130);
+      const sYPx=this.lerpEnc(this.s2EncY,0,2800,195,50);
+      const sXPx=this.lerpEnc(this.s2EncX,0,90,40,130);
+      this.setT(document.getElementById('mCarY'),'transform',`translate(0,${mYPx})`);
+      this.setT(document.getElementById('mCarX'),'transform',`translate(${mXPx},205)`);
+      this.setT(document.getElementById('s2CarY'),'transform',`translate(0,${sYPx})`);
+      this.setT(document.getElementById('s2CarX'),'transform',`translate(${sXPx},205)`);
+      const mYRun=this.homingMaster==='y_run',mXRun=this.homingMaster==='x_run';
+      const sYRun=this.homingSlave2==='y_run',sXRun=this.homingSlave2==='x_run';
+      document.getElementById('mCarY')?.classList.toggle('active',mYRun);
+      document.getElementById('mCarX')?.classList.toggle('active',mXRun);
+      document.getElementById('s2CarY')?.classList.toggle('active',sYRun);
+      document.getElementById('s2CarX')?.classList.toggle('active',sXRun);
+      document.getElementById('mLimY')?.classList.toggle('limit-hit',mYRun===false&&this.homingMaster!=='idle'&&this.homingMaster!=='y_run');
+      document.getElementById('mLimX')?.classList.toggle('limit-hit',this.homingMaster==='done'||this.homingMaster==='servo');
+      document.getElementById('s2LimY')?.classList.toggle('limit-hit',sYRun===false&&this.homingSlave2!=='idle'&&this.homingSlave2!=='y_run');
+      document.getElementById('s2LimX')?.classList.toggle('limit-hit',this.homingSlave2==='done');
+      const mYtxt=mYRun?'Y ↓ running':mXRun?'Y ✓ X ← running':this.homingMaster==='done'?'Selesai':'Y idle';
+      const sYtxt=sYRun?'Y ↓ running':sXRun?'Y ✓ X ← running':this.homingSlave2==='done'?'Selesai':'Y idle';
+      this.setTxt('mLblY',mYtxt);this.setTxt('mLblX',mXRun?'Motor X ←':this.homingMaster==='done'?'X ✓ limit':'');
+      this.setTxt('s2LblY',sYtxt);this.setTxt('s2LblX',sXRun?'Motor X ←':this.homingSlave2==='done'?'X ✓ limit':'');
+      this.setTxt('mLblSrv',this.homingMaster==='done'?`Servo ${this.servo.t}/${this.servo.d}/${this.servo.b}`:'Servo menunggu…');
+    }else if(t==='forest'){
+      const active=this.sActiveForestId||this.sTarget;
+      for(let id=1;id<=12;id++){const c=document.getElementById('fCell'+id);
+        if(c){c.setAttribute('fill',active===id?'#2a3a6a':'#1e2235');c.setAttribute('stroke',active===id?'#4a6cf7':'#2e3140')}}
+      const rx=[0,1,2,0,1,2,0,1,2,0,1,2],ry=[0,0,0,1,1,1,2,2,2,3,3,3];
+      const gridIds=[0,1,2,4,0,6,7,0,9,10,11,12];
+      let bx=20+2*100+44,by=28+3*50+20;
+      if(active>0){const gi=gridIds.indexOf(active);if(gi>=0){bx=20+rx[gi]*100+44;by=28+ry[gi]*50+20}}
+      else{const col=Math.max(0,this.gLastApproachedCol);bx=20+col*100+44;by=28+3*50+20}
+      this.forestBotX=bx;this.forestBotY=by;
+      const bot=document.getElementById('fBot');
+      if(bot){bot.setAttribute('cx',bx);bot.setAttribute('cy',by)}
+      const inset=document.getElementById('fInset');
+      const showArm=this.sPhase>=4;
+      if(inset)inset.setAttribute('opacity',showArm?'1':'0');
+      this.setTxt('fInsetSide',this.gForestArmSide?`side ${this.gForestArmSide}`:'—');
+      this.setTxt('fPhaseLbl',`${FPHASE[this.sPhase]} · F${active||'—'} · (${this.gTargetX|0},${this.gTargetY|0})cm`);
+    }
+  },
+  renderIllus(){
+    const sc=this.play.scenario||document.getElementById('scenarioSel').value;
+    const ill=SCENARIOS[sc]?.illus||'gripper';
+    document.getElementById('illusTitle').textContent=
+      ill==='gripper'?'Ilustrasi Master — Capit Senjata':ill==='forest'?'Ilustrasi Forest Grid':ill==='armbox'?'Ilustrasi Arm Box R/L':'Homing Master + Slave2';
+    this.ensureIllus(ill);
+    this.updateIllusDom();
+    const cap=document.getElementById('illusCaption'),badge=document.getElementById('illusBadge');
+    if(ill==='gripper'){
+      cap.textContent=`${GRIP[this.gGripperState]} · enc Y=${this.encY|0} X=${this.encX|0} · Servo D/T=${this.servo.d}°/${this.servo.t}°`;
+      badge.textContent=GRIP[this.gGripperState];badge.className='badge '+(this.gGripperState===4?'b-done':'b-run');
+    }else if(ill==='forest'){
+      cap.textContent=`Fase ${FPHASE[this.sPhase]} · F${this.sActiveForestId||this.sTarget||'—'} · dest1=${this.gForestDest1Done}`;
+      badge.textContent=this.sActiveForestId?`F${this.sActiveForestId}`:'FOREST';badge.className='badge b-run';
+    }else if(ill==='armbox'){
+      cap.textContent=`R:${ARM[this.gArmBoxR]} encY=${this.s2EncY|0} · L:${ARM[this.gArmBoxL]} encY=${this.encY|0}`;
+      badge.textContent='ARMBOX';badge.className='badge b-run';
+    }else{
+      cap.textContent=`Master: ${this.homingMaster} · Slave2: ${this.homingSlave2}`;
+      badge.textContent=(this.homingMaster==='done'&&this.homingSlave2==='done')?'OK':'…';
+      badge.className='badge '+((this.homingMaster==='done'&&this.homingSlave2==='done')?'b-done':'b-run');
+    }
+  },
+
+  renderMainFlow(){
+    const sc=this.play.scenario||document.getElementById('scenarioSel').value;
+    const steps=SCENARIOS[sc]?.steps||[];
+    let cur=0;
+    if(sc==='zone1_gripper') cur=[0,1,2,3,4,5,6,7][Math.min(this.gGripperState+(this.play.flags.zone1Done?1:0),7)];
+    else if(sc==='homing'){
+      if(this.homingMaster==='done'&&this.homingSlave2==='done') cur=5;
+      else if(this.homingSlave2==='x_run'||this.homingSlave2==='done') cur=4;
+      else if(this.homingMaster==='done') cur=2;
+      else if(this.homingMaster==='x_run'||this.homingSlave2==='y_run') cur=1;
+      else cur=0;
+    }
+    else if(sc==='armbox_r') cur=Math.min(this.gArmBoxR+(this.slave2ProxR?1:0),4);
+    else if(sc==='armbox_l') cur=Math.min(this.gArmBoxL+(this.slave2ProxL?1:0),4);
+    else if(sc.startsWith('forest')) cur=Math.min(this.sPhase+(this.play.flags.forest1Done||this.play.flags.forestExitDone?1:0),steps.length-1);
+    document.getElementById('mainFlow').innerHTML=steps.map((s,i)=>{
+      let c='step';if(i<cur)c+=' done';else if(i===cur)c+=' cur';
+      return `<span class="${c}">${s}</span>${i<steps.length-1?'<span class="sep">→</span>':''}`;
+    }).join('');
+  },
+
+  renderAll(){
+    this.renderIllus();this.renderMainFlow();
+    const g=document.getElementById('globalKv');
+    if(g) g.innerHTML=`
+      <div><span>Gripper</span><strong>${GRIP[this.gGripperState]}</strong></div>
+      <div><span>Motion</span><strong>${this.gMotionWaypointMode?'GOTO…':'free'}</strong></div>
+      <div><span>Motor Y</span><strong>lv${this.motorYLevel} enc${this.encY|0} ${this.motorYActive?'▶':'■'}</strong></div>
+      <div><span>Slave2 Y</span><strong>enc${this.s2EncY|0} ${this.s2MotorYActive?'▶':'■'}</strong></div>
+      <div><span>Forest</span><strong>${FPHASE[this.sPhase]}</strong></div>
+      <div><span>ArmBox R/L</span><strong>${ARM[this.gArmBoxR]}/${ARM[this.gArmBoxL]}</strong></div>
+      <div><span>Play</span><strong>${this.play.done?'✓':this.play.paused?'⏸ wait':this.play.running?'▶':'—'}</strong></div>`;
+    const gf=document.getElementById('gripFlow');
+    if(gf) gf.innerHTML=GRIP.map((s,i)=>`<span class="step${i<this.gGripperState?' done':i===this.gGripperState?' cur':''}">${s}</span>${i<4?'<span class="sep">→</span>':''}`).join('');
+    const gb=document.getElementById('gripBadge');
+    if(gb){gb.textContent=GRIP[this.gGripperState];gb.className='badge '+(this.gGripperState===4?'b-done':'b-run')}
+    const gk=document.getElementById('gripKv');
+    if(gk) gk.innerHTML=`<div><span>Prox</span><strong>${this.proximity}</strong></div><div><span>Servo</span><strong>${this.servo.d}/${this.servo.t}/${this.servo.b}</strong></div>`;
+    const tb=document.getElementById('armboxTbl');
+    if(tb) tb.innerHTML=`<tr><td>R</td><td>${ARM[this.gArmBoxR]}</td></tr><tr><td>L</td><td>${ARM[this.gArmBoxL]}</td></tr>`;
+    const fb=document.getElementById('forestBadge');
+    if(fb){fb.textContent=this.sActiveForestId?`F${this.sActiveForestId}`:'IDLE';fb.className='badge b-run'}
+    const fk=document.getElementById('forestKv');
+    if(fk) fk.innerHTML=`<div><span>Dest</span><strong>${this.gForestDest1}/${this.gForestDest2}</strong></div><div><span>Dest1✓</span><strong>${this.gForestDest1Done}</strong></div><div><span>Active</span><strong>F${this.sActiveForestId||'—'}</strong></div>`;
+    const ff=document.getElementById('forestFlow');
+    if(ff) ff.innerHTML=FPHASE.map((p,i)=>`<span class="step${i<this.sPhase?' done':i===this.sPhase?' cur':''}">${p}</span>${i<5?'<span class="sep">→</span>':''}`).join('');
+  }
+};
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+
+document.getElementById('nav').addEventListener('click',e=>{
+  const b=e.target.closest('.ni');if(!b)return;
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  b.classList.add('on');document.getElementById('pg-'+b.dataset.p).classList.add('on');
+});
+document.getElementById('scenarioSel').addEventListener('change',()=>{sim.illusType=null;sim.renderAll()});
+
+setInterval(()=>sim.tick(),50);
+sim.forestDeriveWp();
+sim.renderAll();
+sim.pl('Siap — pilih skenario, tekan ▶ Play');
+</script>
+</body>
+</html>
