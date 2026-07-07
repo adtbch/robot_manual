@@ -31,7 +31,7 @@
 // Baris pertama = master utama, baris kedua = spare (isi MAC cadangan).
 // Controller coba semua, ESP-NOW kirim ke yang aktif.
 constexpr uint8_t kEspNowTargetMacs[][6] = {
-    {0xA4, 0xCB, 0x8F, 0xD9, 0x27, 0x98}, // Master utama A4:CB:8F:D9:27:98
+    {0xC0, 0x4E, 0x30, 0x29, 0xB5, 0xF8}, // Master utama C0:4E:30:29:B5:F8
     {0xA4, 0xCB, 0x8F, 0xD9, 0x25, 0x0C}, // Spare 1 — isi MAC Master cadangan A4:CB:8F:D9:25:0C
     {0x94, 0xA9, 0x90, 0xD2, 0xFD, 0x2C}  // Spare — isi MAC Master cadangan A4:CB:8F:D9:25:0C
 };
