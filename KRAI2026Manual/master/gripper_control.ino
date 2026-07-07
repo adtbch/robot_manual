@@ -51,6 +51,7 @@ constexpr int ARM_STEP_NORMAL = 10;
 constexpr int ARM_STEP_FAST   = 20;
 
 constexpr uint32_t ARMBOX_Y_ENC_INTERVAL_MS = 100;
+constexpr uint32_t SERVO_B_STEP_INTERVAL_MS = 50;
 constexpr long ARMBOX_Y_ENC_MIN = 0;
 constexpr long ARMBOX_Y_ENC_MAX = 5000;
 
@@ -68,6 +69,7 @@ Jeda gJedaMotorYStep;
 Jeda gJedaMotorYLevel;
 Jeda gJedaMotorXStep;
 Jeda gJedaArmBoxYEnc;
+Jeda gJedaServoBStep;
 
 // ── Input helpers (inverted vs motion_control.ino) ─────────────────
 // ly: int16_t + negasi — aman untuk ly=-128 (-(-128) = +128)
@@ -214,6 +216,7 @@ void handleManualServoB(const ControlPacket &pkt) {
 
     const int dir = servoBMoveDir(pkt);
     if (dir == 0) return;
+    if (!gJedaServoBStep.check(SERVO_B_STEP_INTERVAL_MS)) return;
 
     const int step = pickSpeedStep(pkt.buttons, ARM_STEP_NORMAL, ARM_STEP_SLOW, ARM_STEP_FAST);
     setServoTAngle(gServoTAngle + dir * step);

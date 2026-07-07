@@ -102,7 +102,7 @@ void motorStopAll() {
 //  MOTOR Y — encoder positioning (bang-bang)
 // =====================================================================
 
-constexpr int MOTOR_Y_HOLD_PWM = 1;
+constexpr int MOTOR_Y_HOLD_PWM = 0;
 
 namespace {
 
