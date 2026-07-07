@@ -204,3 +204,38 @@ void waypointTick(float x_m, float y_m, float yaw_deg, float maxSpeed) {
 
     driveFieldCentricWithYawCorrection(vx, vy, (int)wpTargetYaw_deg);
 }
+
+void waypointTickPWM(float x_m, float y_m, float yaw_deg, float maxSpeed) {
+    // ponytail: Cegah tabrakan dengan manual drive (kn) — jangan execute PID kalau IDLE
+    if (wpState != WaypointState::RUNNING) return;
+
+    wpTargetX_m     = x_m;
+    wpTargetY_m     = y_m;
+    wpTargetYaw_deg = yaw_deg;
+
+    float errX = wpTargetX_m - odomX;
+    float errY = wpTargetY_m - odomY;
+
+    if (isWithinWaypointTol(wpTargetX_m, wpTargetY_m, wpTargetYaw_deg)) {
+        if (wpComboActive && wpComboIndex == 0) {
+            wpComboIndex = 1;
+            applyWaypointTarget(wpComboPts[1].x_m, wpComboPts[1].y_m, wpComboPts[1].yaw_deg);
+            errX = wpTargetX_m - odomX;
+            errY = wpTargetY_m - odomY;
+        } else {
+            wpComboActive = false;
+            wpComboIndex  = 0;
+            wpState = WaypointState::REACHED;
+            pwmMotor(0, 0); pwmMotor(1, 0); pwmMotor(2, 0); pwmMotor(3, 0);
+            wpNotifyReachedToMaster();
+            return;
+        }
+    }
+
+    const int vx = (int)constrain(wpKpXY * errX, -maxSpeed, maxSpeed);
+    const int vy = (int)constrain(wpKpXY * errY, -maxSpeed, maxSpeed);
+
+    driveFieldCentricWithYawCorrectionPWM(vx, vy, (int)wpTargetYaw_deg);
+}
+
+

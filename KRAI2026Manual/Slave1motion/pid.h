@@ -20,6 +20,7 @@ void pidControllerInit();
 int pidCompute(PIDState &pid, float target, float current, float dt, float gravOut = 0.0f);
 int pidCompute(int motorIdx, float targetRPM, float dt);
 int pidComputeYaw(PIDState &pid, float target, float current, float dt);
+int pidComputeYawPWM(PIDState &pid, float target, float current, float dt);
 void pidSetGains(int motorIdx, float kp, float ki, float kf, float deadband);
 void pidResetOne(int motorIdx);
 void pidReloadFromNVS();
@@ -37,6 +38,7 @@ void rpmMotor(int rpm1, int rpm2, int rpm3, int rpm4);
 
 // Extern yaw PID
 extern PIDState pidKinematicYaw;
+extern PIDState pidKinematicYawPWM;
 extern PIDState pidStates[MOTOR_COUNT];
 extern float motorKg;
 
