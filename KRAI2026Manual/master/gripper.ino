@@ -24,9 +24,10 @@ constexpr int HOMING_PWM = 400;
 // =====================================================================
 
 void setServoHoming() {
+    setServoAngle('d', 90);
+    delay(50);
     setServoAngle('t', 0);
     setServoAngle('b', 0);
-    setServoAngle('d', 90);
 }
 
 void setMotorHoming() {

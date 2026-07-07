@@ -96,6 +96,27 @@ bool testYawMode = false;
 int testYawTarget = 0;
 
 void loop() {
+    static uint32_t loopLastUs = 0;
+    static uint32_t loopMaxUs = 0;
+    static uint32_t loopCount = 0;
+    static uint32_t loopTotalUs = 0;
+    static Jeda jedaDebug;
+
+    uint32_t loopStartUs = micros();
+    uint32_t loopDelta = (loopLastUs == 0) ? 0 : (loopStartUs - loopLastUs);
+    loopLastUs = loopStartUs;
+    if (loopDelta > loopMaxUs && loopCount > 0) loopMaxUs = loopDelta;
+    loopTotalUs += loopDelta;
+    loopCount++;
+
+    if (jedaDebug.check(2000)) {
+        uint32_t avgUs = loopCount > 0 ? loopTotalUs / loopCount : 0;
+        Serial.printf("[Core1] avg=%luus max=%luus freq=%luHz\n",
+                      avgUs, loopMaxUs, avgUs > 0 ? 1000000UL / avgUs : 0UL);
+        loopMaxUs = 0;
+        loopCount = 0;
+        loopTotalUs = 0;
+    }
 
     // USB Serial (tuning) + UART master (rpm dari motion_control)
     serialCommandTick();

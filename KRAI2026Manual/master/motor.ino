@@ -26,7 +26,7 @@ constexpr long MOTOR_X_POSITION_TOLERANCE = 5;
 constexpr long MOTOR_Y_POSITION_TOLERANCE = 5;
 
 // Hold anti-gravitasi — hanya motor Y saat sudah di target
-constexpr int  MOTOR_Y_HOLD_PWM = 1;
+constexpr int  MOTOR_Y_HOLD_PWM = 0;
 
 // =====================================================================
 //  STATE

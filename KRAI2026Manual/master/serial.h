@@ -22,13 +22,14 @@ constexpr uint8_t SLAVE1_RX = 47;
 constexpr uint8_t SLAVE1_TX = 21;
 
 // UART2 — komunikasi ke slave2arm
-constexpr uint8_t SLAVE2_RX = 45;
-constexpr uint8_t SLAVE2_TX = 48;
+constexpr uint8_t SLAVE2_RX = 11;
+constexpr uint8_t SLAVE2_TX = 12;
 
 // =====================================================================
 //  BAUD RATE
 // =====================================================================
-constexpr uint32_t SLAVE_BAUD = 921600;
+constexpr uint32_t SLAVE1_BAUD = 921600;
+constexpr uint32_t SLAVE2_BAUD = 115200;
 
 // =====================================================================
 //  UART INSTANCES — global, bisa diakses modul lain

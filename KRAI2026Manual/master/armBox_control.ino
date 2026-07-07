@@ -97,6 +97,8 @@ void handleL2SquareManual(const ControlPacket &pkt) {
     armBoxFBbySpeed('l', -255);
     sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
     armBoxFBbySpeed('r', -255);
+    sendSlave2Command("pne l on");
+    sendSlave2Command("pne r on");
 }
 
 // ── L2 + Circle + analog kiri (mode manual) → pne R/L ────────────

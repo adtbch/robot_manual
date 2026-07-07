@@ -33,7 +33,7 @@ constexpr size_t LIMIT_COUNT = 4;
 // =====================================================================
 //  PIN LIMIT SWITCH — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t LIMIT_PIN_Y_BAWAH         = 6;
+constexpr uint8_t LIMIT_PIN_Y_BAWAH         = 46;
 constexpr uint8_t LIMIT_PIN_X_MUNDUR        = 7;
 constexpr uint8_t LIMIT_PIN_ARMBOX_DEPAN    = 15;
 constexpr uint8_t LIMIT_PIN_ARMBOX_BELAKANG = 16;
