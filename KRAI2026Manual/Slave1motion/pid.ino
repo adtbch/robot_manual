@@ -321,7 +321,7 @@ int rampedPidPwm(int motorIdx, int requestedRpm, float dt) {
     if (fabsf(delta) < 2.0f) {
         activeTarget[motorIdx] = (float)requestedRpm;
     } else {
-        float step = fabsf(delta) * 0.5f;
+        float step = fabsf(delta) * 0.12f;  // ponytail: 12%/tick@40ms ≈ 400ms 0→100, cegah spike arus 4 motor
         step = fmaxf(step, 1.0f);
         step = fminf(step, fabsf(delta));
         activeTarget[motorIdx] += (delta > 0.0f) ? step : -step;

@@ -53,7 +53,7 @@ constexpr long MOTOR_Y_ENC_MAX = 4058;
 
 // Capit senjata — level naik/turun Y (0 = bawah/homing, 5 = paling atas)
 constexpr uint8_t MOTOR_Y_LEVEL_MAX = 5;
-constexpr long MOTOR_Y_LEVEL_DEFAULT[6] = {0, 300, 600, 900, 1200, 1500};
+constexpr long MOTOR_Y_LEVEL_DEFAULT[6] = {1500, 3695, 600, 900, 1200, 1500};
 
 extern long gMotorYLevelEnc[6];
 

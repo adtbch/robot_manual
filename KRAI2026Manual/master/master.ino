@@ -65,35 +65,45 @@ void boxCheckDone() {
 // =====================================================================
 
 void setup() {
-    delay(8000);
     Serial.begin(115200);
     Serial.println("=== KRAI 2026 Master Board ===");
-
+    
+    // Init servos
+    setupServos();
+    Serial.println("Servos: READY");
     // Init ESP-NOW receiver
     bool espNowReady = espNowControlInit();
     // Init motors
     SetupMotors();
     initMotorYLevels();
+    Serial.println("Motors: READY");
     // Init encoders
     setupEncoders();
+    Serial.println("Encoders: READY");
     // Init limit switches
     setupLimits();
-    // Init servos
-    setupServos();
+    Serial.println("Limit switches: READY");
     // Init relay
     setupRelay();
+    Serial.println("Relay: READY");
     // Init proximity
     setupProximity();
+    Serial.println("Proximity: READY");
     // Init serial (UART1 + UART2)
     setupSerial();
+    Serial.println("UART1 + UART2: READY");
     // Init serial command handler
     setupSerialCommand();
+    Serial.println("Serial command: READY");
     // Init alliance color (BOOT button + RGB LED + NVS)
     setupAlliance();
+    Serial.println("Alliance color: READY");
     initForestDest();
+    Serial.println("Forest destinations: READY");
     initOdomRec();
-    setServoHoming();
-    // setHomingAll();
+    Serial.println("Odometry: READY");
+
+    setHomingAll();
     Serial.println("Setup zone1: limit Y/X + motor Y lv0 + motor X enc0");
 }
 

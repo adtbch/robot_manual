@@ -55,12 +55,12 @@ void setupSerial() {
     // UART1 — ke slave1
     slave1Serial.setRxBufferSize(2048);
     slave1Serial.setTxBufferSize(2048);
-    slave1Serial.begin(SLAVE_BAUD, SERIAL_8N1, SLAVE1_RX, SLAVE1_TX);
+    slave1Serial.begin(SLAVE1_BAUD, SERIAL_8N1, SLAVE1_RX, SLAVE1_TX);
 
     // UART2 — ke slave2
     slave2Serial.setRxBufferSize(2048);
     slave2Serial.setTxBufferSize(2048);
-    slave2Serial.begin(SLAVE_BAUD, SERIAL_8N1, SLAVE2_RX, SLAVE2_TX);
+    slave2Serial.begin(SLAVE2_BAUD, SERIAL_8N1, SLAVE2_RX, SLAVE2_TX);
 }
 
 // =====================================================================
@@ -364,9 +364,6 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
     // ── STOP ────────────────────────────────────────────────────
     else if (strcmp(token, "stop") == 0) {
         motorStopAll();
-        setServoAngle('d', 90);
-        setServoAngle('t', 90);
-        setServoAngle('b', 90);
         out.println("Semua motor STOP, servo tengah (90)");
     }
 

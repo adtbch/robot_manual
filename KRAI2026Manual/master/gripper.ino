@@ -24,10 +24,10 @@ constexpr int HOMING_PWM = 400;
 // =====================================================================
 
 void setServoHoming() {
+    setServoAngle('d', 90);
+    delay(50);
     setServoAngle('t', 0);
     setServoAngle('b', 0);
-    setServoAngle('d', 0);
-    gGripperState = IDLE;
 }
 
 void setMotorHoming() {
@@ -40,7 +40,6 @@ void setMotorHoming() {
     }
     pwmMotor('y', 0);
     resetEncoderCount('y');
-    gripperMotorYSetLevel(0);
     
     pwmMotor('x', -HOMING_PWM);
     while (!readLimitSwitch(LIMIT_X_MUNDUR)) {
@@ -48,14 +47,13 @@ void setMotorHoming() {
     }
     pwmMotor('x', 0);
     resetEncoderCount('x');
-    motorXSetTarget(1500);
 }
 
 void setHomingAll() {
     setMotorHoming();
     delay(2000);
     setServoHoming();
-    setArmHoming();
+    // setArmHoming();
 }
 
 void setArmHoming() {

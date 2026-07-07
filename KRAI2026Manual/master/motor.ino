@@ -20,13 +20,13 @@
 //  ENCODER POSITION — Motor X & Y
 // =====================================================================
 
-constexpr int  MOTOR_X_MOVE_PWM = 800;
+constexpr int  MOTOR_X_MOVE_PWM = 400;
 constexpr int  MOTOR_Y_MOVE_PWM = 800;
 constexpr long MOTOR_X_POSITION_TOLERANCE = 5;
 constexpr long MOTOR_Y_POSITION_TOLERANCE = 5;
 
 // Hold anti-gravitasi — hanya motor Y saat sudah di target
-constexpr int  MOTOR_Y_HOLD_PWM = 50;
+constexpr int  MOTOR_Y_HOLD_PWM = 0;
 
 // =====================================================================
 //  STATE

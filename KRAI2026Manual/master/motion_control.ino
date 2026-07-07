@@ -46,7 +46,7 @@ constexpr int16_t JOYSTICK_MAX      = 127;
 // KINEMATICS mode: RPM — kecepatan langsung vx/vy
 constexpr int16_t SPEED_RPM_NORMAL = 50;
 constexpr int16_t SPEED_RPM_SLOW = 15;
-constexpr int16_t SPEED_RPM_FAST = 150;
+constexpr int16_t SPEED_RPM_FAST = 100;
 
 constexpr int16_t YAW_STICK_THRESHOLD = 30;
 constexpr uint32_t YAW_STEP_INTERVAL_NORMAL_MS = 50;

@@ -166,8 +166,6 @@ void driveMotorYByLevel(int16_t ly) {
 // ── Motor X ────────────────────────────────────────────────────────
 
 void driveMotorX(int8_t lx, uint32_t buttons) {
-    if (gModeInvert) lx = (int8_t)(-lx);
-
     if (lx == 0) {
         if (!motorXIsActive()) {
             motorXSetTarget(getEncoderCount('x'));
@@ -266,10 +264,10 @@ void handleL2TriangleManual(const ControlPacket &pkt) {
     if (gControllerMode != 0) return;
     if (!isComboEdge(pkt.buttons, gPrevButtons, BTN_L2, BTN_TRIANGLE)) return;
 
-    if (gGripperState == IDLE) {
-        setServoAngle('d', 90);
+    if (gGripperState == OPENING) {
+        setServoAngle('d', 75);
         gGripperState = CLOSING;
-    } else if (gGripperState == STRAIGHTEN) {
+    } else if (gGripperState == UP) {
         gripperReadytoStab();
     }
 }
