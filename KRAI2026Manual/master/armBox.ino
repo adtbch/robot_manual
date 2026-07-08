@@ -62,8 +62,8 @@ void armBoxFBbySpeed(char side, int8_t speed) {
         sendSlave2Command("motor x %ld", (long)sign * speed);
     } else if (side == 'l') {
         const int8_t sign = pickMotorRunSign(
-            readLimitSwitch(LIMIT_ARMBOX_DEPAN),
             readLimitSwitch(LIMIT_ARMBOX_BELAKANG),
+            readLimitSwitch(LIMIT_ARMBOX_DEPAN),
             gMotorKRunSign);
         sendSlave2Command("motor k %ld", (long)sign * speed);
         motorKSetDirection(sign);

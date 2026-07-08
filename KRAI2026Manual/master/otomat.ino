@@ -171,7 +171,7 @@ void armBoxTick() {
             if (!jedaArmBoxR.check(300)) break;
             gSlave2MotorYTarget = gMotorYLevelEnc[4];
             sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
-            armBoxFBbySpeed('r', -255);
+            armBoxFBbySpeed('r', -500);
             gArmBoxR = ARMBOX_GRAB;
             break;
 
@@ -202,7 +202,7 @@ void armBoxTick() {
         case ARMBOX_WAIT:
             if (!jedaArmBoxL.check(300)) break;
             motorYSetTarget(gMotorYLevelEnc[4]);
-            armBoxFBbySpeed('l', -255);
+            armBoxFBbySpeed('l', -1000);
             gArmBoxL = ARMBOX_GRAB;
             break;
 
