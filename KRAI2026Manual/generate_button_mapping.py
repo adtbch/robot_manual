@@ -51,21 +51,23 @@ doc.add_heading('2. Tombol — Mode Manual (mode = 0)', level=1)
 add_table(doc,
     ['Tombol', 'Edge/Hold', 'Aksi'],
     [
-        ['Cross', '—', 'Kosong'],
-        ['Circle', 'Hold + arah (edge)', 'Arm box manual:\nKiri→FB toggle R\nKanan→FB toggle L\nAtas→done L\nBawah→done R'],
+        ['Cross', 'Edge (tanpa L2)', 'Toggle servo B (0° ↔ 90°)'],
+        ['Circle', 'Hold + arah (edge)', 'Arm box manual:\nKanan→FB toggle R\nKiri→FB toggle L\nAtas→done L\nBawah→done R'],
         ['Square', 'Hold', 'Freeze motion (vx=0, vy=0)'],
-        ['Triangle', 'Hold', 'Servo B manual (hanya saat READY_TO_STAB)'],
+        ['Triangle', 'Hold', 'Servo B manual (step ±5/10/20°)\nInput: analog kiri LY (inverted)'],
         ['L1', 'Hold', 'Slow — yaw step 150ms, gripper step 5'],
         ['R1', 'Hold', 'Fast — yaw step 25ms, gripper step 40'],
         ['L2 + Triangle', 'Edge', 'User-defined action (gripper_control)'],
-        ['L2 + Circle + analog kiri ke kanan', 'Hold', 'Arm box R: pne ON → ARMBOX_WAIT'],
-        ['L2 + Circle + analog kiri ke kiri', 'Hold', 'Arm box L: pne ON → ARMBOX_WAIT'],
-        ['L2 + Square', 'Edge', 'User-defined action (armbox_control)'],
+        ['L2 + Cross', 'Edge', 'User-defined action (armBox_control)'],
+        ['L2 + Circle + analog kiri ke kanan', 'Hold', 'Arm box R: pne r + rk ON → ARMBOX_WAIT'],
+        ['L2 + Circle + analog kiri ke kiri', 'Hold', 'Arm box L: pne l + lk ON → ARMBOX_WAIT'],
+        ['L2 + Square', 'Edge', 'Armbox: motor Y level 4 + arm L/R -500 + pne all ON'],
         ['L2 + analog kanan', 'Hold', 'Yaw snap kardinal (0°/90°/180°/-90°)'],
         ['L2 + R2', 'Analog ≥250', 'Flash lamp fire'],
         ['R2', 'Hold', 'Gripper mode — motor X/Y (analog kanan) + armbox Y jog (analog kiri/DPAD)'],
-        ['OPTIONS', 'Edge (zone 1)', 'SetupZone1 — servo homing + motor Y level 0 + motor X enc 200\n(goto odom hanya jika mode=1)'],
-        ['OPTIONS', 'Edge (zone 2)', 'Toggle modeKinematics (goto ↔ kn)'],
+        ['OPTIONS (zone 1)', 'Edge', 'SetupZone1 — servo homing + motor Y level 0 + motor X enc 200'],
+        ['OPTIONS (zone 2) + lx kanan', 'Edge', 'Motor Y level 4 + arm R -500 + pne r + rk ON + armBoxRReset'],
+        ['OPTIONS (zone 2) + lx kiri', 'Edge', 'Motor Y level 4 + arm L -500 + pne l + lk ON + armBoxLReset'],
     ])
 
 # ══════════════════════════════════════════════════════════════════════
@@ -75,17 +77,18 @@ doc.add_heading('3. Tombol — Mode Otomatis (mode = 1)', level=1)
 add_table(doc,
     ['Tombol', 'Edge/Hold', 'Aksi'],
     [
-        ['Cross', '—', 'Kosong'],
-        ['Circle', 'Hold + arah (edge)', 'Arm box manual:\nKiri→FB toggle R\nKanan→FB toggle L\nAtas→done L\nBawah→done R'],
+        ['Cross', 'Edge (tanpa L2)', 'Toggle servo B (0° ↔ 90°)'],
+        ['Circle', 'Hold + arah (edge)', 'Arm box manual:\nKanan→FB toggle R\nKiri→FB toggle L\nAtas→done L\nBawah→done R'],
         ['Square', 'Hold', 'Freeze motion (vx=0, vy=0)'],
-        ['Triangle', 'Hold', 'Servo B manual (hanya saat READY_TO_STAB)'],
+        ['Triangle', 'Hold', 'Servo B manual (step ±5/10/20°)\nInput: analog kiri LY (inverted)'],
         ['L1', 'Hold', 'Slow — yaw step 150ms, gripper step 5'],
         ['R1', 'Hold', 'Fast — yaw step 25ms, gripper step 40'],
         ['L2 + analog kanan', 'Hold', 'Yaw snap kardinal (0°/90°/180°/-90°)'],
         ['L2 + R2', 'Analog ≥250', 'Flash lamp fire'],
         ['R2', 'Hold', 'Gripper mode — motor X/Y (analog kanan) + armbox Y jog (analog kiri/DPAD)'],
-        ['OPTIONS', 'Edge (zone 1)', 'SetupZone1 — servo homing + odomGoto(1) + motor Y level 0 + motor X enc 200'],
-        ['OPTIONS', 'Edge (zone 2)', 'Toggle modeKinematics (goto ↔ kn)'],
+        ['OPTIONS (zone 1)', 'Edge', 'SetupZone1 — servo homing + odomGoto(1) + motor Y level 0 + motor X enc 200'],
+        ['OPTIONS (zone 2) + lx kanan', 'Edge', 'Motor Y level 4 + arm R -500 + pne r + rk ON + armBoxRReset'],
+        ['OPTIONS (zone 2) + lx kiri', 'Edge', 'Motor Y level 4 + arm L -500 + pne l + lk ON + armBoxLReset'],
     ])
 
 # ══════════════════════════════════════════════════════════════════════
@@ -169,8 +172,8 @@ doc.add_heading('9. Auto (tanpa tombol)', level=1)
 add_table(doc,
     ['Trigger', 'Aksi'],
     [
-        ['Proximity R (slave2)', 'Arm box R: pne ON → motor Y level 4 + motor X -255 → grab'],
-        ['Proximity L (slave2)', 'Arm box L: pne ON → motor Y level 4 + motor K -255 → grab'],
+        ['Proximity R (slave2)', 'Arm box R: pne r + rk ON → motor Y level 4 + motor X -255 → grab'],
+        ['Proximity L (slave2)', 'Arm box L: pne l + lk ON → motor Y level 4 + motor K -255 → grab'],
         ['Motor Y sampai target', 'Hold PWM 50 (anti-gravitasi) + active=false'],
         ['Motor K kena limit', 'Auto stop via motor k 0'],
         ['Proximity gripper (auto)', 'IDLE → CLOSING → UP → STRAIGHTEN → READY_TO_STAB'],
@@ -189,6 +192,32 @@ add_table(doc,
         ['3', '900'],
         ['4', '1200'],
         ['5', '1500'],
+        ['6', '1800'],
+    ])
+
+# ══════════════════════════════════════════════════════════════════════
+# 11. PNEUMATIC
+# ══════════════════════════════════════════════════════════════════════
+doc.add_heading('11. Pneumatic (Slave2 Arm)', level=1)
+add_table(doc,
+    ['ID', 'Pin', 'Fungsi'],
+    [
+        ['r', '46', 'Right arm'],
+        ['l', '9', 'Left arm'],
+        ['lk', '10', 'Left kaki'],
+        ['rk', '11', 'Right kaki'],
+    ])
+
+# ══════════════════════════════════════════════════════════════════════
+# 12. DEEP SLEEP (Controller)
+# ══════════════════════════════════════════════════════════════════════
+doc.add_heading('12. Deep Sleep (Controller)', level=1)
+add_table(doc,
+    ['Kondisi', 'Aksi'],
+    [
+        ['Boot tanpa OTG > 10 detik', 'Masuk deep sleep (timer wake 5 detik)'],
+        ['OTG cabut > 10 detik', 'Kirim stop packet + masuk deep sleep'],
+        ['OTG masuk (dari sleep)', 'Full reboot → setup() → jalan normal'],
     ])
 
 # Save

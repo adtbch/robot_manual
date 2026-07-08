@@ -30,8 +30,8 @@ constexpr uint8_t MOTOR_XARM_KANAN_PIN1 = 6;
 constexpr uint8_t MOTOR_XARM_KANAN_PIN2 = 5;
 
 // MotorYArmKanan (axis Y arm kanan)
-constexpr uint8_t MOTOR_YARM_KANAN_PIN1 = 4;
-constexpr uint8_t MOTOR_YARM_KANAN_PIN2 = 7;
+constexpr uint8_t MOTOR_YARM_KANAN_PIN1 = 7;
+constexpr uint8_t MOTOR_YARM_KANAN_PIN2 = 4;
 
 // MotorXArmKiri (axis X arm kiri)
 constexpr uint8_t MOTOR_XARM_KIRI_PIN1 = 3;

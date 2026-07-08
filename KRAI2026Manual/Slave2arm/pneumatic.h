@@ -15,10 +15,10 @@
 // =====================================================================
 //  PIN PNEUMATIC — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t PNEUMATIC_R_PIN = 46;
-constexpr uint8_t PNEUMATIC_RK_PIN = 9;
+constexpr uint8_t PNEUMATIC_R_PIN = 9;
+constexpr uint8_t PNEUMATIC_RK_PIN = 10;
 constexpr uint8_t PNEUMATIC_L_PIN = 11;
-constexpr uint8_t PNEUMATIC_LK_PIN = 10;
+constexpr uint8_t PNEUMATIC_LK_PIN = 46;
 
 // =====================================================================
 //  JUMLAH PNEUMATIC
