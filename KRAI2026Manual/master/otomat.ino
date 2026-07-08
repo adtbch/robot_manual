@@ -169,7 +169,8 @@ void armBoxTick() {
 
         case ARMBOX_WAIT:
             if (!jedaArmBoxR.check(300)) break;
-            sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
+            gSlave2MotorYTarget = gMotorYLevelEnc[4];
+            sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
             armBoxFBbySpeed('r', -255);
             gArmBoxR = ARMBOX_GRAB;
             break;
@@ -220,7 +221,8 @@ void armBoxTick() {
 void armBoxDone(char side) {
     if (side == 'r') {
         if (gArmBoxR == ARMBOX_GRAB) {
-            sendSlave2Command("motortarget %ld", gMotorYLevelEnc[5]);
+            gSlave2MotorYTarget = gMotorYLevelEnc[5];
+            sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
             gArmBoxR = ARMBOX_DONE;
             return;
         } else if (gArmBoxR == ARMBOX_DONE) {
@@ -260,5 +262,13 @@ void armBoxDone(char side) {
 void armBoxReset() {
     sendSlave2Command("pneall");
     gArmBoxR = ARMBOX_IDLE;
+    gArmBoxL = ARMBOX_IDLE;
+}
+
+void armBoxRReset() {
+    gArmBoxR = ARMBOX_IDLE;
+}
+
+void armBoxLReset() {
     gArmBoxL = ARMBOX_IDLE;
 }

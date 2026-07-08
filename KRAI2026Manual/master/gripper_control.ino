@@ -201,8 +201,28 @@ int servoBMoveDir(const ControlPacket &pkt) {
 
 void handleGripperButtons(const ControlPacket &pkt) {
     if (isPressed(pkt.buttons, BTN_OPTIONS)) {
-        setupZone1();
-        return;
+        if (zoneState == 1) {
+            setupZone1();
+            return;
+        } else if (zoneState == 2) {
+            if (pkt.lx > 100) {
+                gSlave2MotorYTarget = gMotorYLevelEnc[4];
+                sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
+                armBoxFBbySpeed('r', -500);
+                sendSlave2Command("pne r on");
+                sendSlave2Command("pne rk on");
+                armBoxRReset();
+                return;
+            }
+            if (pkt.lx < -100) {
+                gripperMotorYSetLevel(4);
+                armBoxFBbySpeed('l', -500);
+                sendSlave2Command("pne l on");
+                sendSlave2Command("pne lk on");
+                armBoxLReset();
+                return;
+            }
+        }
     }
     if (isPressed(pkt.buttons, BTN_CROSS) && !(pkt.buttons & BTN_L2)) {
         static bool servoBState = false;
@@ -238,11 +258,17 @@ void handleArmBoxYEnc(const ControlPacket &pkt) {
     if (abs(ry) <= AXIS_DEADZONE) return;
     if (!gJedaArmBoxYEnc.check(ARMBOX_Y_ENC_INTERVAL_MS)) return;
 
-    const char dir = (ry < 0) ? 'u' : 'd';
     const long step = pickSpeedStep(pkt.buttons,
         MOTOR_Y_STEP_NORMAL, MOTOR_Y_STEP_SLOW, MOTOR_Y_STEP_FAST);
 
-    sendSlave2Command("motory %c %ld", dir, step);
+    if (ry < 0) {
+        gSlave2MotorYTarget += step;
+    } else {
+        gSlave2MotorYTarget -= step;
+    }
+    gSlave2MotorYTarget = constrain(gSlave2MotorYTarget, MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
+
+    sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
 }
 
 // ── R2 + L2 analog max-5 → flash lamp ────────────────────────────

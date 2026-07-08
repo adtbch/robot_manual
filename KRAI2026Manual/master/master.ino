@@ -40,6 +40,7 @@ uint8_t zoneState = 1;
 ControlPacket gLastRxPacket = {};
 uint8_t gControllerMode = 0;  // default: manual
 int speedArm = 600;  // default normal speed
+long gSlave2MotorYTarget = 0;  // track target motor Y slave2
 
 // =====================================================================
 //  BOX STATE — tracking motor Y untuk kirim "box done" ke slave2

@@ -205,4 +205,10 @@ inline bool isComboEdge(uint32_t now, uint32_t prev, uint32_t a, uint32_t b) {
 
 extern int speedArm;
 
+// =====================================================================
+//  SHARED STATE — slave2 motor Y target (di-track di master)
+// =====================================================================
+
+extern long gSlave2MotorYTarget;
+
 #endif // CONFIG_H

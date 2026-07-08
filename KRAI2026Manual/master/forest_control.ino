@@ -32,20 +32,20 @@ void forestControlTick(const ControlPacket& pkt) {
 
     if ((nowDpad & BTN_UP) && !(prevDpad & BTN_UP)) {
         gripperMotorYSetLevel(4);
-        armBoxFBbySpeed('l', -255);
-        sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
-        armBoxFBbySpeed('r', -255);
+        armBoxFBbySpeed('l', -500);
+        gSlave2MotorYTarget = gMotorYLevelEnc[4];
+        sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
+        armBoxFBbySpeed('r', -500);
         sendSlave2Command("pne l on");
         sendSlave2Command("pne lk on");
         sendSlave2Command("pne r on");
         sendSlave2Command("pne rk on");
+        zoneState = 2;
         forestGotoSlot(1);
-
     } else if ((nowDpad & BTN_LEFT) && !(prevDpad & BTN_LEFT)) {
         forestGotoSlot(2);
     } else if ((nowDpad & BTN_DOWN) && !(prevDpad & BTN_DOWN)) {
         forestTriggerExit();
-        zoneState = 2;
     }
 
     prevButtons = pkt.buttons;

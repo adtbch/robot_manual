@@ -94,13 +94,15 @@ void handleL2SquareManual(const ControlPacket &pkt) {
     if (!isComboEdge(pkt.buttons, gArmBoxPrevButtons, BTN_L2, BTN_SQUARE)) return;
 
     gripperMotorYSetLevel(4);
-    armBoxFBbySpeed('l', -255);
-    sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
-    armBoxFBbySpeed('r', -255);
+    armBoxFBbySpeed('l', -500);
+    gSlave2MotorYTarget = gMotorYLevelEnc[4];
+    sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
+    armBoxFBbySpeed('r', -500);
     sendSlave2Command("pne l on");
     sendSlave2Command("pne lk on");
     sendSlave2Command("pne r on");
     sendSlave2Command("pne rk on");
+    zoneState = 2;
 }
 
 // ── L2 + Cross (mode manual) → user-defined action ──────────────
@@ -109,7 +111,9 @@ void handleL2CrossManual(const ControlPacket &pkt) {
     if (gControllerMode != 0) return;
     if (!isComboEdge(pkt.buttons, gArmBoxPrevButtons, BTN_L2, BTN_CROSS)) return;
 
-    // TODO: isi action di sini
+    gripperMotorYSetLevel(2);
+    gSlave2MotorYTarget = gMotorYLevelEnc[2];
+    sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
 }
 
 // ── L2 + Circle + analog kiri (mode manual) → pne R/L ────────────
@@ -126,7 +130,7 @@ void handleL2CircleLxManual(const ControlPacket &pkt) {
 
     if (lx > 0) {
         armBoxStartGrab('r');
-    } else {
+    } else if (lx < 0) {
         armBoxStartGrab('l');
     }
 }
