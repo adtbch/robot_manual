@@ -53,12 +53,13 @@ void setHomingAll() {
     setMotorHoming();
     delay(2000);
     setServoHoming();
-    // setArmHoming();
+    delay(2000);
+    setArmHoming();
 }
 
 void setArmHoming() {
     motorKSetDirection(-1);
-    sendSlave2Command("motor k -255");
+    sendSlave2Command("motor k -%ld", (long)speedArm);
     while (!readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
         delay(2);
     }

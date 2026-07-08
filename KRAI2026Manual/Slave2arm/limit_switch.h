@@ -25,15 +25,15 @@ constexpr size_t LIMIT_COUNT = 3;  // ponytail: 4th switch deadcode dulu
 // =====================================================================
 //  PIN LIMIT SWITCH — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t LIMIT_PIN_ARMBOX_DEPAN    = 40;
+constexpr uint8_t LIMIT_PIN_ARMBOX_DEPAN    = 38;
 constexpr uint8_t LIMIT_PIN_ARMBOX_BELAKANG = 39;
-constexpr uint8_t LIMIT_PIN_ARMBOX_TURUN    = 38;
-constexpr uint8_t LIMIT_PIN_UNUSED          = 37;  // ponytail: deadcode
+constexpr uint8_t LIMIT_PIN_ARMBOX_TURUN    = 40;
+// constexpr uint8_t LIMIT_PIN_UNUSED          = 37;  // ponytail: deadcode
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupLimits();
-bool readLimitSwitch(char index);
+bool readLimitSwitch(uint8_t index);
 
 #endif // LIMIT_SWITCH_H

@@ -51,14 +51,14 @@ constexpr long MOTOR_X_ENC_MAX = 3660;
 constexpr long MOTOR_Y_ENC_MIN = 0;
 constexpr long MOTOR_Y_ENC_MAX = 4058;
 
-// Capit senjata — level naik/turun Y (0 = bawah/homing, 5 = paling atas)
-constexpr uint8_t MOTOR_Y_LEVEL_MAX = 5;
-constexpr long MOTOR_Y_LEVEL_DEFAULT[6] = {1500, 3695, 600, 900, 1200, 1500};
+// Capit senjata — level naik/turun Y (0 = bawah/homing, 6 = paling atas)
+constexpr uint8_t MOTOR_Y_LEVEL_MAX = 6;
+constexpr long MOTOR_Y_LEVEL_DEFAULT[7] = {1500, 3695, 600, 900, 1200, 1500, 1800};
 
-extern long gMotorYLevelEnc[6];
+extern long gMotorYLevelEnc[7];
 
 void initMotorYLevels();
-bool motorYLevelSave(const long levels[6]);
+bool motorYLevelSave(const long levels[7]);
 
 inline long motorYLevelEnc(uint8_t level) {
     if (level > MOTOR_Y_LEVEL_MAX) return gMotorYLevelEnc[MOTOR_Y_LEVEL_MAX];

@@ -38,7 +38,7 @@ void setupLimits() {
 //  READ — langsung baca GPIO
 // =====================================================================
 
-bool readLimitSwitch(char index) {
+bool readLimitSwitch(uint8_t index) {
     if (index >= LIMIT_COUNT) {
         return false;
     }

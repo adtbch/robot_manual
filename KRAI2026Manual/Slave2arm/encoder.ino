@@ -22,11 +22,10 @@ namespace {
 
 ESP32Encoder encoders[ENCODER_COUNT];
 
-// x→enc0, y→enc1, k→no encoder; numeric 0/1 still valid for serial `enc`
+// y→enc0, x/k→no encoder; numeric 0/1 still valid for serial `enc`
 int encoderIdxFromId(char id) {
-    if (id == 'x' || id == 0) return 0;
-    if (id == 'y' || id == 1) return 1;
-    if (id == 'k') return -1;
+    if (id == 'y' || id == 0) return 0;
+    if (id == 'x' || id == 'k') return -1;
     if (id >= 0 && (size_t)id < ENCODER_COUNT) return (int)id;
     return -1;
 }
@@ -39,10 +38,8 @@ int encoderIdxFromId(char id) {
 
 void setupEncoders() {
     encoders[0].attachHalfQuad(ENCODER1_PIN_A, ENCODER1_PIN_B);
+    encoders[0].setFilter(1023); //extEncoders[i].setFilter(1023); 
     encoders[0].clearCount();
-
-    encoders[1].attachHalfQuad(ENCODER2_PIN_A, ENCODER2_PIN_B);
-    encoders[1].clearCount();
 }
 
 // =====================================================================

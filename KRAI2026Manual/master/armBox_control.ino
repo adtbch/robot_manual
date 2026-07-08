@@ -28,7 +28,7 @@ void armBoxStartGrab(char side);
 
 namespace {
 
-constexpr int16_t ARMBOX_AXIS_DEADZONE = 30;
+constexpr int16_t ARMBOX_AXIS_DEADZONE = 100;
 
 enum ArmBoxInputDir : int8_t { ARMBOX_DIR_NONE = -1, ARMBOX_DIR_UP, ARMBOX_DIR_DOWN, ARMBOX_DIR_LEFT, ARMBOX_DIR_RIGHT };
 
@@ -98,7 +98,18 @@ void handleL2SquareManual(const ControlPacket &pkt) {
     sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
     armBoxFBbySpeed('r', -255);
     sendSlave2Command("pne l on");
+    sendSlave2Command("pne lk on");
     sendSlave2Command("pne r on");
+    sendSlave2Command("pne rk on");
+}
+
+// ── L2 + Cross (mode manual) → user-defined action ──────────────
+
+void handleL2CrossManual(const ControlPacket &pkt) {
+    if (gControllerMode != 0) return;
+    if (!isComboEdge(pkt.buttons, gArmBoxPrevButtons, BTN_L2, BTN_CROSS)) return;
+
+    // TODO: isi action di sini
 }
 
 // ── L2 + Circle + analog kiri (mode manual) → pne R/L ────────────
@@ -124,6 +135,7 @@ void armBoxControlTick(const ControlPacket &pkt) {
     if (odomIsModeSave()) return;
 
     handleL2SquareManual(pkt);
+    handleL2CrossManual(pkt);
     handleL2CircleLxManual(pkt);
 
     // Skip Circle+arah jika L2 hold (sudah ditangani handleL2CircleLxManual)

@@ -234,7 +234,7 @@ int motorYGetLastPwm() {
 //  HOMING — blocking, dipanggil dari setup()
 // =====================================================================
 
-constexpr int HOMING_PWM = 400;
+constexpr int HOMING_PWM = 600;
 
 void motorYHoming() {
     motorYStop();
@@ -250,7 +250,7 @@ void motorYHoming() {
 void motorXHoming() {
     motorRunStop('x');
     pwmMotor('x', -HOMING_PWM);
-    while (!readLimitSwitch(LIMIT_ARMBOX_BELAKANG)) {
+    while (!readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
         delay(2);
     }
     pwmMotor('x', 0);
@@ -259,9 +259,9 @@ void motorXHoming() {
 void motorRunTick() {
     // Motor X — limit switch lokal (cek sesuai arah gerak)
     if (gMotorXRun.active) {
-        if (gMotorXRun.pwm > 0 && readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
+        if (gMotorXRun.pwm > 0 && readLimitSwitch(LIMIT_ARMBOX_BELAKANG)) {
             motorRunStop('x');
-        } else if (gMotorXRun.pwm < 0 && readLimitSwitch(LIMIT_ARMBOX_BELAKANG)) {
+        } else if (gMotorXRun.pwm < 0 && readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
             motorRunStop('x');
         } else {
             pwmMotor('x', gMotorXRun.pwm);

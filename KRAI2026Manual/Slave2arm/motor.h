@@ -26,20 +26,20 @@ struct MotorConfig {
 //  PIN MOTOR — berdasarkan schematic KRAI 2026
 // =====================================================================
 // MotorXArmKanan (axis X arm kanan)
-constexpr uint8_t MOTOR_XARM_KANAN_PIN1 = 7;
-constexpr uint8_t MOTOR_XARM_KANAN_PIN2 = 4;
+constexpr uint8_t MOTOR_XARM_KANAN_PIN1 = 6;
+constexpr uint8_t MOTOR_XARM_KANAN_PIN2 = 5;
 
 // MotorYArmKanan (axis Y arm kanan)
-constexpr uint8_t MOTOR_YARM_KANAN_PIN1 = 6;
-constexpr uint8_t MOTOR_YARM_KANAN_PIN2 = 5;
+constexpr uint8_t MOTOR_YARM_KANAN_PIN1 = 4;
+constexpr uint8_t MOTOR_YARM_KANAN_PIN2 = 7;
 
 // MotorXArmKiri (axis X arm kiri)
-constexpr uint8_t MOTOR_XARM_KIRI_PIN1 = 17;
-constexpr uint8_t MOTOR_XARM_KIRI_PIN2 = 18;
+constexpr uint8_t MOTOR_XARM_KIRI_PIN1 = 3;
+constexpr uint8_t MOTOR_XARM_KIRI_PIN2 = 8;
 
 // Motor4 — ponytail: deadcode, belum dipakai
 // constexpr uint8_t MOTOR4_UNUSED_PIN1 = 8;
-// constexpr uint8_t MOTOR4_UNUSED_PIN2 = 3;
+// constexpr uint8_t MOTOR4_UNUSED_.PIN2 = 3;
 
 // =====================================================================
 //  JUMLAH MOTOR
@@ -57,9 +57,9 @@ constexpr int PWM_RESOLUTION = 10;      // bit (2^10 = 1024)
 // =====================================================================
 //  MOTOR Y — encoder position (bang-bang, tanpa PID)
 // =====================================================================
-constexpr int  MOTOR_Y_MOVE_PWM = 400;
+constexpr int  MOTOR_Y_MOVE_PWM = 500;
 constexpr long MOTOR_Y_ENC_MIN  = 0;
-constexpr long MOTOR_Y_ENC_MAX  = 5000;
+constexpr long MOTOR_Y_ENC_MAX  = 4058;
 constexpr long MOTOR_Y_TOLERANCE = 5;
 
 // =====================================================================

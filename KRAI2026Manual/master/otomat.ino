@@ -39,7 +39,7 @@ Jeda gJedaGripper;
 //  STATE — ARM BOX
 // =====================================================================
 
-enum ArmBoxState { ARMBOX_IDLE, ARMBOX_WAIT, ARMBOX_GRAB, ARMBOX_DONE, ARMBOX_BACK };
+enum ArmBoxState { ARMBOX_IDLE, ARMBOX_TEKUK, ARMBOX_WAIT, ARMBOX_GRAB, ARMBOX_DONE, ARMBOX_FINISH, ARMBOX_BACK };
 
 namespace {
 
@@ -54,11 +54,11 @@ Jeda jedaOpening;
 void armBoxStartGrab(char side) {
     if (side == 'r') {
         sendSlave2Command("pne r off");
-        gArmBoxR = ARMBOX_WAIT;
+        gArmBoxR = ARMBOX_TEKUK;
         jedaArmBoxR.reset();
     } else if (side == 'l') {
         sendSlave2Command("pne l off");
-        gArmBoxL = ARMBOX_WAIT;
+        gArmBoxL = ARMBOX_TEKUK;
         jedaArmBoxL.reset();
     }
 }
@@ -154,12 +154,19 @@ void armBoxTick() {
     switch (gArmBoxR) {
         case ARMBOX_IDLE:
             if (slave2ProxR() && gControllerMode == 1) {
-            sendSlave2Command("pne r off");
-                gArmBoxR = ARMBOX_WAIT;
+                sendSlave2Command("pne r off");
                 jedaArmBoxR.reset();
+                gArmBoxR = ARMBOX_TEKUK;
             }
             break;
             
+        case ARMBOX_TEKUK:
+            if (!jedaArmBoxR.check(500)) break;
+            sendSlave2Command("pne rk off");
+            jedaArmBoxR.reset();
+            gArmBoxR = ARMBOX_WAIT;
+            break;
+
         case ARMBOX_WAIT:
             if (!jedaArmBoxR.check(300)) break;
             sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
@@ -179,9 +186,16 @@ void armBoxTick() {
         case ARMBOX_IDLE:
             if (slave2ProxL() && gControllerMode == 1) {
                 sendSlave2Command("pne l off");
-                gArmBoxL = ARMBOX_WAIT;
                 jedaArmBoxL.reset();
+                gArmBoxL = ARMBOX_TEKUK;
             }
+            break;
+
+        case ARMBOX_TEKUK:
+            if (!jedaArmBoxL.check(500)) break;
+            sendSlave2Command("pne lk off");
+            jedaArmBoxL.reset();
+            gArmBoxL = ARMBOX_WAIT;
             break;
             
         case ARMBOX_WAIT:
@@ -210,6 +224,10 @@ void armBoxDone(char side) {
             gArmBoxR = ARMBOX_DONE;
             return;
         } else if (gArmBoxR == ARMBOX_DONE) {
+            sendSlave2Command("pne rk on");
+            gArmBoxR = ARMBOX_FINISH;
+            return;
+        } else if (gArmBoxR == ARMBOX_FINISH) {
             sendSlave2Command("pne r on");
             gArmBoxR = ARMBOX_BACK;
             return;
@@ -222,6 +240,10 @@ void armBoxDone(char side) {
             gArmBoxL = ARMBOX_DONE;
             return;
         } else if (gArmBoxL == ARMBOX_DONE) {
+            sendSlave2Command("pne lk on");
+            gArmBoxL = ARMBOX_FINISH;
+            return;
+        } else if (gArmBoxL == ARMBOX_FINISH) {
             sendSlave2Command("pne l on");
             gArmBoxL = ARMBOX_BACK;
             return;

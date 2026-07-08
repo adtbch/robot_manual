@@ -47,13 +47,13 @@ constexpr long MOTOR_X_STEP_NORMAL = 15;
 constexpr long MOTOR_X_STEP_FAST   = 40;
 
 constexpr int ARM_STEP_SLOW   = 5;
-constexpr int ARM_STEP_NORMAL = 10;
-constexpr int ARM_STEP_FAST   = 20;
+constexpr int ARM_STEP_NORMAL = 15;
+constexpr int ARM_STEP_FAST   = 40;
 
-constexpr uint32_t ARMBOX_Y_ENC_INTERVAL_MS = 100;
-constexpr uint32_t SERVO_B_STEP_INTERVAL_MS = 50;
+constexpr uint32_t ARMBOX_Y_ENC_INTERVAL_MS = 50;
+constexpr uint32_t SERVO_B_STEP_INTERVAL_MS = 100;
 constexpr long ARMBOX_Y_ENC_MIN = 0;
-constexpr long ARMBOX_Y_ENC_MAX = 5000;
+constexpr long ARMBOX_Y_ENC_MAX = 4058;
 
 // =====================================================================
 //  STATE
@@ -204,7 +204,7 @@ void handleGripperButtons(const ControlPacket &pkt) {
         setupZone1();
         return;
     }
-    if (isPressed(pkt.buttons, BTN_CROSS)) {
+    if (isPressed(pkt.buttons, BTN_CROSS) && !(pkt.buttons & BTN_L2)) {
         static bool servoBState = false;
         servoBState = !servoBState;
         setServoAngle('b', servoBState ? 90 : 0);
@@ -238,17 +238,11 @@ void handleArmBoxYEnc(const ControlPacket &pkt) {
     if (abs(ry) <= AXIS_DEADZONE) return;
     if (!gJedaArmBoxYEnc.check(ARMBOX_Y_ENC_INTERVAL_MS)) return;
 
-    const int dir = (ry < 0) ? +1 : -1;  // stick atas = naik
+    const char dir = (ry < 0) ? 'u' : 'd';
     const long step = pickSpeedStep(pkt.buttons,
         MOTOR_Y_STEP_NORMAL, MOTOR_Y_STEP_SLOW, MOTOR_Y_STEP_FAST);
-    long newTarget = slave2EncY() + dir * step;
 
-    // limit switch protection — slave2arm gak punya
-    if (newTarget <= MOTOR_Y_ENC_MIN && slave2LimitTurun()) return;
-    if (newTarget >= MOTOR_Y_ENC_MAX) return;
-
-    newTarget = constrain(newTarget, MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
-    sendSlave2Command("motortarget %ld", newTarget);
+    sendSlave2Command("motory %c %ld", dir, step);
 }
 
 // ── R2 + L2 analog max-5 → flash lamp ────────────────────────────

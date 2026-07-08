@@ -36,7 +36,9 @@ void forestControlTick(const ControlPacket& pkt) {
         sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
         armBoxFBbySpeed('r', -255);
         sendSlave2Command("pne l on");
+        sendSlave2Command("pne lk on");
         sendSlave2Command("pne r on");
+        sendSlave2Command("pne rk on");
         forestGotoSlot(1);
 
     } else if ((nowDpad & BTN_LEFT) && !(prevDpad & BTN_LEFT)) {

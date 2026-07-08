@@ -16,21 +16,22 @@
 namespace {
 
 struct PneumaticConfig {
-    char id;
+    const char* id;
     uint8_t pin;
 };
 
 constexpr PneumaticConfig pneumaticValves[PNEUMATIC_COUNT] = {
-    {'r', PNEUMATIC_R_PIN},
-    {'l', PNEUMATIC_L_PIN},
-    // ponytail: 2 valves deadcode dulu
+    {"r",  PNEUMATIC_R_PIN},
+    {"l",  PNEUMATIC_L_PIN},
+    {"lk", PNEUMATIC_LK_PIN},
+    {"rk", PNEUMATIC_RK_PIN},
 };
 
 bool pneumaticActive[PNEUMATIC_COUNT] = {};
 
-int findPneumaticIndex(char id) {
+int findPneumaticIndex(const char* id) {
     for (size_t i = 0; i < PNEUMATIC_COUNT; i++) {
-        if (pneumaticValves[i].id == id) return (int)i;
+        if (strcmp(pneumaticValves[i].id, id) == 0) return (int)i;
     }
     return -1;
 }
@@ -52,21 +53,21 @@ void setupPneumatic() {
 //  CONTROL
 // =====================================================================
 
-void pneumaticOn(char id) {
+void pneumaticOn(const char* id) {
     int idx = findPneumaticIndex(id);
     if (idx < 0) return;
     digitalWrite(pneumaticValves[idx].pin, HIGH);
     pneumaticActive[idx] = true;
 }
 
-void pneumaticOff(char id) {
+void pneumaticOff(const char* id) {
     int idx = findPneumaticIndex(id);
     if (idx < 0) return;
     digitalWrite(pneumaticValves[idx].pin, LOW);
     pneumaticActive[idx] = false;
 }
 
-void pneumaticToggle(char id) {
+void pneumaticToggle(const char* id) {
     int idx = findPneumaticIndex(id);
     if (idx < 0) return;
     if (pneumaticActive[idx]) {
@@ -76,7 +77,7 @@ void pneumaticToggle(char id) {
     }
 }
 
-bool pneumaticState(char id) {
+bool pneumaticState(const char* id) {
     int idx = findPneumaticIndex(id);
     if (idx < 0) return false;
     return pneumaticActive[idx];

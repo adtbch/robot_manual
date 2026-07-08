@@ -45,7 +45,7 @@ void masterUartSendLine(const char* line);
 void sendProximityStatus(char side, bool detected);
 void sendLimitStatus(const char* name, bool triggered);
 void sendEncoderStatus(char id, long count);
-void sendPneumaticStatus(char side, bool state);
+void sensorTick();
 void sendFullStatus();
 
 #endif // SERIAL_H

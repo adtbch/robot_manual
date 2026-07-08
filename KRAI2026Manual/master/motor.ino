@@ -72,13 +72,14 @@ namespace {
 //  MOTOR Y LEVELS — runtime + Preferences (master only)
 // =====================================================================
 
-long gMotorYLevelEnc[6] = {
+long gMotorYLevelEnc[7] = {
     MOTOR_Y_LEVEL_DEFAULT[0],
     MOTOR_Y_LEVEL_DEFAULT[1],
     MOTOR_Y_LEVEL_DEFAULT[2],
     MOTOR_Y_LEVEL_DEFAULT[3],
     MOTOR_Y_LEVEL_DEFAULT[4],
     MOTOR_Y_LEVEL_DEFAULT[5],
+    MOTOR_Y_LEVEL_DEFAULT[6],
 };
 
 namespace {
@@ -95,12 +96,13 @@ void initMotorYLevels() {
         gMotorYLevelEnc[i] = prefs.getLong(key, MOTOR_Y_LEVEL_DEFAULT[i]);
     }
     prefs.end();
-    Serial.printf("[MotorY] levels: %ld %ld %ld %ld %ld %ld\n",
+    Serial.printf("[MotorY] levels: %ld %ld %ld %ld %ld %ld %ld\n",
                   gMotorYLevelEnc[0], gMotorYLevelEnc[1], gMotorYLevelEnc[2],
-                  gMotorYLevelEnc[3], gMotorYLevelEnc[4], gMotorYLevelEnc[5]);
+                  gMotorYLevelEnc[3], gMotorYLevelEnc[4], gMotorYLevelEnc[5],
+                  gMotorYLevelEnc[6]);
 }
 
-bool motorYLevelSave(const long levels[6]) {
+bool motorYLevelSave(const long levels[7]) {
     for (uint8_t i = 0; i <= MOTOR_Y_LEVEL_MAX; i++) {
         gMotorYLevelEnc[i] = constrain(levels[i], MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
     }

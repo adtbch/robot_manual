@@ -199,4 +199,10 @@ inline bool isComboEdge(uint32_t now, uint32_t prev, uint32_t a, uint32_t b) {
     return (now & a) && (now & b) && !((prev & a) && (prev & b));
 }
 
+// =====================================================================
+//  SHARED STATE — speedArm (kecepatan motor arm, dari web/serial)
+// =====================================================================
+
+extern int speedArm;
+
 #endif // CONFIG_H

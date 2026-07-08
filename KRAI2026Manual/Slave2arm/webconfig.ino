@@ -83,8 +83,10 @@ void handleApiStatus() {
         + ",\"turun\":" + String(readLimitSwitch(LIMIT_ARMBOX_TURUN) ? "true" : "false") + "}"
         + ",\"prox\":{\"r\":" + String(readProximity('r') ? "true" : "false")
         + ",\"l\":" + String(readProximity('l') ? "true" : "false") + "}"
-        + ",\"pne\":{\"r\":" + String(pneumaticState('r') ? "true" : "false")
-        + ",\"l\":" + String(pneumaticState('l') ? "true" : "false") + "}"
+        + ",\"pne\":{\"r\":" + String(pneumaticState("r") ? "true" : "false")
+        + ",\"l\":" + String(pneumaticState("l") ? "true" : "false")
+        + ",\"lk\":" + String(pneumaticState("lk") ? "true" : "false")
+        + ",\"rk\":" + String(pneumaticState("rk") ? "true" : "false") + "}"
         + ",\"motorY\":{\"target\":" + String(motorYGetTarget())
         + ",\"active\":" + String(motorYIsActive() ? "true" : "false") + "}"
         + ",\"motorRun\":{\"x\":" + String(motorRunIsActive('x') ? "true" : "false")
@@ -162,16 +164,16 @@ void handleApiPne() {
         return;
     }
     const String body = webServer.arg("plain");
-    const char side = getJsonChar(body, "side");
+    const String side = getJsonString(body, "side");
     const String state = getJsonString(body, "state");
-    if (side != 'r' && side != 'l') {
+    if (side != "r" && side != "l" && side != "lk" && side != "rk") {
         webServer.send(400, "application/json", "{\"ok\":false}");
         return;
     }
-    if (state == "on") pneumaticOn(side);
-    else if (state == "off") pneumaticOff(side);
-    else pneumaticToggle(side);
-    Serial.printf("[WEB] pne %c %s\n", side, state.c_str());
+    if (state == "on") pneumaticOn(side.c_str());
+    else if (state == "off") pneumaticOff(side.c_str());
+    else pneumaticToggle(side.c_str());
+    Serial.printf("[WEB] pne %s %s\n", side.c_str(), state.c_str());
     webServer.send(200, "application/json", "{\"ok\":true}");
 }
 

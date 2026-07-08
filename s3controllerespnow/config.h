@@ -31,7 +31,7 @@
 // Baris pertama = master utama, baris kedua = spare (isi MAC cadangan).
 // Controller coba semua, ESP-NOW kirim ke yang aktif.
 constexpr uint8_t kEspNowTargetMacs[][6] = {
-    {0xA4, 0xCB, 0x8F, 0xD9, 0x27, 0x98}, // Master utama A4:CB:8F:D9:27:98
+    {0xC0, 0x4E, 0x30, 0x29, 0xB5, 0xF8}, // Master utama C0:4E:30:29:B5:F8
     {0xA4, 0xCB, 0x8F, 0xD9, 0x25, 0x0C}, // Spare 1 — isi MAC Master cadangan A4:CB:8F:D9:25:0C
     {0x94, 0xA9, 0x90, 0xD2, 0xFD, 0x2C}  // Spare — isi MAC Master cadangan A4:CB:8F:D9:25:0C
 };
@@ -59,6 +59,16 @@ constexpr uint8_t  kBootPin          = 0;
 constexpr uint8_t  kLedPin           = 48;   // WS2812 built-in RGB
 constexpr uint32_t kDoublePressMs    = 200;  // jarak max double-press
 constexpr uint32_t kDebounceMs       = 50;   // debounce boot button
+
+// =====================================================================
+//  DEEP SLEEP — OTG absent → sleep, OTG present → wake
+// =====================================================================
+// Timer wake-up interval saat sleep (detik).
+// ESP32-S3 bangun tiap N detik, cek OTG, kalau masih kosong → sleep lagi.
+// Kalau OTG terdeteksi → jalan normal.
+// Tradeoff: makin kecil = makin responsif tapi makin boros listrik.
+constexpr uint64_t kSleepCheckUs     = 5000000ULL;  // 5 detik dalam mikrosekon
+constexpr uint32_t kOtgTimeoutMs     = 10000;        // 10 detik tanpa OTG → sleep
 
 // =====================================================================
 //  STRUCT PAKET KONTROL
