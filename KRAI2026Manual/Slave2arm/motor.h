@@ -30,8 +30,8 @@ constexpr uint8_t MOTOR_XARM_KANAN_PIN1 = 6;
 constexpr uint8_t MOTOR_XARM_KANAN_PIN2 = 5;
 
 // MotorYArmKanan (axis Y arm kanan)
-constexpr uint8_t MOTOR_YARM_KANAN_PIN1 = 7;
-constexpr uint8_t MOTOR_YARM_KANAN_PIN2 = 4;
+constexpr uint8_t MOTOR_YARM_KANAN_PIN1 = 4;
+constexpr uint8_t MOTOR_YARM_KANAN_PIN2 = 7;
 
 // MotorXArmKiri (axis X arm kiri)
 constexpr uint8_t MOTOR_XARM_KIRI_PIN1 = 3;
@@ -57,7 +57,7 @@ constexpr int PWM_RESOLUTION = 10;      // bit (2^10 = 1024)
 // =====================================================================
 //  MOTOR Y — encoder position (bang-bang, tanpa PID)
 // =====================================================================
-constexpr int  MOTOR_Y_MOVE_PWM = 500;
+constexpr int  MOTOR_Y_MOVE_PWM = 700;
 constexpr long MOTOR_Y_ENC_MIN  = 0;
 constexpr long MOTOR_Y_ENC_MAX  = 4058;
 constexpr long MOTOR_Y_TOLERANCE = 5;

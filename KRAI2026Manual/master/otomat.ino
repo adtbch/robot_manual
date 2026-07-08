@@ -43,8 +43,8 @@ enum ArmBoxState { ARMBOX_IDLE, ARMBOX_TEKUK, ARMBOX_WAIT, ARMBOX_GRAB, ARMBOX_D
 
 namespace {
 
-ArmBoxState gArmBoxR = ARMBOX_IDLE;
-ArmBoxState gArmBoxL = ARMBOX_IDLE;
+ArmBoxState gArmBoxR = ARMBOX_BACK;
+ArmBoxState gArmBoxL = ARMBOX_BACK;
 Jeda jedaArmBoxR;
 Jeda jedaArmBoxL;
 Jeda jeda;
@@ -64,7 +64,7 @@ void armBoxStartGrab(char side) {
 }
 
 void setupZone1() {
-    setServoAngle('d', 90);
+    setServoAngle('d', 85);
     setServoAngle('t', 0);
     setServoAngle('b', 0);
     if (gControllerMode == 1) {
@@ -153,7 +153,7 @@ void armBoxTick() {
     // ── Sisi R ─────────────────────────────────────────────────
     switch (gArmBoxR) {
         case ARMBOX_IDLE:
-            if (slave2ProxR() && gControllerMode == 1) {
+            if (slave2ProxR()) {
                 sendSlave2Command("pne r off");
                 jedaArmBoxR.reset();
                 gArmBoxR = ARMBOX_TEKUK;
@@ -170,6 +170,7 @@ void armBoxTick() {
         case ARMBOX_WAIT:
             if (!jedaArmBoxR.check(300)) break;
             gSlave2MotorYTarget = gMotorYLevelEnc[4];
+            gSlave2MotorYLevel = 4;
             sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
             armBoxFBbySpeed('r', -500);
             gArmBoxR = ARMBOX_GRAB;
@@ -185,7 +186,7 @@ void armBoxTick() {
     // ── Sisi L ─────────────────────────────────────────────────
     switch (gArmBoxL) {
         case ARMBOX_IDLE:
-            if (slave2ProxL() && gControllerMode == 1) {
+            if (slave2ProxL()) {
                 sendSlave2Command("pne l off");
                 jedaArmBoxL.reset();
                 gArmBoxL = ARMBOX_TEKUK;
@@ -222,6 +223,7 @@ void armBoxDone(char side) {
     if (side == 'r') {
         if (gArmBoxR == ARMBOX_GRAB) {
             gSlave2MotorYTarget = gMotorYLevelEnc[5];
+            gSlave2MotorYLevel = 5;
             sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
             gArmBoxR = ARMBOX_DONE;
             return;

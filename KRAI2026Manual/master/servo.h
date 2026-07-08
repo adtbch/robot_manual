@@ -23,9 +23,9 @@ struct ServoConfig {
 // =====================================================================
 //  PIN SERVO — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t SERVO_1_PIN = 17;
-constexpr uint8_t SERVO_2_PIN = 18;
-constexpr uint8_t SERVO_3_PIN = 8;
+constexpr uint8_t SERVO_1_PIN = 18;
+constexpr uint8_t SERVO_2_PIN = 8;
+constexpr uint8_t SERVO_3_PIN = 17;
 
 // =====================================================================
 //  JUMLAH SERVO

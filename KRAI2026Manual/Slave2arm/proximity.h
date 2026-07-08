@@ -15,8 +15,8 @@
 // =====================================================================
 //  PIN PROXIMITY — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t PROXIMITY_R_PIN = 15;
-constexpr uint8_t PROXIMITY_L_PIN = 16;
+constexpr uint8_t PROXIMITY_R_PIN = 16;
+constexpr uint8_t PROXIMITY_L_PIN = 15;
 
 // =====================================================================
 //  JUMLAH PROXIMITY

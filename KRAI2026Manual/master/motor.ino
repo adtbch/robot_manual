@@ -23,7 +23,7 @@
 constexpr int  MOTOR_X_MOVE_PWM = 400;
 constexpr int  MOTOR_Y_MOVE_PWM = 800;
 constexpr long MOTOR_X_POSITION_TOLERANCE = 5;
-constexpr long MOTOR_Y_POSITION_TOLERANCE = 5;
+constexpr long MOTOR_Y_POSITION_TOLERANCE = 10;
 
 // Hold anti-gravitasi — hanya motor Y saat sudah di target
 constexpr int  MOTOR_Y_HOLD_PWM = 0;
@@ -57,13 +57,15 @@ namespace {
     }
 
     void motorYHoldAtTarget(long error) {
-        if (error > 0) {
-            pwmMotor('y', MOTOR_Y_HOLD_PWM);
-        } else if (error < 0) {
-            pwmMotor('y', -MOTOR_Y_HOLD_PWM);
-        } else {
-            pwmMotor('y', MOTOR_Y_HOLD_PWM);
-        }
+        // if (error > 0) {
+        //     pwmMotor('y', MOTOR_Y_HOLD_PWM);
+        // } else if (error < 0) {
+        //     pwmMotor('y', -MOTOR_Y_HOLD_PWM);
+        // } else {
+        //     pwmMotor('y', MOTOR_Y_HOLD_PWM);
+        // }
+        ledcWrite(motors[1].pin_pwm, 1023);
+        digitalWrite(motors[1].pin_dir, HIGH);
     }
 
 } // anonymous namespace
@@ -267,7 +269,7 @@ bool motorYAtLevel(uint8_t level) {
 void motorYLimitTick() {
     if (!readLimitSwitch(LIMIT_Y_BAWAH)) return;
 
-    const bool movingUp = gMotorYLastPwm > 0 || gMotorY.target > 0;
+    const bool movingUp = gMotorY.target > 0;
     if (!movingUp) {
         motorYStop();
         gMotorY.target = 0;

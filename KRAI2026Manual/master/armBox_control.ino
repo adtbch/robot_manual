@@ -28,7 +28,7 @@ void armBoxStartGrab(char side);
 
 namespace {
 
-constexpr int16_t ARMBOX_AXIS_DEADZONE = 100;
+constexpr int16_t ARMBOX_AXIS_DEADZONE = 110;
 
 enum ArmBoxInputDir : int8_t { ARMBOX_DIR_NONE = -1, ARMBOX_DIR_UP, ARMBOX_DIR_DOWN, ARMBOX_DIR_LEFT, ARMBOX_DIR_RIGHT };
 
@@ -93,15 +93,19 @@ void handleL2SquareManual(const ControlPacket &pkt) {
     if (gControllerMode != 0) return;
     if (!isComboEdge(pkt.buttons, gArmBoxPrevButtons, BTN_L2, BTN_SQUARE)) return;
 
+    motorXSetTarget(0);
     gripperMotorYSetLevel(4);
     armBoxFBbySpeed('l', -500);
     gSlave2MotorYTarget = gMotorYLevelEnc[4];
+    gSlave2MotorYLevel = 4;
     sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
     armBoxFBbySpeed('r', -500);
     sendSlave2Command("pne l on");
     sendSlave2Command("pne lk on");
     sendSlave2Command("pne r on");
     sendSlave2Command("pne rk on");
+    armBoxRReset();
+    armBoxLReset();
     zoneState = 2;
 }
 
@@ -111,8 +115,9 @@ void handleL2CrossManual(const ControlPacket &pkt) {
     if (gControllerMode != 0) return;
     if (!isComboEdge(pkt.buttons, gArmBoxPrevButtons, BTN_L2, BTN_CROSS)) return;
 
-    gripperMotorYSetLevel(2);
-    gSlave2MotorYTarget = gMotorYLevelEnc[2];
+    gripperMotorYSetLevel(3);
+    gSlave2MotorYTarget = gMotorYLevelEnc[3];
+    gSlave2MotorYLevel = 3;
     sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
 }
 

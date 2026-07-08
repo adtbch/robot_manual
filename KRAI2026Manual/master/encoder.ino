@@ -38,10 +38,12 @@ int findEncoderIndex(char id) {
 void setupEncoders() {
     // Encoder1 — half quad, pullup internal
     encoders[0].attachHalfQuad(ENCODER1_PIN_A, ENCODER1_PIN_B);
+    encoders[0].setFilter(1023); //extEncoders[i].setFilter(1023); 
     encoders[0].clearCount();
 
     // Encoder2 — half quad, pullup internal
     encoders[1].attachHalfQuad(ENCODER2_PIN_A, ENCODER2_PIN_B);
+    encoders[1].setFilter(1023); //extEncoders[i].setFilter(1023); 
     encoders[1].clearCount();
 }
 

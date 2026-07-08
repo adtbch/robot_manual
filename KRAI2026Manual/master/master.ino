@@ -41,6 +41,7 @@ ControlPacket gLastRxPacket = {};
 uint8_t gControllerMode = 0;  // default: manual
 int speedArm = 600;  // default normal speed
 long gSlave2MotorYTarget = 0;  // track target motor Y slave2
+uint8_t gSlave2MotorYLevel = 0;  // track level motor Y slave2
 
 // =====================================================================
 //  BOX STATE — tracking motor Y untuk kirim "box done" ke slave2

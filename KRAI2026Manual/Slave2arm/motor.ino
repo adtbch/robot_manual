@@ -107,13 +107,15 @@ constexpr int MOTOR_Y_HOLD_PWM = 0;
 namespace {
 
 void motorYHoldAtTarget(long error) {
-    if (error > 0) {
-        pwmMotor('y', MOTOR_Y_HOLD_PWM);
-    } else if (error < 0) {
-        pwmMotor('y', -MOTOR_Y_HOLD_PWM);
-    } else {
-        pwmMotor('y', MOTOR_Y_HOLD_PWM);
-    }
+    // if (error > 0) {
+    //     pwmMotor('y', MOTOR_Y_HOLD_PWM);
+    // } else if (error < 0) {
+    //     pwmMotor('y', -MOTOR_Y_HOLD_PWM);
+    // } else {
+    //     pwmMotor('y', MOTOR_Y_HOLD_PWM);
+    // }
+    ledcWrite(motors[1].pin1, 1023);
+    digitalWrite(motors[1].pin2, HIGH);
 }
 
 } // anonymous namespace

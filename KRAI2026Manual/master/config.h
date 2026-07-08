@@ -210,5 +210,6 @@ extern int speedArm;
 // =====================================================================
 
 extern long gSlave2MotorYTarget;
+extern uint8_t gSlave2MotorYLevel;
 
 #endif // CONFIG_H
