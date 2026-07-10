@@ -328,8 +328,8 @@ void handleL2TriangleManual(const ControlPacket &pkt) {
     if (gGripperState == OPENING) {
         setServoAngle('d', 75);
         gGripperState = CLOSING;
-    } else if (gGripperState == UP) {
-        gripperReadytoStab();
+    } else if (gGripperState == STRAIGHTEN) {
+        setServoAngle('d', 20);
     }
 }
 

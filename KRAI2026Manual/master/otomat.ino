@@ -94,7 +94,7 @@ void gripperZone1() {
         case OPENING:
             if (jedaOpening.check(300)) {
                 if (readProximity()) {
-                setServoAngle('d', 80);
+                setServoAngle('d', 75);
                 gGripperState = CLOSING;
                 gJedaGripper.reset();
                 }
