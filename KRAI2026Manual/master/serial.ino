@@ -214,9 +214,10 @@ void parseAndExecuteCommand(char* cmd, Print& out) {
         }
 
         if (strcmp(sub, "get") == 0) {
-            out.printf("motorlevel lvl %ld %ld %ld %ld %ld %ld\n",
+            out.printf("motorlevel lvl %ld %ld %ld %ld %ld %ld %ld\n",
                        gMotorYLevelEnc[0], gMotorYLevelEnc[1], gMotorYLevelEnc[2],
-                       gMotorYLevelEnc[3], gMotorYLevelEnc[4], gMotorYLevelEnc[5]);
+                       gMotorYLevelEnc[3], gMotorYLevelEnc[4], gMotorYLevelEnc[5],
+                       gMotorYLevelEnc[6]);
             return;
         }
 

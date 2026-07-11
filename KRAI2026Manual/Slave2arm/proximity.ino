@@ -25,6 +25,7 @@ constexpr ProximityConfig proximitySensors[PROXIMITY_COUNT] = {
     {'l', PROXIMITY_L_PIN},
 };
 
+const int PROX_THRESHOLD = 102;
 } // anonymous namespace
 
 // =====================================================================
@@ -32,8 +33,8 @@ constexpr ProximityConfig proximitySensors[PROXIMITY_COUNT] = {
 // =====================================================================
 
 void setupProximity() {
-    for (size_t i = 0; i < PROXIMITY_COUNT; i++) {
-        pinMode(proximitySensors[i].pin, INPUT_PULLUP);
+    for (size_t i = 0; i < PROXIMITY_COUNT; i++) { // full range 0-3.3V// full range 0-3.3V
+        pinMode(proximitySensors[i].pin, INPUT);
     }
 }
 

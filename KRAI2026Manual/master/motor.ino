@@ -23,7 +23,7 @@
 constexpr int  MOTOR_X_MOVE_PWM = 400;
 constexpr int  MOTOR_Y_MOVE_PWM = 800;
 constexpr long MOTOR_X_POSITION_TOLERANCE = 5;
-constexpr long MOTOR_Y_POSITION_TOLERANCE = 5;
+constexpr long MOTOR_Y_POSITION_TOLERANCE = 10;
 
 // Hold anti-gravitasi — hanya motor Y saat sudah di target
 constexpr int  MOTOR_Y_HOLD_PWM = 0;
@@ -57,13 +57,15 @@ namespace {
     }
 
     void motorYHoldAtTarget(long error) {
-        if (error > 0) {
-            pwmMotor('y', MOTOR_Y_HOLD_PWM);
-        } else if (error < 0) {
-            pwmMotor('y', -MOTOR_Y_HOLD_PWM);
-        } else {
-            pwmMotor('y', MOTOR_Y_HOLD_PWM);
-        }
+        // if (error > 0) {
+        //     pwmMotor('y', MOTOR_Y_HOLD_PWM);
+        // } else if (error < 0) {
+        //     pwmMotor('y', -MOTOR_Y_HOLD_PWM);
+        // } else {
+        //     pwmMotor('y', MOTOR_Y_HOLD_PWM);
+        // }
+        ledcWrite(motors[1].pin_pwm, 1023);
+        digitalWrite(motors[1].pin_dir, HIGH);
     }
 
 } // anonymous namespace
@@ -72,13 +74,14 @@ namespace {
 //  MOTOR Y LEVELS — runtime + Preferences (master only)
 // =====================================================================
 
-long gMotorYLevelEnc[6] = {
+long gMotorYLevelEnc[7] = {
     MOTOR_Y_LEVEL_DEFAULT[0],
     MOTOR_Y_LEVEL_DEFAULT[1],
     MOTOR_Y_LEVEL_DEFAULT[2],
     MOTOR_Y_LEVEL_DEFAULT[3],
     MOTOR_Y_LEVEL_DEFAULT[4],
     MOTOR_Y_LEVEL_DEFAULT[5],
+    MOTOR_Y_LEVEL_DEFAULT[6],
 };
 
 namespace {
@@ -95,12 +98,13 @@ void initMotorYLevels() {
         gMotorYLevelEnc[i] = prefs.getLong(key, MOTOR_Y_LEVEL_DEFAULT[i]);
     }
     prefs.end();
-    Serial.printf("[MotorY] levels: %ld %ld %ld %ld %ld %ld\n",
+    Serial.printf("[MotorY] levels: %ld %ld %ld %ld %ld %ld %ld\n",
                   gMotorYLevelEnc[0], gMotorYLevelEnc[1], gMotorYLevelEnc[2],
-                  gMotorYLevelEnc[3], gMotorYLevelEnc[4], gMotorYLevelEnc[5]);
+                  gMotorYLevelEnc[3], gMotorYLevelEnc[4], gMotorYLevelEnc[5],
+                  gMotorYLevelEnc[6]);
 }
 
-bool motorYLevelSave(const long levels[6]) {
+bool motorYLevelSave(const long levels[7]) {
     for (uint8_t i = 0; i <= MOTOR_Y_LEVEL_MAX; i++) {
         gMotorYLevelEnc[i] = constrain(levels[i], MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
     }
@@ -265,7 +269,7 @@ bool motorYAtLevel(uint8_t level) {
 void motorYLimitTick() {
     if (!readLimitSwitch(LIMIT_Y_BAWAH)) return;
 
-    const bool movingUp = gMotorYLastPwm > 0 || gMotorY.target > 0;
+    const bool movingUp = gMotorY.target > 0;
     if (!movingUp) {
         motorYStop();
         gMotorY.target = 0;

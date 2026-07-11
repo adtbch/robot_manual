@@ -15,24 +15,24 @@
 // =====================================================================
 //  PIN PNEUMATIC — berdasarkan schematic KRAI 2026
 // =====================================================================
-constexpr uint8_t PNEUMATIC_R_PIN = 49;
-constexpr uint8_t PNEUMATIC_L_PIN = 9;
-// constexpr uint8_t PNEUMATIC_UNUSED_1 = 10;  // ponytail: deadcode
-// constexpr uint8_t PNEUMATIC_UNUSED_2 = 11;  // ponytail: deadcode
+constexpr uint8_t PNEUMATIC_R_PIN = 9;
+constexpr uint8_t PNEUMATIC_RK_PIN = 10;
+constexpr uint8_t PNEUMATIC_L_PIN = 11;
+constexpr uint8_t PNEUMATIC_LK_PIN = 46;
 
 // =====================================================================
 //  JUMLAH PNEUMATIC
 // =====================================================================
-constexpr size_t PNEUMATIC_COUNT = 2;  // ponytail: 2 valves deadcode dulu
+constexpr size_t PNEUMATIC_COUNT = 4;
 
 // =====================================================================
 //  SHARED FUNCTION DECLARATIONS
 // =====================================================================
 void setupPneumatic();
-void pneumaticOn(char index);    // 'r' atau 'l'
-void pneumaticOff(char index);
-void pneumaticToggle(char index);
-bool pneumaticState(char index);
+void pneumaticOn(const char* index);    // "r", "l", "lk", "rk"
+void pneumaticOff(const char* index);
+void pneumaticToggle(const char* index);
+bool pneumaticState(const char* index);
 void pneumaticAllOff();
 
 #endif // PNEUMATIC_H

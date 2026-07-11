@@ -43,26 +43,60 @@ void sendEncoderStatus(char id, long count) {
     masterSerial.printf("enc %c %ld\n", id, count);
 }
 
-void sendPneumaticStatus(char side, bool state) {
-    masterSerial.printf("pne %c %d\n", side, state ? 1 : 0);
+// =====================================================================
+//  SENSOR TICK — auto-kirim perubahan proximity & limit ke master
+//
+//  - value berubah → kirim langsung, reset counter
+//  - value sama → counter++, kirim tiap 50ms
+// =====================================================================
+
+namespace {
+
+struct SensorTrack {
+    bool lastValue;
+    uint8_t sameCount;
+    uint32_t lastSendMs;
+};
+
+SensorTrack gProxR = {false, 0, 0};
+SensorTrack gProxL = {false, 0, 0};
+SensorTrack gLimitT = {false, 0, 0};
+
+constexpr uint32_t SENSOR_INTERVAL_MS = 50;
+constexpr uint8_t  SENSOR_SAME_MAX    = 50;
+
+void trackAndSend(SensorTrack &track, bool currentValue, void (*sendFn)()) {
+    // Cek perubahan — reset counter, kirim langsung
+    if (currentValue != track.lastValue) {
+        track.lastValue = currentValue;
+        track.sameCount = 0;
+        track.lastSendMs = millis();
+        sendFn();
+        return;
+    }
+
+    // Value sama, sudah 50x → stop kirim
+    if (track.sameCount >= SENSOR_SAME_MAX) return;
+
+    // Value sama, belum 50x → kirim tiap 50ms
+    if (millis() - track.lastSendMs < SENSOR_INTERVAL_MS) return;
+    track.sameCount++;
+    track.lastSendMs = millis();
+    sendFn();
 }
 
-// =====================================================================
-//  FULL STATUS — dump semua sensor sekaligus
-// =====================================================================
+} // anonymous namespace
 
-void sendFullStatus() {
-    sendProximityStatus('r', readProximity('r'));
-    sendProximityStatus('l', readProximity('l'));
+void sensorTick() {
+    trackAndSend(gProxR, readProximity('r'), []() {
+        sendProximityStatus('r', readProximity('r'));
+    });
 
-    sendLimitStatus("d", readLimitSwitch(LIMIT_ARMBOX_DEPAN));
-    sendLimitStatus("b", readLimitSwitch(LIMIT_ARMBOX_BELAKANG));
-    sendLimitStatus("t", readLimitSwitch(LIMIT_ARMBOX_TURUN));
+    trackAndSend(gProxL, readProximity('l'), []() {
+        sendProximityStatus('l', readProximity('l'));
+    });
 
-    sendEncoderStatus('x', getEncoderCount('x'));
-    sendEncoderStatus('y', getEncoderCount('y'));
-    sendEncoderStatus('k', getEncoderCount('k'));
-
-    sendPneumaticStatus('r', pneumaticState('r'));
-    sendPneumaticStatus('l', pneumaticState('l'));
+    trackAndSend(gLimitT, readLimitSwitch(LIMIT_ARMBOX_TURUN), []() {
+        sendLimitStatus("t", readLimitSwitch(LIMIT_ARMBOX_TURUN));
+    });
 }

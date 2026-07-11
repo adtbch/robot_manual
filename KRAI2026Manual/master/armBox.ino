@@ -45,27 +45,22 @@ int8_t pickMotorRunSign(bool atDepan, bool atBelakang, int8_t &fallbackSign) {
 void armBoxFBToggle(char side) {
     if (side == 'r') {
         const int8_t sign = pickMotorRunSign(slave2LimitDepan(), slave2LimitBelakang(), gMotorXRunSign);
-        sendSlave2Command("motor x %ld", (long)sign * 255);
+        sendSlave2Command("motor x %ld", (long)sign * speedArm);
     } else if (side == 'l') {
         const int8_t sign = pickMotorRunSign(
-            readLimitSwitch(LIMIT_ARMBOX_DEPAN),
             readLimitSwitch(LIMIT_ARMBOX_BELAKANG),
+            readLimitSwitch(LIMIT_ARMBOX_DEPAN),
             gMotorKRunSign);
-        sendSlave2Command("motor k %ld", (long)sign * 255);
+        sendSlave2Command("motor k %ld", (long)sign * 1000);
         motorKSetDirection(sign);
     }
 }
 
-void armBoxFBbySpeed(char side, int8_t speed) {
+void armBoxFBbySpeed(char side, int16_t speed) {
     if (side == 'r') {
-        const int8_t sign = pickMotorRunSign(slave2LimitDepan(), slave2LimitBelakang(), gMotorXRunSign);
-        sendSlave2Command("motor x %ld", (long)sign * speed);
+        sendSlave2Command("motor x %d", speed);
     } else if (side == 'l') {
-        const int8_t sign = pickMotorRunSign(
-            readLimitSwitch(LIMIT_ARMBOX_DEPAN),
-            readLimitSwitch(LIMIT_ARMBOX_BELAKANG),
-            gMotorKRunSign);
-        sendSlave2Command("motor k %ld", (long)sign * speed);
-        motorKSetDirection(sign);
+        sendSlave2Command("motor k %d", speed);
+        motorKSetDirection(speed > 0 ? 1 : speed < 0 ? -1 : 0);
     }
 }

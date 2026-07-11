@@ -102,18 +102,20 @@ void motorStopAll() {
 //  MOTOR Y — encoder positioning (bang-bang)
 // =====================================================================
 
-constexpr int MOTOR_Y_HOLD_PWM = 1;
+constexpr int MOTOR_Y_HOLD_PWM = 0;
 
 namespace {
 
 void motorYHoldAtTarget(long error) {
-    if (error > 0) {
-        pwmMotor('y', MOTOR_Y_HOLD_PWM);
-    } else if (error < 0) {
-        pwmMotor('y', -MOTOR_Y_HOLD_PWM);
-    } else {
-        pwmMotor('y', MOTOR_Y_HOLD_PWM);
-    }
+    // if (error > 0) {
+    //     pwmMotor('y', MOTOR_Y_HOLD_PWM);
+    // } else if (error < 0) {
+    //     pwmMotor('y', -MOTOR_Y_HOLD_PWM);
+    // } else {
+    //     pwmMotor('y', MOTOR_Y_HOLD_PWM);
+    // }
+    ledcWrite(motors[1].pin1, 1023);
+    digitalWrite(motors[1].pin2, HIGH);
 }
 
 } // anonymous namespace
@@ -234,7 +236,7 @@ int motorYGetLastPwm() {
 //  HOMING — blocking, dipanggil dari setup()
 // =====================================================================
 
-constexpr int HOMING_PWM = 400;
+constexpr int HOMING_PWM = 600;
 
 void motorYHoming() {
     motorYStop();
@@ -250,7 +252,7 @@ void motorYHoming() {
 void motorXHoming() {
     motorRunStop('x');
     pwmMotor('x', -HOMING_PWM);
-    while (!readLimitSwitch(LIMIT_ARMBOX_BELAKANG)) {
+    while (!readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
         delay(2);
     }
     pwmMotor('x', 0);
@@ -259,9 +261,9 @@ void motorXHoming() {
 void motorRunTick() {
     // Motor X — limit switch lokal (cek sesuai arah gerak)
     if (gMotorXRun.active) {
-        if (gMotorXRun.pwm > 0 && readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
+        if (gMotorXRun.pwm > 0 && readLimitSwitch(LIMIT_ARMBOX_BELAKANG)) {
             motorRunStop('x');
-        } else if (gMotorXRun.pwm < 0 && readLimitSwitch(LIMIT_ARMBOX_BELAKANG)) {
+        } else if (gMotorXRun.pwm < 0 && readLimitSwitch(LIMIT_ARMBOX_DEPAN)) {
             motorRunStop('x');
         } else {
             pwmMotor('x', gMotorXRun.pwm);

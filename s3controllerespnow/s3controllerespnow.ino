@@ -42,6 +42,7 @@
 uint16_t nomor_urut_paket = 0;
 bool     espnow_siap      = false;
 uint8_t  gControllerMode  = 1;  // default: otomatis
+uint32_t waktu_otg_terakhir = 0;  // millis() terakhir kali OTG terdeteksi (init di setup())
 
 // =====================================================================
 //  OBJEK GLOBAL
@@ -57,6 +58,15 @@ Adafruit_NeoPixel strip(1, kLedPin, NEO_GRB + NEO_KHZ800);
 
 void setup() {
     Serial.begin(115200);
+
+    // Deteksi wake dari deep sleep
+    const esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    if (cause == ESP_SLEEP_WAKEUP_TIMER) {
+        Serial.println("=== Wake dari deep sleep (timer) ===");
+    } else {
+        Serial.println("=== Boot normal ===");
+    }
+
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     Serial.printf("%02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -85,6 +95,9 @@ void setup() {
 
     Serial.println("Setup selesai. Menunggu koneksi gamepad...");
     Serial.println("Pastikan external 5V VBUS terhubung ke pin 5V ESP32-S3.");
+
+    // Mulai hitung timeout OTG dari sekarang
+    waktu_otg_terakhir = millis();
 }
 
 // =====================================================================
@@ -105,6 +118,15 @@ void loop() {
         kirim_via_espnow(stopPaket);
         Serial.println("Disconnected. Waiting...");
         ESP.restart();
+    }
+
+    // === DEEP SLEEP: track OTG presence ===
+    const bool otg_active = (usb.deviceHandle != NULL) || gp.connected;
+    if (otg_active) {
+        waktu_otg_terakhir = millis();
+    } else if (millis() - waktu_otg_terakhir >= kOtgTimeoutMs) {
+        // OTG absent > 10s → sleep
+        masukDeepSleep();
     }
 
     // Kirim paket pada interval yang teratur
@@ -139,6 +161,31 @@ void loop() {
 
     // // Minimal delay agar task lain bisa jalan
     // delay(1);
+}
+
+// =====================================================================
+//  DEEP SLEEP — OTG absent → sleep
+// =====================================================================
+
+void masukDeepSleep() {
+    Serial.println("[SLEEP] OTG absent 10s. Sending stop + entering deep sleep...");
+
+    // Kirim stop packet dulu
+    ControlPacket stopPaket = {};
+    buat_paket_stop(stopPaket);
+    kirim_via_espnow(stopPaket);
+    delay(50);
+
+    // LED merah sebentar sebagai indikator
+    strip.setPixelColor(0, strip.Color(255, 0, 0));
+    strip.show();
+    delay(200);
+    strip.clear();
+    strip.show();
+
+    // Timer wake-up → bangun tiap 5 detik, cek OTG lagi
+    esp_sleep_enable_timer_wakeup(kSleepCheckUs);
+    esp_deep_sleep_start();
 }
 
 // =====================================================================

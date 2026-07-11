@@ -190,7 +190,9 @@ void motionControlTick(const ControlPacket &pkt) {
         // ponytail: pakai l2Value threshold bukan BTN_L2 — trigger PS4 butuh penuh untuk set bit digital
         const bool l2Active = (pkt.l2Value > 64) && !(pkt.buttons & BTN_R2);
         const bool r2Active = (pkt.r2Value > 64);
-        if (l2Active) {
+        if (pkt.buttons & BTN_CROSS) {
+            // cross hold: gerak tapi yaw freeze
+        } else if (l2Active) {
             updateYawTargetFromCardinalStick(rawRx, rawRy);
         } else if (!r2Active) {
             updateYawTargetFromStick(rawRx, yawStepMs);

@@ -16,12 +16,12 @@
 //  PIN ENCODER — berdasarkan schematic KRAI 2026
 // =====================================================================
 // Encoder1
-constexpr uint8_t ENCODER1_PIN_A = 41;
-constexpr uint8_t ENCODER1_PIN_B = 42;
+constexpr uint8_t ENCODER1_PIN_A = 1;
+constexpr uint8_t ENCODER1_PIN_B = 2;
 
 // Encoder2
-constexpr uint8_t ENCODER2_PIN_A = 1;
-constexpr uint8_t ENCODER2_PIN_B = 2;
+constexpr uint8_t ENCODER2_PIN_A = 41;
+constexpr uint8_t ENCODER2_PIN_B = 42;
 
 // =====================================================================
 //  JUMLAH ENCODER

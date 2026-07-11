@@ -28,7 +28,7 @@ void armBoxStartGrab(char side);
 
 namespace {
 
-constexpr int16_t ARMBOX_AXIS_DEADZONE = 30;
+constexpr int16_t ARMBOX_AXIS_DEADZONE = 110;
 
 enum ArmBoxInputDir : int8_t { ARMBOX_DIR_NONE = -1, ARMBOX_DIR_UP, ARMBOX_DIR_DOWN, ARMBOX_DIR_LEFT, ARMBOX_DIR_RIGHT };
 
@@ -93,12 +93,32 @@ void handleL2SquareManual(const ControlPacket &pkt) {
     if (gControllerMode != 0) return;
     if (!isComboEdge(pkt.buttons, gArmBoxPrevButtons, BTN_L2, BTN_SQUARE)) return;
 
+    motorXSetTarget(0);
     gripperMotorYSetLevel(4);
-    armBoxFBbySpeed('l', -255);
-    sendSlave2Command("motortarget %ld", gMotorYLevelEnc[4]);
-    armBoxFBbySpeed('r', -255);
+    armBoxFBbySpeed('l', -500);
+    gSlave2MotorYTarget = gMotorYLevelEnc[4];
+    gSlave2MotorYLevel = 4;
+    sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
+    armBoxFBbySpeed('r', -500);
     sendSlave2Command("pne l on");
+    sendSlave2Command("pne lk on");
     sendSlave2Command("pne r on");
+    sendSlave2Command("pne rk on");
+    armBoxRReset();
+    armBoxLReset();
+    zoneState = 2;
+}
+
+// ── L2 + Cross (mode manual) → user-defined action ──────────────
+
+void handleL2CrossManual(const ControlPacket &pkt) {
+    if (gControllerMode != 0) return;
+    if (!isComboEdge(pkt.buttons, gArmBoxPrevButtons, BTN_L2, BTN_CROSS)) return;
+
+    gripperMotorYSetLevel(3);
+    gSlave2MotorYTarget = gMotorYLevelEnc[3];
+    gSlave2MotorYLevel = 3;
+    sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
 }
 
 // ── L2 + Circle + analog kiri (mode manual) → pne R/L ────────────
@@ -115,7 +135,7 @@ void handleL2CircleLxManual(const ControlPacket &pkt) {
 
     if (lx > 0) {
         armBoxStartGrab('r');
-    } else {
+    } else if (lx < 0) {
         armBoxStartGrab('l');
     }
 }
@@ -124,6 +144,7 @@ void armBoxControlTick(const ControlPacket &pkt) {
     if (odomIsModeSave()) return;
 
     handleL2SquareManual(pkt);
+    handleL2CrossManual(pkt);
     handleL2CircleLxManual(pkt);
 
     // Skip Circle+arah jika L2 hold (sudah ditangani handleL2CircleLxManual)

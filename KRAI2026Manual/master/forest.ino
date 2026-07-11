@@ -394,8 +394,10 @@ char pickForestArmSide() {
 void deployForestArm(char side, long heightEnc) {
     if (side == 'l')
         motorYSetTarget(heightEnc);
-    else if (side == 'r')
-        sendSlave2Command("motortarget %ld", heightEnc);
+    else if (side == 'r') {
+        gSlave2MotorYTarget = heightEnc;
+        sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
+    }
 }
 
 enum class ForestPhase : uint8_t {

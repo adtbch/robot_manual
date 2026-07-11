@@ -47,12 +47,13 @@ constexpr long MOTOR_X_STEP_NORMAL = 15;
 constexpr long MOTOR_X_STEP_FAST   = 40;
 
 constexpr int ARM_STEP_SLOW   = 5;
-constexpr int ARM_STEP_NORMAL = 10;
-constexpr int ARM_STEP_FAST   = 20;
+constexpr int ARM_STEP_NORMAL = 15;
+constexpr int ARM_STEP_FAST   = 40;
 
-constexpr uint32_t ARMBOX_Y_ENC_INTERVAL_MS = 100;
+constexpr uint32_t ARMBOX_Y_ENC_INTERVAL_MS = 50;
+constexpr uint32_t SERVO_B_STEP_INTERVAL_MS = 100;
 constexpr long ARMBOX_Y_ENC_MIN = 0;
-constexpr long ARMBOX_Y_ENC_MAX = 5000;
+constexpr long ARMBOX_Y_ENC_MAX = 4058;
 
 // =====================================================================
 //  STATE
@@ -68,6 +69,10 @@ Jeda gJedaMotorYStep;
 Jeda gJedaMotorYLevel;
 Jeda gJedaMotorXStep;
 Jeda gJedaArmBoxYEnc;
+Jeda gJedaServoBStep;
+
+bool gPrevRyOutside = false;
+bool gPrevLyOutside = false;
 
 // ── Input helpers (inverted vs motion_control.ino) ─────────────────
 // ly: int16_t + negasi — aman untuk ly=-128 (-(-128) = +128)
@@ -198,11 +203,40 @@ int servoBMoveDir(const ControlPacket &pkt) {
 // ── Tick sections ──────────────────────────────────────────────────
 
 void handleGripperButtons(const ControlPacket &pkt) {
-    if (isPressed(pkt.buttons, BTN_OPTIONS)) {
+    // zoneState 1: edge OPTIONS → setupZone1
+    if (isPressed(pkt.buttons, BTN_OPTIONS) && zoneState == 1) {
         setupZone1();
         return;
     }
-    if (isPressed(pkt.buttons, BTN_CROSS)) {
+
+    // zoneState 2: hold OPTIONS + analog lx → action (fire sekali per arah)
+    if ((pkt.buttons & BTN_OPTIONS) && zoneState == 2) {
+        static int8_t lastDir = 0;
+        int8_t dir = 0;
+        if (pkt.lx > 100) dir = +1;
+        else if (pkt.lx < -100) dir = -1;
+
+        if (dir != 0 && dir != lastDir) {
+            if (dir == +1) {
+                gSlave2MotorYTarget = gMotorYLevelEnc[4];
+                gSlave2MotorYLevel = 4;
+                sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
+                armBoxFBbySpeed('r', -500);
+                sendSlave2Command("pne r on");
+                sendSlave2Command("pne rk on");
+                armBoxRReset();
+            } else {
+                gripperMotorYSetLevel(4);
+                armBoxFBbySpeed('l', -500);
+                sendSlave2Command("pne l on");
+                sendSlave2Command("pne lk on");
+                armBoxLReset();
+            }
+        }
+        lastDir = dir;
+        return;
+    }
+    if (isPressed(pkt.buttons, BTN_CROSS) && !(pkt.buttons & BTN_L2)) {
         static bool servoBState = false;
         servoBState = !servoBState;
         setServoAngle('b', servoBState ? 90 : 0);
@@ -211,41 +245,68 @@ void handleGripperButtons(const ControlPacket &pkt) {
 
 void handleManualServoB(const ControlPacket &pkt) {
     if (!(pkt.buttons & BTN_TRIANGLE)) return;
+    if (gGripperState != READY_TO_STAB) return;
 
     const int dir = servoBMoveDir(pkt);
     if (dir == 0) return;
+    if (!gJedaServoBStep.check(SERVO_B_STEP_INTERVAL_MS)) return;
 
-    const int step = pickSpeedStep(pkt.buttons, ARM_STEP_NORMAL, ARM_STEP_SLOW, ARM_STEP_FAST);
-    setServoTAngle(gServoTAngle + dir * step);
+    if (dir == -1) {
+        setServoTAngle(45);
+    } else if (dir == +1) {
+        setServoTAngle(0);
+    }
 }
 
 void handleGripperMotors(const ControlPacket &pkt) { 
-    if (isR2Held(pkt.buttons)) {
+    if (pkt.buttons & BTN_CROSS) {
         driveMotorY(applyDeadzoneY(readInvertedAxisY(pkt)), pkt.buttons);
         driveMotorX(applyDeadzoneX(readInvertedAxisX(pkt)), pkt.buttons);
     }
 }
 
-// ── R2 hold + analog kanan → armbox motor Y jog manual (slave2) ──
+// ── R2 hold + ry → slave2 motor Y level ±1 (constrain 2–4) ────────
+
+constexpr uint8_t MOTOR_Y_LEVEL_MIN_R2 = 2;
+constexpr uint8_t MOTOR_Y_LEVEL_MAX_R2 = 4;
 
 void handleArmBoxYEnc(const ControlPacket &pkt) {
-    if (!(pkt.buttons & BTN_R2)) return;
+    if (!(pkt.buttons & BTN_R2)) { gPrevRyOutside = false; return; }
 
     const int16_t ry = pkt.ry;
-    if (abs(ry) <= AXIS_DEADZONE) return;
-    if (!gJedaArmBoxYEnc.check(ARMBOX_Y_ENC_INTERVAL_MS)) return;
+    const bool ryOutside = abs(ry) > 100;
+    if (!ryOutside) { gPrevRyOutside = false; return; }
+    if (gPrevRyOutside) return;  // edge: hanya trigger saat baru keluar deadzone
+    gPrevRyOutside = true;
 
-    const int dir = (ry < 0) ? +1 : -1;  // stick atas = naik
-    const long step = pickSpeedStep(pkt.buttons,
-        MOTOR_Y_STEP_NORMAL, MOTOR_Y_STEP_SLOW, MOTOR_Y_STEP_FAST);
-    long newTarget = slave2EncY() + dir * step;
+    const int dir = (ry < 0) ? +1 : -1;  // stick up = level naik
+    int newLevel = constrain((int)gSlave2MotorYLevel + dir,
+                             (int)MOTOR_Y_LEVEL_MIN_R2, (int)MOTOR_Y_LEVEL_MAX_R2);
+    if ((uint8_t)newLevel == gSlave2MotorYLevel) return;
 
-    // limit switch protection — slave2arm gak punya
-    if (newTarget <= MOTOR_Y_ENC_MIN && slave2LimitTurun()) return;
-    if (newTarget >= MOTOR_Y_ENC_MAX) return;
+    gSlave2MotorYLevel = (uint8_t)newLevel;
+    gSlave2MotorYTarget = motorYLevelEnc(gSlave2MotorYLevel);
+    sendSlave2Command("motortarget %ld", gSlave2MotorYTarget);
+}
 
-    newTarget = constrain(newTarget, MOTOR_Y_ENC_MIN, MOTOR_Y_ENC_MAX);
-    sendSlave2Command("motortarget %ld", newTarget);
+// ── R2 hold + ly → master motor Y level ±1 (constrain 2–4) ─────────
+
+void handleMasterMotorYLevel(const ControlPacket &pkt) {
+    if (!(pkt.buttons & BTN_R2)) { gPrevLyOutside = false; return; }
+
+    const int16_t ly = readInvertedAxisY(pkt);
+    const bool lyOutside = abs(ly) > 100;
+    if (!lyOutside) { gPrevLyOutside = false; return; }
+    if (gPrevLyOutside) return;  // edge: hanya trigger saat baru keluar deadzone
+    gPrevLyOutside = true;
+
+    const int dir = (ly > 0) ? +1 : -1;  // stick up = level naik
+    const int curLevel = (int)gripperMotorYGetLevel();
+    int newLevel = constrain(curLevel + dir,
+                             (int)MOTOR_Y_LEVEL_MIN_R2, (int)MOTOR_Y_LEVEL_MAX_R2);
+    if (newLevel == curLevel) return;
+
+    gripperMotorYSetLevel((uint8_t)newLevel);
 }
 
 // ── R2 + L2 analog max-5 → flash lamp ────────────────────────────
@@ -267,8 +328,8 @@ void handleL2TriangleManual(const ControlPacket &pkt) {
     if (gGripperState == OPENING) {
         setServoAngle('d', 75);
         gGripperState = CLOSING;
-    } else if (gGripperState == UP) {
-        gripperReadytoStab();
+    } else if (gGripperState == STRAIGHTEN) {
+        setServoAngle('d', 20);
     }
 }
 
@@ -278,6 +339,10 @@ void gripperMotorYSetLevel(uint8_t level) {
     level = constrain(level, 0, MOTOR_Y_LEVEL_MAX);
     gMotorYLevel = level;
     motorYSetTarget(gMotorYLevelEnc[level]);
+}
+
+uint8_t gripperMotorYGetLevel() {
+    return gMotorYLevel;
 }
 
 void gripperMotorYResetLevel() {
@@ -299,6 +364,7 @@ void gripperControlTick(const ControlPacket &pkt) {
     handleManualServoB(pkt);
     handleGripperMotors(pkt);
     handleArmBoxYEnc(pkt);
+    handleMasterMotorYLevel(pkt);
     handleFlashTrigger(pkt);
     handleL2TriangleManual(pkt);
     gPrevButtons = pkt.buttons;

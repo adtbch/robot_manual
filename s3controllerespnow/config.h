@@ -61,6 +61,16 @@ constexpr uint32_t kDoublePressMs    = 200;  // jarak max double-press
 constexpr uint32_t kDebounceMs       = 50;   // debounce boot button
 
 // =====================================================================
+//  DEEP SLEEP — OTG absent → sleep, OTG present → wake
+// =====================================================================
+// Timer wake-up interval saat sleep (detik).
+// ESP32-S3 bangun tiap N detik, cek OTG, kalau masih kosong → sleep lagi.
+// Kalau OTG terdeteksi → jalan normal.
+// Tradeoff: makin kecil = makin responsif tapi makin boros listrik.
+constexpr uint64_t kSleepCheckUs     = 5000000ULL;  // 5 detik dalam mikrosekon
+constexpr uint32_t kOtgTimeoutMs     = 10000;        // 10 detik tanpa OTG → sleep
+
+// =====================================================================
 //  STRUCT PAKET KONTROL
 //  __attribute__((packed)) = larang compiler menambah padding bytes.
 //  Layout memory harus IDENTIK di sisi penerima.
