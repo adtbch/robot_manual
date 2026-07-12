@@ -54,6 +54,18 @@ bool espnow_init() {
     Serial.println("Mac Address: " + WiFi.macAddress());
     WiFi.disconnect(false, false);
 
+    // Lock TX power ke max 20 dBm (ESP32-S3 max)
+    esp_wifi_set_max_tx_power(80);  // 80 * 0.25 = 20 dBm
+    Serial.println("[ESP-NOW] TX power: 20 dBm (max)");
+
+    // Long range mode — pakai 802.11n HT20, data rate rendah, jarak lebih jauh
+    WiFi.enableLongRange(true);
+    Serial.println("[ESP-NOW] Long range: ON");
+
+    // Matikan WiFi sleep — minimum latency untuk ESP-NOW
+    WiFi.setSleep(false);
+    Serial.println("[ESP-NOW] WiFi sleep: OFF");
+
     // Set channel agar cocok dengan receiver
     esp_wifi_set_promiscuous(true);
     const esp_err_t ch_err = esp_wifi_set_channel(kEspNowChannel, WIFI_SECOND_CHAN_NONE);

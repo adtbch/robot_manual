@@ -29,8 +29,8 @@ constexpr uint8_t MOTOR1_PIN_DIR  = 42;   // direction pin
 constexpr uint8_t MOTOR1_PIN_PWM  = 41;   // speed pin (LEDC PWM)
 
 // Motor2 (axis Y / arm)
-constexpr uint8_t MOTOR2_PIN_DIR  = 1;   // direction pin
-constexpr uint8_t MOTOR2_PIN_PWM  = 2;   // speed pin (LEDC PWM)
+constexpr uint8_t MOTOR2_PIN_DIR  = 2;   // direction pin
+constexpr uint8_t MOTOR2_PIN_PWM  = 1;   // speed pin (LEDC PWM)
 
 // =====================================================================
 //  JUMLAH MOTOR
@@ -53,7 +53,7 @@ constexpr long MOTOR_Y_ENC_MAX = 4058;
 
 // Capit senjata — level naik/turun Y (0 = bawah/homing, 6 = paling atas)
 constexpr uint8_t MOTOR_Y_LEVEL_MAX = 6;
-constexpr long MOTOR_Y_LEVEL_DEFAULT[7] = {1500, 3720, 640, 1960, 3320, 2250, 1800};
+constexpr long MOTOR_Y_LEVEL_DEFAULT[7] = {2120, 3770, 640, 1960, 3320, 2250, 1800};
 
 extern long gMotorYLevelEnc[7];
 

@@ -164,6 +164,7 @@ static void sendBinaryMotionCmd(uint8_t type, int16_t x, int16_t y, int16_t yaw,
 
 void sendKnCommand(int16_t vx, int16_t vy, int16_t yawTarget) {
     // ponytail: Binary (9 bytes) > text (~20 bytes) — lebih kecil, ga kena guard availableForWrite
+    Serial.printf("[Master] sendKnCommand: vx=%d, vy=%d, yaw=%d\n", vx, vy, yawTarget);
     if (slave1Serial.availableForWrite() >= (int)sizeof(SerialMotionCmd)) {
         sendBinaryMotionCmd(2, vx, vy, yawTarget, 0);
     }

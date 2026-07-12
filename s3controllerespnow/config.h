@@ -32,8 +32,8 @@
 // Controller coba semua, ESP-NOW kirim ke yang aktif.
 constexpr uint8_t kEspNowTargetMacs[][6] = {
     {0xC0, 0x4E, 0x30, 0x29, 0xB5, 0xF8}, // Master utama C0:4E:30:29:B5:F8
-    {0xA4, 0xCB, 0x8F, 0xD9, 0x25, 0x0C}, // Spare 1 — isi MAC Master cadangan A4:CB:8F:D9:25:0C
-    {0x94, 0xA9, 0x90, 0xD2, 0xFD, 0x2C}  // Spare — isi MAC Master cadangan A4:CB:8F:D9:25:0C
+    {0x8C, 0xBF, 0xEA, 0x17, 0x4D, 0x10}, // Spare 1 — isi MAC Master cadangan 8C:BF:EA:17:4D:10
+    {0xA4, 0xCB, 0x8F, 0xD9, 0x25, 0x0C}  // Spare — isi MAC Master cadangan A4:CB:8F:D9:25:0C
 };
 constexpr uint8_t kEspNowTargetCount = sizeof(kEspNowTargetMacs) / 6;
 
@@ -41,8 +41,8 @@ constexpr uint8_t kEspNowTargetCount = sizeof(kEspNowTargetMacs) / 6;
 //  KONFIGURASI KOMUNIKASI
 // =====================================================================
 
-// ESP-NOW WiFi channel (harus sama dengan receiver)
-constexpr uint8_t kEspNowChannel = 1;
+// ESP-NOW WiFi channel — harus sama di controller & master
+extern uint8_t kEspNowChannel;
 
 // Magic number validasi paket (harus sama di pengirim & penerima)
 constexpr uint16_t kPacketMagic = 0xA5B4;
@@ -51,24 +51,14 @@ constexpr uint16_t kPacketMagic = 0xA5B4;
 //  KONFIGURASI TIMING
 // =====================================================================
 
-// Interval kirim data (ms) — 50ms = 20 Hz
-constexpr uint32_t kSendIntervalMs = 50;
+// Interval kirim data (ms) — 20ms = 50 Hz (turunin untuk less input lag)
+constexpr uint32_t kSendIntervalMs = 20;
 
 // Boot button & LED
 constexpr uint8_t  kBootPin          = 0;
 constexpr uint8_t  kLedPin           = 48;   // WS2812 built-in RGB
 constexpr uint32_t kDoublePressMs    = 200;  // jarak max double-press
 constexpr uint32_t kDebounceMs       = 50;   // debounce boot button
-
-// =====================================================================
-//  DEEP SLEEP — OTG absent → sleep, OTG present → wake
-// =====================================================================
-// Timer wake-up interval saat sleep (detik).
-// ESP32-S3 bangun tiap N detik, cek OTG, kalau masih kosong → sleep lagi.
-// Kalau OTG terdeteksi → jalan normal.
-// Tradeoff: makin kecil = makin responsif tapi makin boros listrik.
-constexpr uint64_t kSleepCheckUs     = 5000000ULL;  // 5 detik dalam mikrosekon
-constexpr uint32_t kOtgTimeoutMs     = 10000;        // 10 detik tanpa OTG → sleep
 
 // =====================================================================
 //  STRUCT PAKET KONTROL

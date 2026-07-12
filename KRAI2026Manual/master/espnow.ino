@@ -110,8 +110,10 @@ bool isAllowedSender(const uint8_t *macAddr) {
     if (!espNowEnableMacWhitelist) {
         return true;
     }
-    return macEquals(macAddr, espNowAllowedTransmitterStaMac) ||
-           macEquals(macAddr, espNowAllowedTransmitterApMac);
+    for (uint8_t i = 0; i < espNowAllowedTransmitterCount; i++) {
+        if (macEquals(macAddr, espNowAllowedTransmitterMacs[i])) return true;
+    }
+    return false;
 }
 
 bool isNewSequence(uint16_t sequence) {
@@ -133,6 +135,15 @@ void updatePacketFromIsr(const ControlPacket &packet) {
 bool configureWifiChannel() {
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(false, false);
+
+    // Lock TX power ke max 20 dBm (ESP32-S3 max)
+    esp_wifi_set_max_tx_power(80);  // 80 * 0.25 = 20 dBm
+
+    // Long range mode — pakai 802.11n HT20, data rate rendah, jarak lebih jauh
+    WiFi.enableLongRange(true);
+
+    // Matikan WiFi sleep — minimum latency untuk ESP-NOW
+    WiFi.setSleep(false);
 
     esp_wifi_set_promiscuous(true);
     const esp_err_t channelErr = esp_wifi_set_channel(espNowChannel, WIFI_SECOND_CHAN_NONE);
@@ -288,12 +299,13 @@ bool espNowControlInit() {
     if (esp_read_mac(gEspNow.staMac, ESP_MAC_WIFI_STA) == ESP_OK) {
         printMac("Receiver STA MAC: ", gEspNow.staMac);
     }
-    printMac("Allowed TX STA : ", espNowAllowedTransmitterStaMac);
-    printMac("Allowed TX AP  : ", espNowAllowedTransmitterApMac);
 
-    if (macEquals(gEspNow.staMac, espNowAllowedTransmitterStaMac) ||
-        macEquals(gEspNow.staMac, espNowAllowedTransmitterApMac)) {
-        Serial.println("[ESPNOW] WARN: Allowed transmitter MAC sama dengan receiver MAC, cek konfigurasi.");
+    // Cek apakah receiver MAC ada di whitelist (misconfig warning)
+    for (uint8_t i = 0; i < espNowAllowedTransmitterCount; i++) {
+        printMac("Allowed TX      : ", espNowAllowedTransmitterMacs[i]);
+        if (macEquals(gEspNow.staMac, espNowAllowedTransmitterMacs[i])) {
+            Serial.println("[ESPNOW] WARN: Allowed transmitter MAC sama dengan receiver MAC, cek konfigurasi.");
+        }
     }
 
     if (!configureWifiChannel()) {
@@ -309,8 +321,11 @@ bool espNowControlInit() {
 
     bool peerOk = true;
     if (espNowEnableMacWhitelist) {
-        peerOk = ensurePeer(espNowAllowedTransmitterStaMac, "sta");
-        peerOk = ensurePeer(espNowAllowedTransmitterApMac, "ap") && peerOk;
+        for (uint8_t i = 0; i < espNowAllowedTransmitterCount; i++) {
+            char label[8];
+            snprintf(label, sizeof(label), "tx%d", i);
+            if (!ensurePeer(espNowAllowedTransmitterMacs[i], label)) peerOk = false;
+        }
     }
 
     gEspNow.isReady = peerOk;

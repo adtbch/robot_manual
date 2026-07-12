@@ -37,6 +37,7 @@
 // =====================================================================
 
 uint8_t zoneState = 1;
+uint8_t espNowChannel = 12;  // fixed channel 12
 ControlPacket gLastRxPacket = {};
 uint8_t gControllerMode = 0;  // default: manual
 int speedArm = 600;  // default normal speed
