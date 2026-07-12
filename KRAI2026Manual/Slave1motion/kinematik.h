@@ -18,6 +18,7 @@
 void driveRobotCentric(int vx, int vy, int vtheta);
 void driveFieldCentric(int vx, int vy, int vtheta);
 void driveFieldCentricWithYawCorrection(int vx, int vy, int yawTarget);
+void driveFieldCentricWithYawCorrectionPWM(int vx, int vy, int yawTarget);
 void driveRobotCentricRpm(int vx, int vy, int vtheta);
 void driveFieldCentricRpm(int vx, int vy, int vtheta);
 

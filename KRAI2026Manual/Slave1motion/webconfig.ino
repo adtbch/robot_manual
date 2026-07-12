@@ -91,6 +91,13 @@ h1{font-size:1.2em;margin-bottom:12px;color:#38bdf8}
 </div>
 </div>
 <div class="card">
+<h2>Yaw PID PWM</h2>
+<div class="row"><label>Kp</label><input id="pwm_ykp" type="number" step="0.01"><label>Ki</label><input id="pwm_yki" type="number" step="0.001"><label>Kd</label><input id="pwm_ykd" type="number" step="0.01"></div>
+<div style="margin-top:6px">
+<button class="btn btn-blue" onclick="saveYawPidPwm()">Save Yaw PWM</button>
+</div>
+</div>
+<div class="card">
 <h2>Gravity FF (tanjakan)</h2>
 <p class="status">Kg &times; sin(roll). S di OLED: maju nanjak +, mundur nanjak &minus;. Range 0&ndash;2500.</p>
 <div class="row"><label>Kg</label><input id="motorKg" type="number" step="10" min="0" max="2500" style="flex:2"></div>
@@ -144,11 +151,12 @@ h1{font-size:1.2em;margin-bottom:12px;color:#38bdf8}
 const M=['FR','FL','BR','BL'];
 function log(m){const d=document.getElementById('log');d.innerHTML+=new Date().toLocaleTimeString()+' '+m+'<br>';d.scrollTop=d.scrollHeight;}
 function buildCards(){const c=document.getElementById('motor-pids');let h='';for(let i=0;i<4;i++){h+='<div class="card"><div class="motor-label">Motor '+i+' ('+M[i]+')</div>';h+='<div class="row"><label>Kp</label><input id="m'+i+'kp" type="number" step="0.1"><label>Ki</label><input id="m'+i+'ki" type="number" step="0.01"><label>Kf</label><input id="m'+i+'kf" type="number" step="0.01"></div>';h+='<div class="row"><label>Db</label><input id="m'+i+'db" type="number" step="1"></div>';h+='<div style="margin-top:4px"><button class="btn btn-blue" onclick="saveM('+i+')">Save M'+i+'</button></div></div>';}c.innerHTML=h;}
-function loadPid(){fetch('/api/pid').then(r=>r.json()).then(d=>{for(let i=0;i<4;i++){const p=d.motors[i]||{};document.getElementById('m'+i+'kp').value=p.kp||0;document.getElementById('m'+i+'ki').value=p.ki||0;document.getElementById('m'+i+'kf').value=p.kf||0;document.getElementById('m'+i+'db').value=p.deadband||0;}document.getElementById('ykp').value=d.yaw?.kp||0;document.getElementById('yki').value=d.yaw?.ki||0;document.getElementById('ykd').value=d.yaw?.kd||0;document.getElementById('motorKg').value=d.gravity?.kg||0;if(d.waypoint){document.getElementById('wpKp').value=d.waypoint.kp||0;document.getElementById('wpTol').value=d.waypoint.tol_pos||0;document.getElementById('wpTolYaw').value=d.waypoint.tol_yaw||0;}log('PID loaded');}).catch(e=>log('ERR: '+e));}
+function loadPid(){fetch('/api/pid').then(r=>r.json()).then(d=>{for(let i=0;i<4;i++){const p=d.motors[i]||{};document.getElementById('m'+i+'kp').value=p.kp||0;document.getElementById('m'+i+'ki').value=p.ki||0;document.getElementById('m'+i+'kf').value=p.kf||0;document.getElementById('m'+i+'db').value=p.deadband||0;}document.getElementById('ykp').value=d.yaw?.kp||0;document.getElementById('yki').value=d.yaw?.ki||0;document.getElementById('ykd').value=d.yaw?.kd||0;document.getElementById('pwm_ykp').value=d.yaw_pwm?.kp||0;document.getElementById('pwm_yki').value=d.yaw_pwm?.ki||0;document.getElementById('pwm_ykd').value=d.yaw_pwm?.kd||0;document.getElementById('motorKg').value=d.gravity?.kg||0;if(d.waypoint){document.getElementById('wpKp').value=d.waypoint.kp||0;document.getElementById('wpTol').value=d.waypoint.tol_pos||0;document.getElementById('wpTolYaw').value=d.waypoint.tol_yaw||0;}log('PID loaded');}).catch(e=>log('ERR: '+e));}
 function saveGravity(){const b=JSON.stringify({kg:parseFloat(document.getElementById('motorKg').value)||0});fetch('/api/gravity',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('Kg: '+d.ok)).catch(e=>log('ERR: '+e));}
 function saveM(i){const b=JSON.stringify({idx:i,kp:parseFloat(document.getElementById('m'+i+'kp').value),ki:parseFloat(document.getElementById('m'+i+'ki').value),kf:parseFloat(document.getElementById('m'+i+'kf').value),db:parseFloat(document.getElementById('m'+i+'db').value)});fetch('/api/pid',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('M'+i+': '+d.ok)).catch(e=>log('ERR: '+e));}
 function saveYawPid(){const b=JSON.stringify({kp:parseFloat(document.getElementById('ykp').value),ki:parseFloat(document.getElementById('yki').value),kd:parseFloat(document.getElementById('ykd').value)});fetch('/api/yawpid',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('Yaw: '+d.ok)).catch(e=>log('ERR: '+e));}
-function saveAll(){saveM(0);saveM(1);saveM(2);saveM(3);saveYawPid();saveGravity();setTimeout(()=>fetch('/api/save',{method:'POST'}),200);log('All saved to NVS');}
+function saveYawPidPwm(){const b=JSON.stringify({kp:parseFloat(document.getElementById('pwm_ykp').value),ki:parseFloat(document.getElementById('pwm_yki').value),kd:parseFloat(document.getElementById('pwm_ykd').value)});fetch('/api/yawpidpwm',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('Yaw PWM: '+d.ok)).catch(e=>log('ERR: '+e));}
+function saveAll(){saveM(0);saveM(1);saveM(2);saveM(3);saveYawPid();saveYawPidPwm();saveGravity();setTimeout(()=>fetch('/api/save',{method:'POST'}),200);log('All saved to NVS');}
 function testYaw(target){const b=JSON.stringify(target===null?{stop:true}:{stop:false,target:target});fetch('/api/testyaw',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log(target===null?'Test Yaw STOP':'Test Yaw Target: '+target+'°')).catch(e=>log('ERR: '+e));}
 function autoTune(i){if(!confirm('Auto-tune motor '+i+'? Robot harus diam.'))return;fetch('/api/autotune',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idx:i})}).then(r=>r.json()).then(d=>log('AT: '+d.ok)).catch(e=>log('ERR: '+e));}
 function saveWp(){const b=JSON.stringify({kp:parseFloat(document.getElementById('wpKp').value)||200,tol_pos:parseFloat(document.getElementById('wpTol').value)||5,tol_yaw:parseFloat(document.getElementById('wpTolYaw').value)||3});fetch('/api/waypoint',{method:'POST',headers:{'Content-Type':'application/json'},body:b}).then(r=>r.json()).then(d=>log('WP: '+d.ok)).catch(e=>log('ERR: '+e));}
@@ -184,6 +192,9 @@ static void handleApiPidGet() {
     json += "],\"yaw\":{\"kp\":" + String(pidKinematicYaw.kp, 3);
     json += ",\"ki\":" + String(pidKinematicYaw.ki, 3);
     json += ",\"kd\":" + String(pidKinematicYaw.kd, 3) + "}";
+    json += ",\"yaw_pwm\":{\"kp\":" + String(pidKinematicYawPWM.kp, 3);
+    json += ",\"ki\":" + String(pidKinematicYawPWM.ki, 3);
+    json += ",\"kd\":" + String(pidKinematicYawPWM.kd, 3) + "}";
     json += ",\"waypoint\":{\"kp\":" + String(wpKpXY, 1);
     json += ",\"tol_pos\":" + String(wpTolPos_m * 100.0f, 1);  // m → cm
     json += ",\"tol_yaw\":" + String(wpTolYaw_deg, 1) + "}";
@@ -273,11 +284,32 @@ static void handleApiYawPid() {
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
+static void handleApiYawPidPwm() {
+    if (server.method() != HTTP_POST) {
+        server.send(405, "application/json", "{\"error\":\"POST only\"}");
+        return;
+    }
+    String body = server.arg("plain");
+
+    float kp = getJsonFloat(body, "kp");
+    float ki = getJsonFloat(body, "ki");
+    float kd = getJsonFloat(body, "kd");
+
+    pidKinematicYawPWM.kp = kp;
+    pidKinematicYawPWM.ki = ki;
+    pidKinematicYawPWM.kd = kd;
+    pidKinematicYawPWM.reset();
+    saveYawPid();  // save semua yaw (termasuk PWM) ke NVS
+
+    Serial.printf("[WEB] Yaw PID PWM: Kp=%.3f Ki=%.3f Kd=%.3f (NVS saved)\n", kp, ki, kd);
+    server.send(200, "application/json", "{\"ok\":true}");
+}
+
 static void handleApiSave() {
     for (int i = 0; i < 4; i++) {
         pidSaveToNVS(i, pidStates[i].kp, pidStates[i].ki, pidStates[i].kf, pidStates[i].deadband);
     }
-    saveYawPid();
+    saveYawPid();      // includes both RPM and PWM yaw PID
     saveMotorKg();
     saveWaypointPid();
     Serial.println("[WEB] All PID + Waypoint saved to NVS");
@@ -475,6 +507,7 @@ void setupWebServer() {
     server.on("/api/pid", HTTP_GET, handleApiPidGet);
     server.on("/api/pid", HTTP_POST, handleApiPidPost);
     server.on("/api/yawpid", HTTP_POST, handleApiYawPid);
+    server.on("/api/yawpidpwm", HTTP_POST, handleApiYawPidPwm);
     server.on("/api/gravity", HTTP_POST, handleApiGravity);
     server.on("/api/testyaw", HTTP_POST, handleApiTestYaw);
     server.on("/api/save", HTTP_POST, handleApiSave);

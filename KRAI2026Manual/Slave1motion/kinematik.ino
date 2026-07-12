@@ -8,6 +8,7 @@
  */
 
 #include "kinematik.h"
+#include "pid.h"
 
 // =====================================================================
 //  INTERNAL HELPERS
@@ -72,6 +73,18 @@ void driveFieldCentricWithYawCorrection(int vx, int vy, int yawTarget) {
     float currentYaw = getYaw();
     int correctionYaw = pidComputeYaw(pidKinematicYaw, (float)yawTarget, currentYaw, dt);
     driveFieldCentricRpm(vx, -vy, correctionYaw);
+}
+
+// Versi PWM — vx/vy dalam PWM unit, yaw correction via pidComputeYawPWM
+void driveFieldCentricWithYawCorrectionPWM(int vx, int vy, int yawTarget) {
+    static uint32_t lastCallMs = 0;
+    uint32_t nowMs = millis();
+    float dt = (nowMs <= lastCallMs) ? 0.001f : (nowMs - lastCallMs) * 0.001f;
+    lastCallMs = nowMs;
+
+    float currentYaw = getYaw();
+    int correctionYaw = pidComputeYawPWM(pidKinematicYawPWM, (float)yawTarget, currentYaw, dt);
+    driveFieldCentric(vx, vy, correctionYaw);
 }
 
 // =====================================================================

@@ -26,7 +26,8 @@ constexpr float YAW_PID_DEFAULT_KD = 0.1f;
 } // anonymous namespace
 
 PIDState pidStates[MOTOR_COUNT];
-PIDState pidKinematicYaw;
+PIDState pidKinematicYaw;     // untuk rpmMotor path (waypointTick)
+PIDState pidKinematicYawPWM;  // untuk pwmMotor path (waypointTickPWM)
 float motorKg = 0.0f;
 
 // =====================================================================
@@ -95,9 +96,17 @@ void initYawPid() {
     pidKinematicYaw.kd = prefs.getFloat("kd", YAW_PID_DEFAULT_KD);
     pidKinematicYaw.reset();
     pidKinematicYaw.lastTarget = 0.0f;
+    // PWM yaw PID — pakai gains yang sama, NVS terpisah nanti jika perlu tuning beda
+    pidKinematicYawPWM.kp = prefs.getFloat("pwm_kp", YAW_PID_DEFAULT_KP);
+    pidKinematicYawPWM.ki = prefs.getFloat("pwm_ki", YAW_PID_DEFAULT_KI);
+    pidKinematicYawPWM.kd = prefs.getFloat("pwm_kd", YAW_PID_DEFAULT_KD);
+    pidKinematicYawPWM.reset();
+    pidKinematicYawPWM.lastTarget = 0.0f;
     prefs.end();
     Serial.printf("Yaw PID loaded: Kp=%.3f Ki=%.3f Kd=%.3f\n",
         pidKinematicYaw.kp, pidKinematicYaw.ki, pidKinematicYaw.kd);
+    Serial.printf("Yaw PID PWM loaded: Kp=%.3f Ki=%.3f Kd=%.3f\n",
+        pidKinematicYawPWM.kp, pidKinematicYawPWM.ki, pidKinematicYawPWM.kd);
 }
 
 void saveYawPid() {
@@ -106,9 +115,14 @@ void saveYawPid() {
     prefs.putFloat("kp", pidKinematicYaw.kp);
     prefs.putFloat("ki", pidKinematicYaw.ki);
     prefs.putFloat("kd", pidKinematicYaw.kd);
+    prefs.putFloat("pwm_kp", pidKinematicYawPWM.kp);
+    prefs.putFloat("pwm_ki", pidKinematicYawPWM.ki);
+    prefs.putFloat("pwm_kd", pidKinematicYawPWM.kd);
     prefs.end();
     Serial.printf("Yaw PID saved: Kp=%.3f Ki=%.3f Kd=%.3f\n",
         pidKinematicYaw.kp, pidKinematicYaw.ki, pidKinematicYaw.kd);
+    Serial.printf("Yaw PID PWM saved: Kp=%.3f Ki=%.3f Kd=%.3f\n",
+        pidKinematicYawPWM.kp, pidKinematicYawPWM.ki, pidKinematicYawPWM.kd);
 }
 
 void showYawPid() {
@@ -244,6 +258,35 @@ int pidComputeYaw(PIDState &pid, float target, float current, float dt) {
 
     float output = pOut + iOut + dOut;
     return (int)constrain(output, -100.0f, 100.0f);
+}
+
+// Versi PWM — clamp ke ±PWM_MAX, dipakai waypointTickPWM
+int pidComputeYawPWM(PIDState &pid, float target, float current, float dt) {
+    float error = target - current;
+    if (error > -2.0f && error < 2.0f) error = 0.0f;
+    while (error > 180.0f) error -= 360.0f;
+    while (error < -180.0f) error += 360.0f;
+
+    float pOut = pid.kp * error;
+
+    float integralLimit = (pid.ki > 0.0001f) ? (float)PWM_MAX / pid.ki : 2000.0f;
+    pid.integral += error * dt;
+    pid.integral = constrain(pid.integral, -integralLimit, integralLimit);
+    float iOut = pid.ki * pid.integral;
+
+    float dOut = 0.0f;
+    if (dt > 0.0f && pid.lastTime > 0.0f) {
+        float diff = current - pid.lastError;
+        while (diff > 180.0f) diff -= 360.0f;
+        while (diff < -180.0f) diff += 360.0f;
+        dOut = -pid.kd * diff / dt;
+    }
+
+    pid.lastError = current;
+    pid.lastTime = millis();
+
+    float output = pOut + iOut + dOut;
+    return (int)constrain(output, -500.0f, 500.0f);
 }
 
 // =====================================================================
